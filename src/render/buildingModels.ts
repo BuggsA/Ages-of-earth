@@ -2890,8 +2890,8 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.
-      if (['airfield', 'towncenter', 'house', 'forge', 'wonder'].includes(type)) {
-        const span = type === 'airfield' || type === 'wonder' ? 1.8 : big ? 1.4 : 0.7;
+      if (['towncenter', 'house', 'forge', 'wonder'].includes(type)) {
+        const span = type === 'wonder' ? 1.8 : big ? 1.4 : 0.7;
         k.box(span * 2, 0.12, 0.04, '#76c6d6', 0, 0.55, span);
         const h = type === 'wonder' ? 3.3 : big ? 2.5 : 1.6;
         k.cyl(0.025, 0.025, h, 5, '#d7e4e8', span, 0, 0);
@@ -3073,9 +3073,41 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heartstone: (k: Kit, _e: number, st: Style) => heartstone(k, st.base),
 };
 
+/** The Aeronauts' Airfield (#816): no runway but a mooring mast, an airship riding at its nose with a winch house and fuel drums below. */
+function aeroAirfield(k: Kit, st: Style): void {
+  k.box(3.9, 0.05, 3.9, '#8fa586', 0, -0.02, 0);
+  k.cyl(1.7, 1.7, 0.03, 20, '#aeb2a8', 0, 0.02, -0.2);
+  // The mast: a tapering lattice of three legs with a landing cap, and the winch house at its foot.
+  const mx = 1.45;
+  for (const a of [0, 2.1, 4.2]) {
+    const leg = k.box(0.05, 1.9, 0.05, '#d7e4e8', mx + Math.sin(a) * 0.14, 0, -0.2 + Math.cos(a) * 0.14);
+    leg.rotation.z = Math.sin(a) * -0.05;
+  }
+  for (const y of [0.5, 1.0, 1.5]) k.cyl(0.14 - y * 0.03, 0.14 - y * 0.03, 0.04, 6, '#9aa6ab', mx, y, -0.2);
+  k.cyl(0.13, 0.1, 0.12, 8, '#2b3a48', mx, 1.9, -0.2);
+  k.box(0.6, 0.4, 0.5, st.wall, 1.1, 0, 1.0);
+  k.prism(0.7, 0.2, 0.6, st.roof, 1.1, 0.4, 1.0);
+  k.box(0.2, 0.22, 0.02, '#1d1e24', 1.1, 0, 1.26);
+  // The airship: a long cream envelope nosed on to the mast, tail fins in team colour, a slung gondola.
+  const ship = k.sphere(0.5, '#e9e6df', 0, 2.05, -0.2);
+  ship.scale.set(3, 0.95, 0.95);
+  const belly = k.sphere(0.5, '#c2cbd0', 0, 1.9, -0.2);
+  belly.scale.set(2.7, 0.7, 0.8);
+  k.cone(0.12, 0.3, 8, '#2b3a48', mx - 0.15, 2.05, -0.2).rotation.z = -Math.PI / 2;
+  k.team(k.box(0.5, 0.8, 0.04, TEAM, -1.15, 1.65, -0.2));
+  k.team(k.box(0.5, 0.04, 0.8, TEAM, -1.15, 2.03, -0.2));
+  k.box(0.9, 0.18, 0.26, '#2b3a48', 0, 1.35, -0.2);
+  k.box(0.7, 0.07, 0.02, '#9ad0dc', 0, 1.4, -0.06);
+  for (const x of [-0.3, 0.3]) k.cyl(0.015, 0.015, 0.25, 4, '#d7e4e8', x, 1.52, -0.2);
+  // Bollards for the tail lines, and fuel drums by the winch house.
+  for (const z of [-1.1, 0.7]) k.cyl(0.07, 0.08, 0.14, 6, '#5a6450', -1.9, 0, z);
+  for (const [x, z] of [[0.5, 1.2], [0.7, 1.4]]) k.cyl(0.1, 0.1, 0.26, 8, '#5a6450', x, 0, z);
+}
+
 /** Buildings an age raises in a shape of its own (#816), in place of the trunk's model; its touches still follow. */
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
   iron: { house: ironHouse },
+  aeronaut: { airfield: aeroAirfield },
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
