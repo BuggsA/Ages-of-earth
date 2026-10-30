@@ -30,6 +30,8 @@ import { ashoreLeft, bedClock } from '../sim/tides';
 import { hutBeds, hutWorks } from '../sim/tides';
 import { gateHead, gateReach, gateWorks, pondBehind, tideGateProblem } from '../sim/tides';
 import { TIDE_GATE } from '../sim/data';
+import { FIT, TRUNK, UNITS } from '../sim/data';
+import { fitsOf, type FitRead } from '../sim/fit';
 import { COCKLER } from '../sim/data';
 import { COCKLE } from '../sim/data';
 import { R_COCKLE } from '../sim/types';
@@ -56,7 +58,7 @@ import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
 import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
-import type { AgeId, BloomSeed, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { AgeId, UnitType, BloomSeed, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { hiveLine, keepsBees } from '../sim/hive';
 import { heartBarred, heartLine, heartOf, rootProblem, wakesForest } from '../sim/wildwood';
@@ -244,26 +246,78 @@ function orderWords(s: GameState, u: Unit): string {
 /** The verbs rubric's line on a choice (#506): what the player will do, and what it shuts. */
 const verbLine = (e: { verb?: string; door?: string }) => (e.verb ? `<br><b>You now:</b> ${e.verb}. <b>It shuts:</b> ${e.door}.` : '');
 
+/** A name an online player chose: nothing in it may become markup in a tip. */
+const plain = (t: string) => t.replace(/[<>&"']/g, '');
+
 /**
- * The age panel (#555 s4, `docs/age-roads.md` spine §2): the route an age stands on, what you will do there, what it is
- * good at, what it shuts and, as far as you know, where it leads. A turn of your town, said in a few lines.
+ * What an age opens of its own for this people (the owner, 2026-10-30: "what it enables"): its buildings, units, technologies and
+ * hires, by name. Read through the rules as if the people stood in the age already, so a building another road gates (a Great Den, a
+ * Seed Spire) is never promised.
  */
-const agePanel = (s: GameState, p: Player, id: AgeId) => {
+const opensNew = (p: Player, id: AgeId): string[] => {
+  const a = AGES[id];
+  const there = { ...p, age: id, epoch: a.tier } as Player;
+  const raised = (b: BuildingType) => {
+    const d = BUILDINGS[b];
+    return !d.only && d.epoch <= a.tier && (!d.ages || d.ages.includes(id)) && !buildBarred(there, b);
+  };
+  const types = Object.keys(BUILDINGS) as BuildingType[];
+  const trunk = TRUNK[a.tier] === id;
+  const blds = types.filter((b) => (trunk ? BUILDINGS[b].epoch === a.tier && !BUILDINGS[b].ages : BUILDINGS[b].ages?.includes(id)) && raised(b)).map((b) => BUILDINGS[b].name);
+  const fresh = trunk
+    ? (Object.keys(UNITS) as UnitType[])
+        .filter((u) => UNITS[u][a.tier] && UNITS[u].findIndex((x) => x) === a.tier && !barred(there, u) && types.some((b) => BUILDINGS[b].trains.includes(u) && raised(b)))
+        .map((u) => UNITS[u][a.tier]!.name)
+    : [];
+  const techs = Object.values(TECHS).filter((t) => t.only === id).map((t) => t.name);
+  const hires = a.hire ? a.hire.units.map((u) => `${(UNITS[u][a.tier] ?? UNITS[u].find((x) => x))?.name ?? u} for hire`) : [];
+  return [...blds, ...fresh, ...techs, ...hires];
+};
+
+/** One reason for or against an age, here and now (`fitsOf`), in a line. */
+const fitLine = (s: GameState, f: FitRead): string => {
+  const mark = f.pro ? '✔' : '✘';
+  if (f.k === 'land') {
+    const name = FIT.land[f.on].name;
+    return `${mark} ${f.pro ? `${name.charAt(0).toUpperCase()}${name.slice(1)} near your town` : `${f.on === 'wood' || f.on === 'game' ? 'Few' : 'Little'} ${name} near your town, and`} ${f.why}.`;
+  }
+  if (f.k === 'rival') return `${mark} ${plain(s.players[f.rival].name)} stands in the ${AGES[f.age].name}: ${f.why}.`;
+  if (!f.near) return `${mark} No rival soldiers seen near your town: time for a long investment.`;
+  return f.on === 'quick'
+    ? `${mark} ${f.near} rival soldiers seen near your town, and this age pays at once.`
+    : `${mark} ${f.near} rival soldiers seen near your town: a long investment leaves them a window.`;
+};
+
+/**
+ * The age panel (#555 s4, `docs/age-roads.md` spine §2): a turn of your town, in four parts (the owner, 2026-10-30): what it opens,
+ * when it helps (and, from the map and your rivals, whether it helps here), what it costs (the door it shuts and, from the
+ * button, the price still to pay) and where it leads, as far as you know.
+ */
+const agePanel = (s: GameState, p: Player, id: AgeId, price = '') => {
   const a = AGES[id];
   const routes = a.routes ?? [];
   const on = leadsTo(s, p, id);
   const hidden = new Set(leadsOn(id).map((r) => r.to)).size > on.length;
   // What the Prospector's Lodge found missing (#562): a door this world can't open, said where the road is read.
-  const lacks = lacking(s, p, id).map((d) => `<br><b>This world lacks ${PROSPECTOR.keys[d.key].name.toLowerCase()}:</b> ${d.only ? 'this road stays shut' : 'only the deeds open it'}.`);
+  const lacks = lacking(s, p, id).map((d) => `<br>This world lacks ${PROSPECTOR.keys[d.key].name.toLowerCase()}: ${d.only ? 'this road stays shut' : 'only the deeds open it'}.`);
+  const fresh = opensNew(p, id);
+  const here = fitsOf(s, p, id).map((f) => `<br>${fitLine(s, f)}`);
+  const opens =
+    (a.verb ? `You now: ${a.verb}.` : '') +
+    (fresh.length ? `${a.verb ? '<br>' : ''}New: ${fresh.join(', ')}.` : '') +
+    (a.keepsake ? `<br>Keepsake: one ${BUILDINGS[a.keepsake.building].name} keeps ${a.keepsake.does} after you leave.` : '');
+  const leads = on.length ? `${on.map((t, i) => `${i ? 'the' : 'The'} ${AGES[t].name}`).join(', ')}${hidden ? ', and roads you have not found' : ''}.` : hidden ? 'Roads you have not found.' : '';
   return (
-    lacks.join('') +
-    (routes.length ? `<br><b>${routes.map((r) => ROUTES[r].name).join(' and ')}:</b> ${routes.map((r) => ROUTES[r].blurb).join('; ')}.` : '<br><b>Off the basic routes:</b> only a rare find opens it.') +
+    (opens ? `<br><b>What it opens</b>${opens}` : '') +
+    `<br><b>When it helps</b>${a.good ? `${a.good}.` : ''}` +
+    (routes.length ? `<br>${routes.map((r) => ROUTES[r].name).join(' and ')}: ${routes.map((r) => ROUTES[r].blurb).join('; ')}.` : '<br>Off the basic routes: only a rare find opens it.') +
+    (here.length ? `<br><i>Here:</i>${here.join('')}` : '') +
+    `<br><b>What it costs</b>` +
+    (a.door ? `It shuts: ${a.door}.` : 'Nothing shut.') +
     (a.gateway ? '<br><i>Weak on its own: the road on is why you come.</i>' : '') +
-    (a.verb ? `<br><b>You now:</b> ${a.verb}.` : '') +
-    (a.good ? `<br><b>Good at:</b> ${a.good}.` : '') +
-    (a.door ? `<br><b>It shuts:</b> ${a.door}.` : '') +
-    (a.keepsake ? `<br><b>Keepsake:</b> one ${BUILDINGS[a.keepsake.building].name} keeps ${a.keepsake.does} after you leave.` : '') +
-    (on.length ? `<br><b>Leads to:</b> ${on.map((t) => `the ${AGES[t].name}`).join(', ')}${hidden ? ', and roads you have not found' : ''}.` : hidden ? '<br><b>Leads to:</b> roads you have not found.' : '')
+    lacks.join('') +
+    price +
+    (leads ? `<br><b>Where it leads</b>${leads}` : '')
   );
 };
 
@@ -1722,7 +1776,7 @@ export class Hud {
               glyph: isMain ? '⏫' : '🔀',
               gid: `age:${road.to}`,
               title: `${toward} the ${to.name}${routeTag(road.to)}`,
-              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${(road.crossing ?? []).map((a) => `<br>${hasWalked(p, a) ? '✔' : '…'} A crossing: walk the ${AGES[a].name}.`).join('')}${road.lives ? `<br>${livesOf(p).length >= road.lives.n ? '✔' : '…'} Side ages walked: ${Math.min(livesOf(p).length, road.lives.n)}/${road.lives.n}${livesOf(p).length ? ` (${livesOf(p).map((a) => AGES[a].short).join(', ')})` : ''}. Each one is woven in.` : ''}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
+              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${agePanel(s, p, road.to, `${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${(road.crossing ?? []).map((a) => `<br>${hasWalked(p, a) ? '✔' : '…'} A crossing: walk the ${AGES[a].name}.`).join('')}${road.lives ? `<br>${livesOf(p).length >= road.lives.n ? '✔' : '…'} Side ages walked: ${Math.min(livesOf(p).length, road.lives.n)}/${road.lives.n}${livesOf(p).length ? ` (${livesOf(p).map((a) => AGES[a].short).join(', ')})` : ''}. Each one is woven in.` : ''}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.`)}`,
               cost: road.cost,
               ok: !advancing && !problem && !short && b.queue.length === 0,
               on: b.advance >= 0 && !b.back && journeyOf(p, b)?.to === road.to,

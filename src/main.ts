@@ -3257,15 +3257,28 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           else if (theirs) hud.toast(`${ev.silo ? 'A silo held in Reserve fires' : 'An interceptor rises'} to meet ${ev.by === viewer ? 'your' : `${who}'s`} warhead`, 'alert');
           play('interceptLaunch');
         } else if (ev.what === 'hit') {
-          if (ours) hud.toast(`Intercepted! ${who}'s warhead is stopped in the sky: no blast, no fallout`, 'good');
+          if (ours) hud.toast(`Intercepted! ${who}'s warhead is stopped in the sky (a ${Math.round(INTERCEPT.chance * 100)}% shot that held): no blast, no fallout`, 'good');
           else if (theirs) hud.toast(`${ev.by === viewer ? 'Your' : `${who}'s`} warhead was intercepted: no blast`, 'bad');
           minimap.ping(ev.x, ev.y, '#e8f6ff', true);
           play('interceptHit');
         } else {
-          if (ours) hud.toast(`The interceptor missed: ${who}'s warhead flies on`, 'bad');
+          if (ours) hud.toast(`The interceptor missed: ${who}'s warhead flies on. It stops ${Math.round(INTERCEPT.chance * 100)}% of them, this one fell in the other ${100 - Math.round(INTERCEPT.chance * 100)}%: each warhead draws one attempt, so a second battery would not have helped`, 'bad');
           else if (theirs) hud.toast(`Their interceptor missed: ${ev.by === viewer ? 'your' : `${who}'s`} warhead flies on`, 'good');
           play('interceptMiss');
         }
+        break;
+      }
+      case 'unguarded': {
+        // No interceptor rose (the owner, 2026-10-30): a people that stood guard is told what kept its own guard down.
+        if (s.players[viewer].team !== s.players[ev.owner].team) break;
+        const whose = ev.owner === viewer ? 'your' : `${s.players[ev.owner].name}'s`;
+        const why: string[] = [];
+        if (ev.bat?.why === 'reach') why.push(`${whose} nearest Interceptor Battery stood ${ev.bat.d} tiles from the ring you were shown, and covers ${ev.bat.reach}`);
+        else if (ev.bat?.why === 'reload') why.push(`${whose} batteries in reach were reloading (ready in ${ev.bat.wait}s)`);
+        if (ev.res?.why === 'arming') why.push(`${whose} silo in Reserve was still arming (${ev.res.wait}s)`);
+        else if (ev.res?.why === 'store') why.push(`${whose} silo in Reserve had no warhead in store to fire`);
+        else if (ev.res?.why === 'fuel') why.push(`${whose} silo in Reserve could not pay the launch fuel`);
+        hud.toast(`No interceptor rose for ${s.players[ev.by].name}'s warhead: ${why.join('; ')}`, 'alert', () => view.rig.focus(ev.x, ev.y));
         break;
       }
       case 'oreBuy':
