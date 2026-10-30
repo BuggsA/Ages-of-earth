@@ -2949,7 +2949,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.
-      if (['house', 'forge', 'wonder'].includes(type)) {
+      if (['forge', 'wonder'].includes(type)) {
         const span = type === 'wonder' ? 1.8 : big ? 1.4 : 0.7;
         k.box(span * 2, 0.12, 0.04, '#76c6d6', 0, 0.55, span);
         const h = type === 'wonder' ? 3.3 : big ? 2.5 : 1.6;
@@ -3193,6 +3193,35 @@ function merchantMarket(k: Kit, st: Style): void {
   banner(k, -1.35, 0, 1.35, 1.3);
 }
 
+/** The Aeronauts' House (#816): a flier's cottage under a rounded hangar roof, a small tethered balloon riding above it, a rooftop windsock, a round door and a rack of sandbags. */
+function aeroHouse(k: Kit, st: Style): void {
+  const SKY = '#76c6d6';
+  const STEEL = '#d7e4e8';
+  pad(k, 2, st.base);
+  k.box(1.2, 0.62, 0.95, st.wall, 0, 0, -0.1);
+  k.box(1.28, 0.05, 1.03, st.trim, 0, 0.62, -0.1);
+  // The roof is a half-barrel of ribs, lit by a row of small round windows.
+  const vault = k.cyl(0.46, 0.46, 1.2, 10, '#a9d6e0', 0, 0.66, -0.1);
+  vault.rotation.z = Math.PI / 2;
+  vault.scale.set(0.5, 1, 1);
+  for (const x of [-0.45, 0, 0.45]) k.box(0.04, 0.27, 0.92, STEEL, x, 0.66, -0.1).scale.y = 0.9;
+  for (const x of [-0.32, 0.32]) window(k, st, x, 0.22, 0.38, 0.2, 0.22);
+  k.cyl(0.14, 0.14, 0.03, 10, '#1d1e24', 0, 0.16, 0.39).rotation.x = Math.PI / 2;
+  // The tethered balloon: a cream envelope with a team-coloured band, slung basket and a line to the roof.
+  const bx = 0.25;
+  const env = k.sphere(0.3, '#e9e6df', bx, 1.8, -0.1);
+  env.scale.set(1, 1.15, 1);
+  k.team(k.ring(0.28, 0.045, TEAM, 1.8)).position.set(bx, 1.8, -0.1);
+  k.cone(0.12, 0.2, 8, '#c2cbd0', bx, 1.35, -0.1).rotation.x = Math.PI;
+  k.box(0.14, 0.1, 0.14, '#9a7a52', bx, 1.02, -0.1);
+  k.cyl(0.008, 0.008, 0.4, 4, STEEL, bx, 0.8, -0.1);
+  // A windsock on the gable, and sandbag ballast by the door.
+  k.cyl(0.02, 0.025, 0.5, 5, STEEL, -0.55, 0.62, -0.4);
+  k.box(0.34, 0.09, 0.08, '#f4a04a', -0.38, 1.05, -0.4);
+  k.box(0.09, 0.09, 0.09, '#f4efe4', -0.4, 1.05, -0.4);
+  for (const [x, z] of [[0.62, 0.5], [0.78, 0.45], [0.7, 0.62]]) k.box(0.14, 0.08, 0.1, '#b9a982', x, 0, z);
+}
+
 /** The Aeronauts' Airfield (#816): no runway but a mooring mast, an airship riding at its nose with a winch house and fuel drums below. */
 function aeroAirfield(k: Kit, st: Style): void {
   k.box(3.9, 0.05, 3.9, '#8fa586', 0, -0.02, 0);
@@ -3289,7 +3318,7 @@ function aeroTerminal(k: Kit, st: Style): void {
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
   iron: { house: ironHouse, towncenter: ironHillfort },
   merchant: { market: merchantMarket },
-  aeronaut: { airfield: aeroAirfield, towncenter: aeroTerminal },
+  aeronaut: { house: aeroHouse, airfield: aeroAirfield, towncenter: aeroTerminal },
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
