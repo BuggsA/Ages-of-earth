@@ -3700,6 +3700,15 @@ export const LIVING = {
   aiRing: 6,
 };
 
+/**
+ * The computer on the Deep Road past the Megaliths (#906): from the Delvings on, its climbs and orders are paid in stone (the Faults
+ * 1,200, the Living Earth 1,600, the Quake 800), so `stone` times the epoch's share of hands go to the quarries, and it sinks up to
+ * `shafts` Mine Shafts (not `SHAFT.aiMax`) once the deposits by home are dug out. While its store is short of the next climb's stone
+ * (the Quake's, in the Living Earth), a clever town buys stone at the Market with gold beyond that climb's gold and `margin` more, and
+ * sells food or wood piled `pile` past the climb's for the gold.
+ */
+export const AI_DEEP = { stone: 3, shafts: 8, margin: 200, pile: 1500 };
+
 export const HENGE = { hold: 7, reach: 6, most: 12, gift: { food: 8, gold: 5 } as Cost, solstice: 2 };
 export const SEASONS = [
   { name: 'Spring', icon: '🌱', plant: 1, field: 1, rot: 1, bold: 1, grass: 1.2, blurb: 'The thaw: berries and herds return.' },
