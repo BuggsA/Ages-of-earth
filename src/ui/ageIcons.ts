@@ -18,7 +18,7 @@ import { AGE_ART } from './ageArt';
 
 export type PlateId =
   | 'slab' | 'disc' | 'arch' | 'bastion' | 'cog' | 'hex' | 'wing' | 'octagon' | 'scroll' | 'banner'
-  | 'tent' | 'shell' | 'star' | 'shield' | 'claw' | 'lozenge' | 'leaf' | 'cloud' | 'drop' | 'trilithon' | 'mound' | 'chimney' | 'anvil';
+  | 'tent' | 'shell' | 'star' | 'shield' | 'claw' | 'lozenge' | 'leaf' | 'cloud' | 'drop' | 'trilithon' | 'mound' | 'chimney' | 'anvil' | 'rift';
 
 export type MotifId =
   | 'cracks' | 'rivets' | 'bricks' | 'dots' | 'pipes' | 'orbits' | 'chevrons' | 'patches' | 'coins' | 'grain'
@@ -81,6 +81,7 @@ export const AGE_ICONS: Record<AgeId, AgeIcon> = {
   delvings: ic('mound', 'planks', 'inked'),
   undercity: ic('chimney', 'dots', 'carved'),
   forges: ic('anvil', 'cracks', 'cast'),
+  faults: ic('rift', 'diamonds', 'carved'),
   tides: ic('drop', 'waves', 'neon'),
   waterline: ic('octagon', 'lines', 'tidal'),
   locks: ic('cog', 'planks', 'cast'),
@@ -198,6 +199,8 @@ export const PLATES: Record<PlateId, string> = {
   // A fairy chimney of Cappadocia: a cone of soft tuff under its cap of hard rock, a rock-cut door at its foot (the Undercity, #883).
   // A smith's anvil: its horn to the left, the flat face, the waist and the spread foot (the Deep Forges, #884).
   anvil: 'M2 9 C10 10 15 8 19 5 H54 V20 H45 C41 21 39 25 39 30 V37 H46 L51 53 H5 L10 37 H17 V30 C17 26 15 23 11 22 C6 20 3 16 2 9 Z',
+  // A block of rock riven top to bottom, its halves leaning apart over the gap (the Faults, #900).
+  rift: 'M3 53 L6 8 L24 3 L29 16 L25 27 L30 38 L27 53 Z M31 53 L35 40 L31 29 L36 17 L32 4 L50 8 L53 53 Z',
   chimney: 'M6 53 L19 19 C10 18 6 14 7 10 C12 4 20 3 28 3 C36 3 44 4 49 10 C50 14 46 18 37 19 L50 53 H34 V42 Q28 35 22 42 V53 Z',
 };
 

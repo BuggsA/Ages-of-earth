@@ -30,6 +30,8 @@ export const LAST_EPOCH = EPOCHS.length - 1;
 const UNDER_SINK = { cost: 10, sink: 15, rise: 25, find: 5 };
 /** The Deep Forges' heat (#884, `VENT`), named here so the age's and the forge's words can say them. */
 const VENT_HEAT = { reach: 9, drive: 150, cold: 75, hold: 4, scald: 5, burn: 60, spent: 20, again: 45 };
+/** The Faults' engines (#900, `FAULT`), named here so the age's and the engine's words can say them. */
+const FAULT_CRACK = { tap: 7, reach: 22, len: 12, charge: 40, fall: 50, hurl: 40, again: 90 };
 /** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
 const HIVE_REACH = 6;
 const HIVE_TREES = 8;
@@ -254,6 +256,11 @@ export interface Age {
    * out of every forge's reach works slow (`VENT`, `forge.ts`). A verb, carried into a Golden Age.
    */
   vents?: boolean;
+  /**
+   * The Age of Faults (#900, the Deep Road's fifth age): Fault Engines beside the vents crack the ground along a line into a chasm that
+   * nothing crosses on foot (`FAULT`, `fault.ts`). A verb, carried into a Golden Age.
+   */
+  faults?: boolean;
 }
 
 /**
@@ -916,6 +923,25 @@ export const AGES: Record<AgeId, Age> = {
     delves: true,
     vents: true,
     carries: ['barrow'],
+  },
+  // The Deep Road's fifth age (#876 s5, #900): instead of the Atomic Age, a people that breaks the land rather than burning it. The
+  // Great Rift of East Africa and Iceland's Thingvellir, where the plates pull apart and the ground opens in a night; the Krafla fires
+  // of 1975 to 1984, when the earth split and filled again by turns; Poseidon the Earth-shaker, who opened the ground with his trident.
+  faults: {
+    verb: 'Raise Fault Engines by the vents and crack the ground along a line you draw: a chasm opens that no one crosses on foot, and what stands on it falls',
+    door: 'No Missile Silo: the people breaks the land rather than burning it. Every engine is bound to a vent, its long charge is seen and felt by every people, and its chasm cuts your own roads as well as a rival\'s',
+    good: 'A map you redraw: shut a pass, cut an army off from its town, or open the ground under a rival\'s forward walls',
+    routes: ['deep'],
+    keepsake: { building: 'faultengine', does: 'cracking the ground along a line, on any road' },
+    name: 'Age of Faults',
+    short: 'Faults',
+    tier: 5,
+    blurb: `As the plates pull apart along the Great Rift and at Thingvellir in Iceland, and the ground opened and filled again by turns in the Krafla fires of 1975 to 1984; as the Greeks told of Poseidon the Earth-shaker. Raise a Fault Engine (Q, stone and gold) within ${FAULT_CRACK.tap} tiles of a vent of the earth's heat: select it and Crack (F), then click where the crack begins and where it ends, up to ${FAULT_CRACK.len} tiles long and within ${FAULT_CRACK.reach} tiles of the engine, for stone and gold. The engine charges ${FAULT_CRACK.charge} seconds, and every people sees the line and feels the tremor build. Then the ground opens: a chasm that no one crosses on foot, for good. A building standing on it loses half its strength (a field falls in whole), and whoever stands there is thrown clear and hurt (${FAULT_CRACK.hurl}), or lost with no ground near. Water, rock and the ground round a vent don't crack. A rival may raze the engine while it charges, or hold its vent with soldiers to stall the clock; and any people from the Middle Ages on may lay a Bridge over a chasm, for its own feet only. The tunnel still runs, Barrows are still dug and the Vent Forges still drive (a building out of every forge's reach still works at three quarters pace). No Missile Silo is raised. The Atomic Age's arms are here otherwise.`,
+    noBuild: { buildings: ['silo'], why: 'A people of the Faults breaks the land rather than burning it: no Missile Silo until it rejoins the Atomic Age' },
+    delves: true,
+    vents: true,
+    faults: true,
+    carries: ['barrow', 'ventforge'],
   },
   // The Water Road's sixth age (#739, s6 of #701): instead of the Atomic Age, a people that keeps the sea's hours. Reached for now by a
   // turn off the Atomic Age (the Age of Locks, s5, will lead here too). The tide wakes for the whole world when the first people enters.
@@ -1803,6 +1829,25 @@ export const ROADS: Road[] = [
   },
   { from: 'forges', to: 'industrial', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Climb out into the smoke: the ordinary Industrial Age, with Airfields, and nothing slowed far from a vent. The forges go cold but for the one kept.' },
   { from: 'forges', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price: Airfields return, and nothing is slowed far from a vent. The forges go cold but for the one kept.' },
+  // The Deep Road's trunk (#876 s5, #900): the Age of Faults instead of the Atomic Age, a climb from the Deep Forges; a turn off the
+  // Atomic Age for a people that walked the Deep Forges; back onto the plain road at the Atomic Age.
+  {
+    from: 'forges',
+    to: 'faults',
+    cost: { food: 1800, stone: 1200, gold: 800 },
+    time: 90,
+    walked: 'forges',
+    blurb: 'Instead of the Atomic Age, on down the Deep Road: break the land itself. Fault Engines raised by the vents crack the ground along a line you draw into a chasm no one crosses on foot. Paid in stone more than gold. What it gives up: the Missile Silo, and every charge is seen by every people.',
+  },
+  {
+    from: 'atomic',
+    to: 'faults',
+    cost: { food: 600, stone: 600, gold: 200 },
+    time: 50,
+    walked: 'forges',
+    blurb: 'A turn, not a climb, for a people that worked the earth\'s heat before: break the land itself. Fault Engines by the vents crack the ground into chasms no one crosses on foot. What it gives up: the Missile Silo, and every charge is seen by every people.',
+  },
+  { from: 'faults', to: 'atomic', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Let the ground lie still: the ordinary Atomic Age, with Missile Silos. The chasms stay open for good; the engines sleep but for the one kept.' },
 ];
 
 /**
@@ -2970,6 +3015,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
   // The Age of Deep Forges (#884, the Deep Road): raised over a vent, it drives the buildings round it (`VENT`, `forge.ts`).
+  // The Age of Faults (#900, the Deep Road): raised by a vent, it cracks the ground into a chasm along a line (`FAULT`, `fault.ts`).
+  faultengine: { name: 'Fault Engine', size: 3, hp: 2400, cost: { stone: 450, gold: 150 }, time: 55, pop: 0, sight: 7, trains: [], drop: [], epoch: 5, ages: ['faults'], menu: 'mil', key: 'Q', blurb: `A great wedge of teal-veined stone driven into split rock, raised within ${FAULT_CRACK.tap} tiles of a vent of the earth's heat and drawing on it. Crack (F): click where the crack begins and where it ends, up to ${FAULT_CRACK.len} tiles long and within ${FAULT_CRACK.reach} tiles of the engine. It charges ${FAULT_CRACK.charge} seconds, seen by every people, then the ground opens into a chasm no one crosses on foot: buildings on it lose half their strength, and whoever stands there is thrown clear. Its clock stops while a rival's soldiers hold its vent; raze it and the charge is lost. It cracks again ${FAULT_CRACK.again} seconds after.` },
   ventforge: { name: 'Vent Forge', size: 3, hp: 2000, cost: { stone: 250, gold: 100 }, time: 45, pop: 0, sight: 6, trains: [], drop: [], epoch: 4, ages: ['forges'], menu: 'mil', key: 'V', blurb: `A forge of black basalt raised over a vent of the earth's heat, and over nothing else: one to a vent, and nothing else is built on a vent. It burns no wood. While it stands hot, every building of yours within ${VENT_HEAT.reach} tiles trains and researches half again as fast. It goes cold while a rival's soldiers stand within ${VENT_HEAT.hold} tiles of its vent and none of yours do. Scald (X) lets its steam out: every rival soldier within ${VENT_HEAT.scald} tiles of the vent takes ${VENT_HEAT.burn}, and the forge lies cold ${VENT_HEAT.spent} seconds.` },
   barrow: { name: 'Barrow', size: 2, hp: 1400, cost: { stone: 120, wood: 40 }, time: 35, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['delvings'], garrison: 12, menu: 'mil', key: 'C', blurb: 'A turf-roofed mouth of dressed stone into the earth. Shelters twelve (no riders), and joins the tunnel that runs to every Barrow and Town Center of yours: select it with people inside and Delve (D) to another mouth, and they go below and come up there, five tiles a second. One that falls spills those bound for it out where it stood.' },
   henge: { name: 'Henge', size: 3, hp: 1600, cost: { stone: 180 }, time: 40, pop: 0, sight: 6, trains: [], drop: [], epoch: 1, ages: ['megaliths'], menu: 'eco', key: 'R', blurb: 'A ring of standing stones round a turf bank. The ground within 7 tiles is your land, and no rival raises anything inside it, not even a Tower or a War Camp. Every time the season turns, each of your citizens standing within 6 tiles brings in food and gold (up to 12 counted), twice as much at midsummer and midwinter.' },
@@ -3572,6 +3619,18 @@ export const UNDER = {
  * vents within `aiFrom` tiles of home, `aiMost` at most, and scalds when `aiScald` rival soldiers stand round a vent.
  */
 export const VENT = { ...VENT_HEAT, at: 8, wide: 14, per: 2, apart: 18, spread: 14, take: 0.7, stay: 240, aiFrom: 30, aiMost: 2, aiScald: 2 };
+
+/**
+ * The Age of Faults (#900, `fault.ts`). A Fault Engine stands with its centre within `tap` tiles of a vent's, and charges only while no
+ * rival holds that vent (`VENT.hold`, `holder`). A crack runs between two tiles at most `len` apart, both within `reach` of the engine's
+ * centre; it costs `cost`, charges `charge` seconds, and the engine cracks again `again` seconds after. Buildings on the chasm lose `fall`
+ * hundredths of their strength (a field falls in whole); land units on it are thrown to open ground within `clear` tiles and lose
+ * `hurl`, or are lost with none. Water, rock and the ground within one tile of a vent never crack. At most `most` engines a people. Any
+ * people from epoch `spanFrom` on lays a Bridge over a chasm. The computer: `take` the coin it climbs on from the Deep Forges, keeps the
+ * age `stay` seconds at least, raises an engine by its nearest vent, and cracks across a rival army of `aiArmy` soldiers or more within
+ * `aiNear` tiles of home, else under the rival building nearest home in reach.
+ */
+export const FAULT = { ...FAULT_CRACK, cost: { stone: 300, gold: 100 } as Cost, clear: 3, most: 2, spanFrom: 2, take: 0.7, stay: 300, aiArmy: 5, aiNear: 26 };
 
 export const HENGE = { hold: 7, reach: 6, most: 12, gift: { food: 8, gold: 5 } as Cost, solstice: 2 };
 export const SEASONS = [

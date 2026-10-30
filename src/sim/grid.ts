@@ -1,4 +1,5 @@
 import { ventSpot } from './forge';
+import { engineSpot, isChasm } from './fault';
 import { hallowed } from './henge';
 import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
 import { ageDef } from './ages';
@@ -100,7 +101,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'hallowed' | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage' | 'vent' | 'hot';
+export type PlaceProblem = null | 'hallowed' | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage' | 'vent' | 'hot' | 'tap' | 'chasm';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -120,7 +121,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     const why = dykeSpot(s, tx, ty);
     if (why) return why;
   }
-  if (type === 'bridge') {
+  // A Bridge goes over a canal or a channel, or over a chasm (#900).
+  if (type === 'bridge' && !isChasm(s, ty * s.w + tx)) {
     const why = bridgeSpot(s, tx, ty);
     if (why) return why;
   }
@@ -141,6 +143,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     for (let x = tx; x < tx + n; x++) {
       const i = y * s.w + x;
       if (!cause && !dyke && bared(s, i)) return 'tidal';
+      // A chasm (#900) takes nothing but a Bridge over it.
+      if (type !== 'bridge' && isChasm(s, i)) return 'chasm';
       if (s.terrain[i] === T_WATER && !cause && !float && ((!dyke && type !== 'bridge' && !(deepen && isChannel(s, i))) || isInund(s, i))) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
       if (s.res[i] !== R_NONE || (near && (relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)))) return 'blocked';
@@ -179,13 +183,19 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   if (owner >= 0 && hallowed(s, owner, tx, ty, n)) return 'hallowed';
   // Borders (#132 s3): no building in an enemy's land, but a Tower may be raised there as a foothold,
   // and a War Camp pitched where the army stands (#303).
-  if (owner >= 0 && type !== 'tower' && type !== 'warcamp') {
+  // A Bridge over a chasm (#900) may be laid in a rival's land too: that is where the chasm cuts the road.
+  if (owner >= 0 && type !== 'tower' && type !== 'warcamp' && !(type === 'bridge' && isChasm(s, ty * s.w + tx))) {
     const o = landOwnerAt(s, tx + (n >> 1), ty + (n >> 1));
     if (o >= 0 && isEnemy(s, owner, o)) return 'foreign';
   }
   // A vent (#884) takes a Vent Forge over it; once a people is on the Deep Road, nothing else goes on it or the ground round it.
   const hot = ventSpot(s, type, tx, ty, n);
   if (hot) return hot;
+  // A Fault Engine (#900) stands by a vent, to draw on it.
+  if (type === 'faultengine') {
+    const why = engineSpot(s, tx, ty, n);
+    if (why) return why;
+  }
   // A spring head (#701) is left open, for the channel dug from it.
   if (s.springs) for (const t of s.springs) if (t % s.w >= tx && t % s.w < tx + n && Math.floor(t / s.w) >= ty && Math.floor(t / s.w) < ty + n) return 'blocked';
   // Its builders need a foothold beside it, the shore or a deck of their own; a tow moors anywhere (`pitchSpot` lets this one pass).
@@ -272,8 +282,8 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
           s.block[i] |= B_GATE;
           s.gateTeam[i] = team;
         } else if (on) s.block[i] |= B_BUILDING;
-        // Water or rock under a dyke is crossed while it stands, and is water or rock again once it is gone.
-        if (dyke) s.block[i] = on && b.built ? s.block[i] & ~B_TERRAIN : (s.terrain[i] === T_WATER && !isDug(s, i)) || s.terrain[i] === T_ROCK ? s.block[i] | B_TERRAIN : s.block[i];
+        // Water, rock or chasm under a dyke or bridge is crossed while it stands, and is so again once it is gone.
+        if (dyke) s.block[i] = on && b.built ? s.block[i] & ~B_TERRAIN : (s.terrain[i] === T_WATER && !isDug(s, i)) || s.terrain[i] === T_ROCK || isChasm(s, i) ? s.block[i] | B_TERRAIN : s.block[i];
       } else if (!open) s.block[i] = on ? s.block[i] | B_BUILDING : s.block[i] & ~B_BUILDING;
     }
   }

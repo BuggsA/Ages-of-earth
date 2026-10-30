@@ -43,6 +43,7 @@ export const AGE_GROUNDS: Record<AgeId, AgeGround> = {
   megaliths: g('#6c6c64', '#8a877a', 'flags'), // granite flags, chalk in the joints
   delvings: g('#4e4436', '#6a5a44', 'boards'), // trodden spoil and shoring boards
   forges: g('#2e2a2a', '#7a4630', 'ash'), // black basalt grit, ember-rust in the cracks
+  faults: g('#44464a', '#2e6e6a', 'flags'), // split grey slabs, teal crystal in the seams
   undercity: g('#8a7456', '#a88c66', 'slab'), // the bare tuff floor of the valley, cut in steps
   hunt: g('#6a6a44', '#7e5236', 'meadow'), // trampled grass, hides pegged out
   steppe: g('#8c8a5c', '#77744e', 'earth'), // dry steppe grass

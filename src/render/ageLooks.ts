@@ -38,6 +38,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
   wild: pal('#d2c09e', '#b49f7a', '#3e2416', '#321c10', '#ede3cc', '#8f7a5c'), // hide walls, bracken roofs, bone
   rivers: pal('#dccaa0', '#c4af84', '#d5c58e', '#c2b07a', '#cdb88a', '#b5a37e'), // sun-dried mud, reed roofs
   delvings: pal('#9c8064', '#7e6650', '#3b2a1c', '#2e2116', '#a08a5a', '#4e4236'), // timber-shored earth, peat roofs, lamp brass
+  faults: pal('#7a7672', '#5e5a56', '#1a2022', '#20282a', '#4e7c78', '#5c5852'), // split grey rock walls, slate-dark roofs, teal crystal trim
   forges: pal('#4e4c52', '#3e3c42', '#1c1816', '#261c18', '#7a5646', '#2e2c30'), // black basalt walls, soot roofs, ember-copper trim
   undercity: pal('#d8c4a4', '#c9ab80', '#d8a884', '#cca080', '#5e4232', '#b39470'), // cream tuff walls, rose-tuff caps, soot-dark door frames
   megaliths: pal('#a3a7a8', '#878c8f', '#26221e', '#1d1a17', '#b4aa8c', '#6a6e70'), // dressed granite, peat-turf roofs, chalk and lichen
@@ -86,7 +87,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
 /** The ages whose touches live in this file. */
 export const NEW_LOOK_AGES: AgeId[] = [
   'atomic', 'fission', 'fusion', 'alchemy', 'sapper', 'searaider', 'chariots', 'wild', 'grove', 'hive', 'wildwood', 'bloom', 'leviathans',
-  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium', 'megaliths', 'delvings', 'undercity', 'forges',
+  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium', 'megaliths', 'delvings', 'undercity', 'forges', 'faults',
 ];
 
 /** Buildings that take touches: the town's own halls and houses. Water works, walls, fields and one-tile pieces keep their shape. */
@@ -129,6 +130,9 @@ const BASALT_EDGE = '#5a5860';
 const EMBER = '#ff6a1a';
 const COPPER = '#9a6a48';
 const STEAM = '#e4e2de';
+const RIFT_ROCK = '#6e6a66';
+const RIFT_DARK = '#2a2c2e';
+const CRYSTAL = '#3ad6c8';
 
 /** A barrel on its end: a keg, a water butt or a tar barrel. */
 function keg(k: Kit, x: number, z: number, r = 0.11, color = '#6a4a2e'): void {
@@ -421,6 +425,20 @@ export function ageLookTouches(k: Kit, type: BuildingType, age: AgeId): boolean 
       }
       break;
     }
+    case 'faults': {
+      // Thingvellir and the Great Rift: a boulder split clean in two by the door with teal crystal grown in the crack, a crystal cluster
+      // on the roof's corner, and behind the great halls a standing slab of rock riven top to bottom, its halves leaning apart.
+      for (const dx of [-0.07, 0.07]) k.rock(0.14, RIFT_ROCK, l + 0.3 + dx * 1.4, 0.06, f + 0.16).scale.set(0.8, 1.3, 1);
+      k.glow(k.octa(0.06, CRYSTAL, l + 0.3, 0.12, f + 0.16)).scale.set(0.6, 1.8, 0.6);
+      k.box(0.03, 0.01, 0.4, RIFT_DARK, l + 0.3, 0.005, f + 0.38);
+      for (const [dx, dy, s] of [[0, 0, 1], [0.06, -0.02, 0.7], [-0.05, -0.03, 0.6]] as const) k.glow(k.octa(0.05 * s, CRYSTAL, h - 0.08 + dx, e + 0.06 + dy, f - 0.06)).scale.set(0.7, 2, 0.7);
+      if (great || big) {
+        for (const [dx, r] of [[-0.13, -0.12], [0.13, 0.12]] as const) k.box(0.22, 1.5, 0.3, RIFT_ROCK, -h * 0.55 + dx, 0, -h - 0.25).rotation.z = r;
+        k.glow(k.box(0.05, 1.1, 0.12, CRYSTAL, -h * 0.55, 0.1, -h - 0.25));
+        k.box(0.12, 0.02, 0.9, RIFT_DARK, -h * 0.55, 0.005, -h + 0.25);
+      }
+      break;
+    }
     case 'forges': {
       // Staffa and Larderello: two stubs of hexagonal basalt column flanking the door, an iron grate by it glowing with the heat below,
       // a copper steam pipe up the wall to a vent cap on the roof with a puff of steam, and a basalt stack smoking behind the great halls.
@@ -624,6 +642,8 @@ const HATS: Partial<Record<AgeId, (k: Kit) => void>> = {
   rivers: (k) => { k.cone(0.14, 0.07, 10, REED, 0, 0.55, 0); band(k, 0.54, 0.07); },
   // A miner's leather skullcap with a little brass lamp at the brow, as the flint diggers wore below.
   delvings: (k) => { cap(k, '#5a4030', 0.075); k.glow(k.box(0.03, 0.025, 0.02, AMBER, 0, 0.57, 0.07)); band(k, 0.53, 0.071); },
+  // A quarrier's grey felt hood pulled low against the rock-dust, a teal crystal pinned at the brow on a slate band.
+  faults: (k) => { cap(k, '#6a6864', 0.077); k.cyl(0.08, 0.08, 0.024, 10, '#2a3032', 0, 0.528, 0); k.glow(k.octa(0.022, '#3ad6c8', 0, 0.54, 0.078)).scale.set(0.7, 1.6, 0.7); band(k, 0.58, 0.062); },
   // A smith's leather cap, its brim black with soot, and smoked-glass goggles in copper rims pushed up on the brow.
   forges: (k) => { cap(k, '#4a3226', 0.075); k.cyl(0.082, 0.082, 0.018, 10, '#1e1a18', 0, 0.512, 0); for (const x of [-0.032, 0.032]) { k.cyl(0.024, 0.024, 0.02, 8, '#9a6a48', x, 0.565, 0.062).rotation.x = Math.PI / 2; k.cyl(0.016, 0.016, 0.022, 8, '#2e4a4a', x, 0.565, 0.064).rotation.x = Math.PI / 2; } band(k, 0.548, 0.074); },
   // A Cappadocian felt cap, cream, wound round with a madder-red scarf against the dust of the stair.

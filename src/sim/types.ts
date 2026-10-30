@@ -72,7 +72,9 @@ export type BuildingType =
   /** The Age of Delvings (#881, the Deep Road): a stone mouth into the earth, one end of the people's tunnel. */
   | 'barrow'
   /** The Age of Deep Forges (#884, the Deep Road): a forge raised over a vent of the earth's heat, that drives the buildings round it. */
-  | 'ventforge';
+  | 'ventforge'
+  /** The Age of Faults (#900, the Deep Road): an engine by a vent that cracks the ground into a chasm along a line. */
+  | 'faultengine';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -92,7 +94,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths' | 'delvings' | 'undercity' | 'forges';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths' | 'delvings' | 'undercity' | 'forges' | 'faults';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -431,6 +433,8 @@ export interface Building {
   /** A Vent Forge that scalded (#884): the tick it last did, and the tick it is hot again (it drives nothing until then). */
   scaldAt?: number;
   spent?: number;
+  /** A Fault Engine (#900): the tick its last crack opened; it charges again `FAULT.again` seconds after. */
+  crackAt?: number;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -586,6 +590,18 @@ export interface BloomSeed {
   lands: number;
   at: number;
   cut: number;
+}
+
+/**
+ * A Fault Engine's charge (#900, `fault.ts`): engine `engine` of `owner` cracks the tiles of `line` (in order, from its first end to its
+ * last) once `left` more ticks have run; the clock stops while `held` (a rival holds its vent). Every people sees it.
+ */
+export interface Fault {
+  engine: number;
+  owner: number;
+  line: number[];
+  left: number;
+  held?: true;
 }
 
 /** A warhead in the air (#605, `silo.ts`): launched from `silo`, it lands at (`x`, `y`) on tick `at`. */
@@ -887,6 +903,8 @@ export interface PlayerStats {
   unearthed?: number;
   /** Rival soldiers struck by this people's Vent Forges' steam (#884, the Age of Deep Forges). */
   scalded?: number;
+  /** Tiles of ground this people's Fault Engines cracked open (#900, the Age of Faults). */
+  cracked?: number;
   /** Causeway tiles raised over the flats (#739, the Age of Tides). */
   causeways?: number;
   /** Rival causeway tiles breached by this people's kegs and warheads (#748). */
@@ -1216,6 +1234,11 @@ export type GameEvent =
    * soldiers round its vent. `x`, `y` its centre.
    */
   | { k: 'vent'; owner: number; id: number; what: 'cold' | 'warm' | 'scald'; by?: number; n?: number; x: number; y: number }
+  /**
+   * A Fault Engine's crack (#900), told to every people: `charge` (the clock starts; `x`, `y` the line's middle), `stall` (a rival holds
+   * its vent, `by`) or `go` (the clock runs again), `lost` (the engine fell while charging) or `crack` (the ground opened: `n` tiles).
+   */
+  | { k: 'fault'; owner: number; id: number; what: 'charge' | 'stall' | 'go' | 'lost' | 'crack'; by?: number; n?: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
   | { k: 'causeway'; owner: number; tile: number; x: number; y: number }
   /** A causeway tile was breached (#748) by `by`'s keg or warhead: it is plain tidal ground again (or open sea), `owner`'s road cut. */
@@ -1366,6 +1389,15 @@ export interface GameState {
    * Nothing is built on a vent or the tiles round it but a Vent Forge over it (`forge.ts`). Absent where there are none.
    */
   vents?: number[];
+  /**
+   * Chasms (#900, the Age of Faults): per tile, 1 where a Fault Engine cracked the ground open. Its terrain is kept, but it is
+   * `B_TERRAIN`: nothing crosses it on foot but over a Bridge, and nothing else is raised on it. Absent until the first crack.
+   */
+  chasm?: Uint8Array;
+  /** Tiles cracked open so far (#900): a cheap test for the renderer that the chasms moved. Absent until the first. */
+  cracked?: number;
+  /** Fault Engines charging (#900, `fault.ts`), seen by every people; absent until the first charge. */
+  faults?: Fault[];
   /** Tiles of polder the sea has taken back (#701 s3, the breach), by any breach: a cheap test for the renderer that the shore moved. Absent until the first. */
   flooded?: number;
   /**
@@ -1625,6 +1657,8 @@ export interface AiMemory {
   under?: { since: number; threat: number };
   /** The Age of Deep Forges (#884): when it entered the age, and when it last let off a forge's steam. */
   forges?: { since: number; scald: number };
+  /** The Age of Faults (#900): when it entered the age, and when it last ordered a crack. */
+  faults?: { since: number; crack: number };
   /** The tick it entered the Age of the Wildwood, kept while it wakes its forest there (`WILDWOOD.aiStay`). */
   wildwood?: number;
   /** The tick it entered the Age of the Bloom, kept while it slings its Seeds there (`BLOOM.aiStay`); and when it last planted an Orchard for the Greening. */
@@ -1679,6 +1713,8 @@ export type Command =
   | { t: 'sink'; p: number; building: number; up?: boolean }
   /** Let a Vent Forge's steam out over its vent, scalding the rival soldiers round it (#884, the Age of Deep Forges). */
   | { t: 'scald'; p: number; building: number }
+  /** A Fault Engine cracks the ground from tile (`x0`, `y0`) to tile (`x1`, `y1`) (#900, the Age of Faults). */
+  | { t: 'fault'; p: number; building: number; x0: number; y0: number; x1: number; y1: number }
   | { t: 'bell'; p: number; ring: boolean }
   /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
   | { t: 'flee'; p: number; on: boolean; ids?: number[] }
