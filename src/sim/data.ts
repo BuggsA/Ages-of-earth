@@ -3038,6 +3038,33 @@ export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | Ra
   { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662', prop: { wood: 200 }, rush: 0.2, fall: 0.06, blast: { gold: 250 } },
 ];
 
+/**
+ * The ground below differs (#924 m3, `docs/deep-mine.md`): the match's seed lays the map out in lodes, patches of `LODE.cell`
+ * tiles, each one of the kinds of `LODES`, drawn by `weight` round `LODE.patch` tiles apart so the kinds lie in broad tracts.
+ * Every patch within `LODE.home` tiles of a town's start is common ground, so every town digs the same at home (rule 1) and
+ * the rich ground, and the poor, lie out on the map. A kind scales the layers' `veins` of stone and of gold, adds `add` to their
+ * pace while they last, and scales the chance of a cave-in by `fall`; every kind holds some stone and gold (rule 1). A tract out
+ * on the map holds, with chance `LODE.ore`, a seam of a rare ore this world holds (glowcaps aside: they wait on the hot deep) in
+ * layer `LODE.oreLayer`: `LODE.oreVein` of it, dug at `LODE.oreGrade` of an open deposit's pace while it lasts, and only there.
+ * `tint` is the patch's colour in the underground view and on a core's cap.
+ */
+export const LODE = { cell: 8, patch: 22, home: 14, ore: 0.35, oreLayer: 2, oreVein: 300, oreGrade: 0.5 };
+export const LODES: { name: string; stone: number; gold: number; add: number; fall: number; weight: number; tint: string; blurb: string }[] = [
+  { name: 'Common ground', stone: 1, gold: 1, add: 0, fall: 1, weight: 4, tint: '#a08c6c', blurb: 'the plain run of the earth, as under every town' },
+  { name: 'A gold reef', stone: 0.7, gold: 2.2, add: 0.1, fall: 1, weight: 2, tint: '#e6bc3e', blurb: 'gold threaded thick through the deep rock' },
+  { name: 'Building stone', stone: 2.2, gold: 0.6, add: 0.05, fall: 0.8, weight: 2, tint: '#ddd5c0', blurb: 'sound, even beds of good stone' },
+  { name: 'Poor ground', stone: 0.4, gold: 0.35, add: 0, fall: 1, weight: 3, tint: '#6b6762', blurb: 'thin, worked-out rock: little to dig' },
+  { name: 'Sound rock', stone: 1.2, gold: 1, add: 0, fall: 0.3, weight: 2, tint: '#7d8ea6', blurb: 'hard rock that holds its roof' },
+  { name: 'Shattered ground', stone: 1.4, gold: 1.6, add: 0.1, fall: 2.5, weight: 2, tint: '#b0604c', blurb: 'faulted rock, rich and loose: it falls in' },
+];
+/**
+ * Core samples (#924 m3): a finished Prospector's Lodge drills a core at any tile its people has seen, for `cost`, one at a
+ * time, ready `time` seconds later: a striped column at the spot shows the ground below, layer by layer, and its patch shows
+ * in the underground view (U). A people keeps its `most` latest. The computer with a Lodge drills `aiCores`, `aiRing` tiles out
+ * from home round the compass, and sites its shafts on the best cored ground within `aiReach` of home for the stock it lacks.
+ */
+export const CORE = { cost: { food: 40, wood: 40 } as Cost, time: 15, most: 12, near: 2, aiCores: 4, aiRing: 24, aiReach: 34 };
+
 /** The interceptor's numbers (`INTERCEPT`), named here so the battery's words can say them. */
 const INTERCEPT_REACH = 12;
 const INTERCEPT_FIRE = 2;

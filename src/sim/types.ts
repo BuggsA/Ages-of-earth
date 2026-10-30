@@ -131,6 +131,14 @@ export type RareId = 'salt' | 'saltpetre' | 'bloodiron' | 'glowcap';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron', 'glowcap'];
 /** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings. */
 export type SeamId = 'stone' | 'gold' | RareId;
+
+/** A core sample (#924 m3): where it was drilled, the lode found there (`lodes.ts`), the lodge that drew it, and when it is ready. */
+export interface CoreSample {
+  tile: number;
+  lode: number;
+  by: number;
+  at: number;
+}
 /** A key resource (#555 spine §3): something only some worlds place that opens an age or a technology. The Prospector's Lodge answers for each. */
 export type KeyId = 'bogIron' | RareId | 'ruin';
 export const KEYS: readonly KeyId[] = ['bogIron', ...RARES, 'ruin'];
@@ -500,6 +508,8 @@ export interface Building {
   propped?: boolean[];
   /** A Mine Shaft (#924 m2): per layer, the tick a cave-in's rubble is cleared by (the layer is shut till then). Absent: none. */
   shut?: number[];
+  /** A Mine Shaft (#924 m3): the ground below it (`lodes.ts`: a `LODES` kind, and a rare seam held there), stamped when it is placed. Absent: common ground (an older save). */
+  lode?: number;
 }
 
 export type Ent = Unit | Building;
@@ -1116,6 +1126,8 @@ export interface Player {
   vis: Uint8Array;
   /** Tiles this player has ever seen. */
   seen: Uint8Array;
+  /** Core samples its Prospector's Lodges drew (#924 m3), oldest first: the tile, the lode found there, the lodge, and the tick it is ready. Absent: none. */
+  cores?: CoreSample[];
   defeated: boolean;
   stats: PlayerStats;
   history: HistoryPoint[];
@@ -1539,6 +1551,8 @@ export interface GameState {
   rares?: RareId[];
   /** Cave mouths (#356); absent in older saves and campaigns (none). */
   caves?: Cave[];
+  /** The ground below (#924 m3, `lodes.ts`): per `LODE.cell` patch, row by row, its lode. Absent in older saves and campaigns (common ground everywhere). */
+  lodes?: Uint8Array;
   nextId: number;
   shots: Shot[];
   rng: number;
@@ -1782,6 +1796,8 @@ export type Command =
   | { t: 'deepen'; p: number; building: number; /** Blast the layer open at once, from the Gunpowder Age (#924 m2). */ blast?: boolean }
   /** Shore a layer of a Mine Shaft with timber props (#924 m2). */
   | { t: 'prop'; p: number; building: number; layer: number }
+  /** A Prospector's Lodge drills a core sample at a tile (#924 m3). */
+  | { t: 'core'; p: number; building: number; x: number; y: number }
   /** Send one of a Mine Shaft's miners to a layer it reaches (#924 m1): from the layer with the least left to dig. */
   | { t: 'toLayer'; p: number; building: number; layer: number }
   /** Call citizens to arms at a War Camp in the Age of Total War (#313): up to `n`, the nearest first. */

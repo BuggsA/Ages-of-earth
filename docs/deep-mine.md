@@ -22,7 +22,7 @@ Layers live in one table, `STRATA` in `data.ts`: each layer lists its seams, wei
 
 - **m1, depth and layers:** `STRATA`, sinking a shaft one layer deeper (wood, time, the shaft stops working while it sinks), finite veins per layer, a working place per miner on each layer, the cut-away panel. Stone and gold only. The computer sinks deeper when a layer runs dry.
 - **m2, props, cave-ins and blasting** (built, #929): shore a layer with wood, or dig unshored faster with a chance of a cave-in on the match's dice that kills its miners; from the Gunpowder Age blast a new layer open at once, with a chance of firedamp. The pithead is a target: a burnt winch strands the miners below.
-- **m3, the ground below differs:** the seed lays strata by region (rich and poor ground, rare seams under some places only); the Prospector's Lodge takes **core samples** (a striped borehole column on the map); the U key shows the underground view.
+- **m3, the ground below differs** (built, #931): the seed lays strata by region (rich and poor ground, rare seams under some places only); the Prospector's Lodge takes **core samples** (a striped borehole column on the map); the U key shows the underground view.
 - **m4, the wet deep:** gems, floods and the pump.
 - **m5, the hot deep:** glowcaps and crystal, beside the Deep Road (vents, Delvings and the Undercity may tunnel into a mine).
 

@@ -48,7 +48,8 @@ import { Sky } from './sky';
 import { airOf } from './ageAir';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
-import { FogTexture, TerrainView, heightAt } from './terrain';
+import { FogTexture, TerrainView, heightAt, terrainMaterial } from './terrain';
+import { CoresView } from './coresView';
 import { AIR_ALT, UnitsView, wearOf } from './unitsView';
 import { ageSparks } from './ageGrounds';
 import { WATER_Y, WaterView } from './water';
@@ -124,6 +125,14 @@ export class View {
   readonly ruins = new RuinsView();
   readonly finds = new FindsView();
   readonly springs = new SpringsView();
+  /** Core samples (#924 m3): the viewer's striped columns, and their patches in the underground view. */
+  readonly cores = new CoresView();
+  /**
+   * The underground view (#924 m3, U): the surface fades (its people, trees and other buildings set aside, the ground darkened)
+   * and the pitheads and cores stand out, the cored patches lit in their lodes' colours.
+   */
+  underground = false;
+  private wasUnder = false;
   readonly vents = new VentsView();
   /** Chasms and charging cracks (#900). */
   readonly chasms = new ChasmView();
@@ -217,7 +226,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.vents.group, this.chasms.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.cores.group, this.vents.group, this.chasms.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -286,6 +295,7 @@ export class View {
     this.ruins.clear();
     this.finds.clear();
     this.springs.clear();
+    this.cores.clear();
     this.vents.clear();
     this.chasms.clear();
     this.rubble.clear();
@@ -576,6 +586,8 @@ export class View {
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.springs.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
+    this.cores.update(s, this.viewer, this.underground);
+    this.goUnder(this.underground);
     this.vents.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.chasms.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, performance.now() / 1000);
     this.tides.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
@@ -1957,6 +1969,15 @@ export class View {
   }
 
   /** A ring and spark where an order was given. */
+  /** Fade the surface for the underground view (#924 m3), or bring it back; only on a change. */
+  private goUnder(on: boolean): void {
+    if (on === this.wasUnder) return;
+    this.wasUnder = on;
+    for (const g of [this.units.group, this.resources.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.caches.group, this.kegs.group, this.webs.group, this.landmarks.group, this.weather.group, this.birds.mesh, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points, this.rangeGuides.mesh, this.graze.mesh]) g.visible = !on;
+    this.buildings.only = on ? 'shaft' : null;
+    terrainMaterial.color.setScalar(on ? 0.34 : 1);
+  }
+
   marker(s: GameState, x: number, y: number, attack: boolean): void {
     const at = this.ground(s, x, y, 0.06);
     this.effects.ring(at, attack ? '#ff5a4a' : '#9dff9a', 0.7, 0.55);

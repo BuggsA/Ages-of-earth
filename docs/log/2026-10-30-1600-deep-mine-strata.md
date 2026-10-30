@@ -1,0 +1,8 @@
+# The deep mine m3: the ground below differs, core samples, the underground view (#931, umbrella #924)
+
+- `LODE`, `LODES`, `CORE` in `data.ts` (all new numbers). `src/sim/lodes.ts`: `layLodes` (own seeded stream, `seed ^ 0x10de5`, so the map and every other placement are unchanged), `lodeAt`, `lodeOfSite`, `kindOf`/`oreOf` (a lode is a byte: kind + 16 × rare seam), core samples (`coreProblem`, `drawCore`, `coresOf`, `drillingLeft`).
+- State: `GameState.lodes` (a `Uint8Array`, one byte a patch; absent in older saves and campaigns: common ground), `Building.lode` (stamped in `placeBuilding`), `Player.cores`. All optional; no `v` bump.
+- `shafts.ts`: `veinFull` (lode-scaled), `fallOf`, `lodeOnly`; `digShare` adds the lode's `add`; `riskLoad` rolls `fallOf`; a rare seam held only by the lode is dug in `LODE.oreLayer` while it lasts (`placeFor` gives no other place, `seamOf` falls back when spent, `seamProblem` says why).
+- Command `core` (a line in `tests/command-ownership.test.ts`). The computer: `ai.ts` deep-mine section drills `CORE.aiCores` round home and sites shafts on the best cored lode within `CORE.aiReach`, never on a patch cored poor.
+- Look: `src/render/coresView.ts` (core column per lode, a drilling rig, patches in the U view), `View.underground`/`goUnder`, `BuildingsView.only`. HUD: Core sample button (C), Lodge status, the lode in the shaft's line and the cut-away (a tag; rare glints), `worldTip` for hovering a core. `main.ts`: U and Esc, the `core` target mode.
+- Tests: `tests/deep-mine-strata.test.ts`; the wide rule-1 sweep (3 sizes × 6 maps × 8 seeds) in `tests/slow/deep-mine-strata-sweep.test.ts`.

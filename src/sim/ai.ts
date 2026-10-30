@@ -47,6 +47,7 @@ import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, freeShaft, nearestTemple, TILE_OF_RARE } from './units';
 import { blastProblem, deepenProblem, depthOf, propProblem, seamOf, seamProblem, siteGrade, spentAt } from './shafts';
+import { coreProblem, coresOf, drillingLeft, kindOf, lodeOfSite, patchOf } from './lodes';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findPath, findRoute } from './path';
 import { isEnemy, maxHp, townCenters } from './world';
@@ -69,7 +70,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_DEEP, AI_TEMPER, ROUTES, STRATA, TRUNK, type RouteId } from './data';
+import { AI_DEEP, AI_TEMPER, CORE, LODE, LODES, ROUTES, STRATA, TRUNK, type RouteId } from './data';
 import { AI_RIDGE } from './data';
 import { ridgeNear } from './terrain';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY, AI_MEWS } from './data';
@@ -3500,9 +3501,37 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const drops = v.buildings.filter((b) => b.built && BUILDINGS[b.type].drop.length);
     const dry = (['gold', 'stone'] as const).filter((r) => want[r] >= 1 && mineable(p, TILE_OF[r]) && !drops.some((b) => findResource(s, TILE_OF[r], b.x, b.y, SHAFT.aiNear) >= 0));
     if (dry.length && !v.buildings.some((b) => b.type === 'shaft' && !b.built) && !freeShaft(s, p.id, home.x, home.y, s.w + s.h)) {
-      const at = (g: 'old' | 'hill' | null) => findSpot(s, 'shaft', home.x, home.y, 4, SHAFT.aiReach, 1, g ? (tx, ty) => siteGrade(s, { tx, ty, size: 2 }) === g : undefined);
+      // The ground below (#924 m3): the best ground its cores show for what it lacks, within reach of home, comes first.
+      const near2 = (dx: number, dy: number) => dx * dx + dy * dy;
+      const worth = (code: number) => dry.reduce((a, r) => a + LODES[kindOf(code)][r], 0) / dry.length;
+      const cores = coresOf(s, p.id);
+      const rich = cores.filter((c) => worth(c.lode) > 1 && near2(c.tile % s.w - home.x, Math.floor(c.tile / s.w) - home.y) <= CORE.aiReach * CORE.aiReach).sort((a, b) => worth(b.lode) - worth(a.lode) || a.tile - b.tile)[0];
+      const there = rich ? findSpot(s, 'shaft', (rich.tile % s.w) + 0.5, Math.floor(rich.tile / s.w) + 0.5, 0, 5, 1, (tx, ty) => lodeOfSite(s, { tx, ty, size: 2 }) === rich.lode) : null;
+      if (there && construct(s, v, mem, 'shaft', there, 1, issue)) return;
+      // Else home, over old workings, by rock or on open ground: never on ground a core showed poor.
+      const poor = cores.filter((c) => worth(c.lode) < 1).map((c) => patchOf(c.tile % s.w, Math.floor(c.tile / s.w)));
+      const fair = (tx: number, ty: number) => !poor.some((q) => tx + 1 >= q.x0 && tx + 1 < q.x0 + q.side && ty + 1 >= q.y0 && ty + 1 < q.y0 + q.side);
+      const at = (g: 'old' | 'hill' | null) => findSpot(s, 'shaft', home.x, home.y, 4, SHAFT.aiReach, 1, (tx, ty) => fair(tx, ty) && (!g || siteGrade(s, { tx, ty, size: 2 }) === g));
       const spot = at('old') ?? at('hill') ?? at(null);
       if (spot && construct(s, v, mem, 'shaft', spot, 1, issue)) return;
+    }
+    // Core samples (#924 m3): with a Lodge standing idle, it drills a few round home, a compass point at a time.
+    const lodge = v.buildings.find((b) => b.type === 'prospector' && b.built && b.queue.length === 0 && drillingLeft(s, b) === 0);
+    const drawn = p.cores?.length ?? 0;
+    if (lodge && drawn < CORE.aiCores && afford(v, CORE.cost)) {
+      // The four quarters first, then the points between; nearer in where the far point is unseen or off the map.
+      let done = false;
+      for (let k = 0; k < COMPASS.length && !done; k++) {
+        const [dx, dy] = COMPASS[(drawn * 4 + k * 5) % COMPASS.length];
+        for (let r = CORE.aiRing; r >= LODE.home && !done; r -= 4) {
+          const x = Math.floor(home.x + dx * r) + 0.5;
+          const y = Math.floor(home.y + dy * r) + 0.5;
+          if (coreProblem(s, p.id, lodge, x, y)) continue;
+          spend(v, CORE.cost);
+          issue({ t: 'core', p: p.id, building: lodge.id, x, y });
+          done = true;
+        }
+      }
     }
   }
 

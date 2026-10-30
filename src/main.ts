@@ -10,9 +10,11 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
-import { wallLine } from './sim/commands';
+import { shortfall, wallLine } from './sim/commands';
 import { AGES, FAULT, LIVING, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { siteGrade } from './sim/shafts';
+import { coreProblem, coresOf, lodeName, patchOf } from './sim/lodes';
+import { coreTip } from './ui/cutaway';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
@@ -34,7 +36,7 @@ import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
 import { AI_FLOAT, FLOAT } from './sim/data';
 import { mooringSpot } from './sim/floating';
 import { R_COCKLE } from './sim/types';
-import { AI_BARRAGE, BLOOM, INTERCEPT, SALVO, STRATA, secs } from './sim/data';
+import { AI_BARRAGE, BLOOM, CORE, INTERCEPT, SALVO, STRATA, secs } from './sim/data';
 import { rooted, slingProblem } from './sim/bloom';
 import { isCarrier } from './sim/units';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
@@ -136,7 +138,9 @@ let slingSpire = 0;
 let launchWarhead: WarheadKind | undefined;
 /** A salvo being aimed (#765): the points clicked so far, until there are `SALVO.trio`; null for a single launch. */
 let salvoAims: { x: number; y: number }[] | null = null;
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'delve' | 'fault' | 'earth' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'core' | 'delve' | 'fault' | 'earth' | null = null;
+/** The Prospector's Lodge whose core sample (#924 m3) the next click places. */
+let coreLodge = 0;
 /** The Fault Engine whose crack is being aimed (#900), or the Heartstone whose order is (#904), and the tile a line begins on once the first click is made. */
 let faultEngine = 0;
 let faultFrom: { x: number; y: number } | null = null;
@@ -236,6 +240,11 @@ const hud = new Hud({
   slingMode: (spire) => {
     slingSpire = spire;
     targetMode = 'sling';
+    placing = null;
+  },
+  coreMode: (lodge) => {
+    coreLodge = lodge;
+    targetMode = 'core';
     placing = null;
   },
   unloadMode: () => {
@@ -595,6 +604,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   game = saved ?? createGame(setup);
   viewer = seat;
   record = [];
+  setUnderground(false);
   if (!watchingNext) {
     watching = null;
     $('replay-bar').classList.add('hidden');
@@ -1862,7 +1872,10 @@ function placeHere(shift: boolean): void {
   if (kind === 'shaft') {
     const site = { tx: placeAt.tx, ty: placeAt.ty, size: BUILDINGS.shaft.size };
     const g = siteGrade(s, site);
-    hud.toast(`${{ old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[g]}: a shaft here digs at ${Math.round(SHAFT.grade[g] * 100)}% of an open deposit's pace`);
+    // A core drawn on that patch (#924 m3) says what lies below too.
+    const patch = patchOf(site.tx + 1, site.ty + 1);
+    const cored = coresOf(s, viewer).find((c) => patchOf(c.tile % s.w, Math.floor(c.tile / s.w)).x0 === patch.x0 && patchOf(c.tile % s.w, Math.floor(c.tile / s.w)).y0 === patch.y0);
+    hud.toast(`${{ old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[g]}: a shaft here digs at ${Math.round(SHAFT.grade[g] * 100)}% of an open deposit's pace${cored ? `. Below: ${lodeName(cored.lode, (m) => SHAFT.seams[m].name).toLowerCase()}` : ''}`);
   }
   if (!shift) {
     placing = null;
@@ -2083,6 +2096,23 @@ canvas.addEventListener('pointerdown', (e) => {
     targetMode = null;
     return;
   }
+  if (targetMode === 'core') {
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (g && s) {
+      const why = coreProblem(s, viewer, s.byId.get(coreLodge), g.x, g.y) ?? shortfall(s.players[viewer], CORE.cost);
+      if (why) {
+        hud.toast(why, 'bad');
+        play('error');
+      } else {
+        issue({ t: 'core', p: viewer, building: coreLodge, x: g.x, y: g.y });
+        view.marker(s, g.x, g.y, false);
+        play('queue');
+      }
+    }
+    targetMode = null;
+    return;
+  }
   if (targetMode === 'unload') {
     unloadAt(e.clientX, e.clientY, e.shiftKey);
     targetMode = null;
@@ -2113,13 +2143,32 @@ canvas.addEventListener('pointermove', (e) => {
     }
   }
   if (placing) updatePlacement(e.clientX, e.clientY);
+  coreHover(e.clientX, e.clientY);
   if (wallDrag && placeAt) {
     wallDrag.x1 = placeAt.tx;
     wallDrag.y1 = placeAt.ty;
   }
 });
 
-canvas.addEventListener('pointerleave', () => (pointer.inside = false));
+canvas.addEventListener('pointerleave', () => {
+  pointer.inside = false;
+  hud.worldTip(null, 0, 0);
+});
+
+/** The underground view (#924 m3): U, or Esc, toggles it; the surface fades and pitheads and cores stand out. */
+function setUnderground(on: boolean): void {
+  view.underground = on;
+  $('underground-note').classList.toggle('hidden', !on);
+}
+
+/** Hovering a core sample of the viewer's (#924 m3) reads what lies below it, layer by layer. */
+function coreHover(cx: number, cy: number): void {
+  const s = game;
+  if (!s || placing || boxing || panDrag) return hud.worldTip(null, 0, 0);
+  const g = view.groundAt(cx, cy);
+  const c = g ? coresOf(s, viewer).find((k) => Math.abs((k.tile % s.w) + 0.5 - g.x) < 0.7 && Math.abs(Math.floor(k.tile / s.w) + 0.5 - g.y) < 0.7) : undefined;
+  hud.worldTip(c ? coreTip(c.lode) : null, cx, cy);
+}
 
 canvas.addEventListener('pointerup', (e) => {
   if (panDrag && (e.button === 1 || e.button === 0)) {
@@ -2389,6 +2438,10 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (k === 'Escape') {
+    if (view.underground && !placing && !targetMode) {
+      setUnderground(false);
+      return;
+    }
     if (placing || targetMode) {
       placing = null;
       placeAt = null;
@@ -2408,6 +2461,11 @@ window.addEventListener('keydown', (e) => {
   if (k === 'Enter' && online) {
     e.preventDefault();
     openChat();
+    return;
+  }
+  // The underground view (#924 m3): U, unless the selection's card has an open button on U (a shut one gives way).
+  if (k.toLowerCase() === 'u' && !e.ctrlKey && !e.metaKey && !hud.hasOpenKey('U')) {
+    setUnderground(!view.underground);
     return;
   }
   // The command card first: its letters change with the selection.
@@ -3585,6 +3643,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'unload' || targetMode === 'delve') return 'cur-garrison';
   if (targetMode === 'fault' || targetMode === 'earth') return 'cur-attack';
   if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch' || targetMode === 'sling') return 'cur-attack';
+  if (targetMode === 'core') return 'cur-place';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);

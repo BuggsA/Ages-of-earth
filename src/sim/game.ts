@@ -32,6 +32,7 @@ import { applyCommand } from './commands';
 import { AGES, AURA, AUTO_WORK, TICK_HZ, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
 import { AIR, BARGE, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
+import { layLodes } from './lodes';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { elmoStep } from './elmo';
@@ -233,6 +234,8 @@ export function createGame(setup: GameSetup): GameState {
   for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
   markHomeHerds(s);
   if (map.caves.length) s.caves = map.caves.map((c) => ({ ...c }));
+  // The ground below (#924 m3): laid from the seed, on maps drawn for a match (campaigns keep common ground).
+  if (!setup.scenario) s.lodes = layLodes(setup.seed, map.w, map.h, map.starts, map.rares);
   if (map.landmarks.length) s.landmarks = map.landmarks.map((m) => ({ id: s.nextId++, x: m.x, y: m.y, kind: m.kind, owner: -1, claim: 0, by: -1 }));
   for (const c of map.caves) if (c.den) for (const p of denWolves(c.tile, map.w)) spawnAnimal(s, p.x, p.y, 'wolf');
   // Each raider camp's band keeps its fire as home (what ties them together).
