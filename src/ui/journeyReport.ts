@@ -112,6 +112,6 @@ export function journeyHtml(s: GameState, viewer: number, end: number): string {
     .join('');
   const none = untaken.length ? `<p class="jr-sub">Roads you knew of that nobody took: ${untaken.map((r) => `${AGES[r.from].short} → ${AGES[r.to].name}`).join(', ')}.</p>` : '';
   return `<details class="jr" open><summary>Roads walked</summary>
-    <svg class="jr-map" viewBox="${x0} ${y0} ${vw} ${vh}" role="img" aria-label="Each player's road through the ages"><defs>${defs}</defs>${faint}${nodes}${legs}</svg>
+    <svg class="jr-map" viewBox="${x0} ${y0} ${vw} ${vh}" width="${vw}" height="${vh}" role="img" aria-label="Each player's road through the ages"><defs>${defs}</defs>${faint}${nodes}${legs}</svg>
     <ul class="jr-list">${rows}</ul>${none}</details>`;
 }

@@ -115,11 +115,16 @@ export async function drawShareCard(inp: ShareInput): Promise<HTMLCanvasElement>
   const st = p.stats;
   g.font = `700 24px ${sans}`;
   g.fillStyle = '#b9c1cf';
-  g.fillText(`Built ${st.built} · Trained ${st.trained} · Kills ${st.kills} · Techs ${st.techs}`, 68, 548);
+  const tally = `Built ${st.built} · Trained ${st.trained} · Kills ${st.kills} · Techs ${st.techs}`;
+  g.fillText(tally, 68, 548);
+  const tallyEnd = 68 + g.measureText(tally).width;
   g.font = `800 24px ${sans}`;
   g.fillStyle = '#ffdf8a';
   const play = `Play free at ${location.host || 'Ages of Earth'}`;
-  g.fillText(play, W - 64 - g.measureText(play).width, 548);
+  const playW = g.measureText(play).width;
+  // Where a long tally would run into it, the link goes up beside the name instead.
+  if (W - 64 - playW > tallyEnd + 24) g.fillText(play, W - 64 - playW, 548);
+  else g.fillText(play, W - 64 - playW, 96);
   // The five epochs' colours along the foot, as on the title.
   AGE_COLORS.slice(0, 5).forEach((col, i) => {
     g.fillStyle = col;
