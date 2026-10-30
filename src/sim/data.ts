@@ -2987,7 +2987,9 @@ export const SHAFT = {
     saltpetre: { name: 'Saltpetre', old: true },
     bloodiron: { name: 'Blood-iron', old: true },
     glowcap: { name: 'Glowcaps', old: true },
-  } as Record<'stone' | 'gold' | RareId, { name: string; old: boolean }>,
+    // Gems (#924 m4) lie in the wet deep only: no ground holds them nearer the grass, and they are dug only while their vein lasts.
+    gems: { name: 'Gems', old: true, deep: true },
+  } as Record<'stone' | 'gold' | RareId | 'gems', { name: string; old: boolean; deep?: boolean }>,
   aiNear: 26,
   aiReach: 18,
   aiWood: 250,
@@ -3008,6 +3010,16 @@ export const SHAFT = {
   aiRaidNear: 40,
   aiRaidBand: 4,
   aiRaidEvery: 180,
+  // The wet deep (#924 m4): floods, the pump and gems (`STRATA[].fill`, `LODES[].wet` and `.gems`, `GEMS`).
+  inrush: 0.25,
+  drown: 0.5,
+  pumpAge: 4,
+  pump: { wood: 300, gold: 200 } as Cost,
+  mill: { wood: 220 } as Cost,
+  drain: 40,
+  gemGrade: 0.35,
+  aiPump: 80,
+  aiGems: 60,
 };
 
 /**
@@ -3032,11 +3044,26 @@ export const SHAFT = {
  * `SHAFT.aiBlast` gold over the charge; its bombers are drawn to a rival's deep pithead (`SHAFT.aiRaid` a layer), and between
  * waves, at most every `SHAFT.aiRaidEvery` seconds, a band of `SHAFT.aiRaidBand` falls on one seen within `SHAFT.aiRaidNear` tiles.
  */
-export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | RareId, number>>; add: number; room: number; sink: Cost; time: number; epoch: number; tint: string; prop: Cost; rush: number; fall: number; blast: Cost }[] = [
-  { name: 'Clay and gravel', veins: { stone: 250 }, add: 0.2, room: 2, sink: {}, time: 0, epoch: 1, tint: '#b48a5c', prop: {}, rush: 0, fall: 0, blast: {} },
-  { name: 'Bedrock', veins: { stone: 450, gold: 400 }, add: 0.4, room: 3, sink: { wood: 200 }, time: 40, epoch: 1, tint: '#857868', prop: { wood: 120 }, rush: 0.15, fall: 0.04, blast: { gold: 150 } },
-  { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662', prop: { wood: 200 }, rush: 0.2, fall: 0.06, blast: { gold: 250 } },
+export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | RareId | 'gems', number>>; add: number; room: number; sink: Cost; time: number; epoch: number; tint: string; prop: Cost; rush: number; fall: number; blast: Cost; fill: number }[] = [
+  { name: 'Clay and gravel', veins: { stone: 250 }, add: 0.2, room: 2, sink: {}, time: 0, epoch: 1, tint: '#b48a5c', prop: {}, rush: 0, fall: 0, blast: {}, fill: 0 },
+  { name: 'Bedrock', veins: { stone: 450, gold: 400 }, add: 0.4, room: 3, sink: { wood: 200 }, time: 40, epoch: 1, tint: '#857868', prop: { wood: 120 }, rush: 0.15, fall: 0.04, blast: { gold: 150 }, fill: 0 },
+  { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662', prop: { wood: 200 }, rush: 0.2, fall: 0.06, blast: { gold: 250 }, fill: 0 },
+  { name: 'The wet deep', veins: { stone: 200, gold: 500, gems: 360 }, add: 0.7, room: 4, sink: { wood: 450, stone: 150 }, time: 75, epoch: 3, tint: '#3e5a66', prop: { wood: 260 }, rush: 0.2, fall: 0.05, blast: { gold: 300 }, fill: 120 },
 ];
+/**
+ * The wet deep (#924 m4, `docs/deep-mine.md`): a layer with a `fill` takes on water from the moment the shaft reaches it,
+ * filling in `fill` seconds (sooner on wet ground: `LODES[].wet` scales the rise) unless a pump stands at the pithead. While the
+ * water stands in it, every full basket there risks an inrush on the match's dice, `SHAFT.inrush` times the water's height:
+ * the layer fills at once and each miner at its face drowns with chance `SHAFT.drown`, else is driven up with
+ * `SHAFT.strandHurt` of their health. Water that rises to the roof drives the miners up unhurt; a flooded layer takes no one
+ * until it is pumped. The pump: a steam engine from age `SHAFT.pumpAge` for `SHAFT.pump`, or, for a people that walked the
+ * Age of Dykes, a windmill pump in any age for `SHAFT.mill`. It pumps a full layer dry in `SHAFT.drain` seconds and keeps it
+ * dry while the pithead stands above `SHAFT.winchHurt` of its health; a hurt pithead's pump stalls and the water rises again.
+ * Gems are dug in the wet deep only, at `SHAFT.gemGrade` of an open deposit of gold's pace, while their vein lasts (scaled by
+ * `LODES[].gems`), and sold at the Market (`GEMS`). The computer pumps with `SHAFT.aiPump` to spare over the pump's price, and
+ * sends its gold hands to the gems while a lot fetches `SHAFT.aiGems` or more.
+ */
+
 
 /**
  * The ground below differs (#924 m3, `docs/deep-mine.md`): the match's seed lays the map out in lodes, patches of `LODE.cell`
@@ -3046,16 +3073,17 @@ export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | Ra
  * pace while they last, and scales the chance of a cave-in by `fall`; every kind holds some stone and gold (rule 1). A tract out
  * on the map holds, with chance `LODE.ore`, a seam of a rare ore this world holds (glowcaps aside: they wait on the hot deep) in
  * layer `LODE.oreLayer`: `LODE.oreVein` of it, dug at `LODE.oreGrade` of an open deposit's pace while it lasts, and only there.
- * `tint` is the patch's colour in the underground view and on a core's cap.
+ * `tint` is the patch's colour in the underground view and on a core's cap. The wet deep (#924 m4): `wet` scales how fast its
+ * water rises, `gems` its vein of gems; a core shows both.
  */
 export const LODE = { cell: 8, patch: 22, home: 14, ore: 0.35, oreLayer: 2, oreVein: 300, oreGrade: 0.5 };
-export const LODES: { name: string; stone: number; gold: number; add: number; fall: number; weight: number; tint: string; blurb: string }[] = [
-  { name: 'Common ground', stone: 1, gold: 1, add: 0, fall: 1, weight: 4, tint: '#a08c6c', blurb: 'the plain run of the earth, as under every town' },
-  { name: 'A gold reef', stone: 0.7, gold: 2.2, add: 0.1, fall: 1, weight: 2, tint: '#e6bc3e', blurb: 'gold threaded thick through the deep rock' },
-  { name: 'Building stone', stone: 2.2, gold: 0.6, add: 0.05, fall: 0.8, weight: 2, tint: '#ddd5c0', blurb: 'sound, even beds of good stone' },
-  { name: 'Poor ground', stone: 0.4, gold: 0.35, add: 0, fall: 1, weight: 3, tint: '#6b6762', blurb: 'thin, worked-out rock: little to dig' },
-  { name: 'Sound rock', stone: 1.2, gold: 1, add: 0, fall: 0.3, weight: 2, tint: '#7d8ea6', blurb: 'hard rock that holds its roof' },
-  { name: 'Shattered ground', stone: 1.4, gold: 1.6, add: 0.1, fall: 2.5, weight: 2, tint: '#b0604c', blurb: 'faulted rock, rich and loose: it falls in' },
+export const LODES: { name: string; stone: number; gold: number; add: number; fall: number; weight: number; tint: string; blurb: string; wet: number; gems: number }[] = [
+  { name: 'Common ground', stone: 1, gold: 1, add: 0, fall: 1, weight: 4, tint: '#a08c6c', blurb: 'the plain run of the earth, as under every town', wet: 1, gems: 1 },
+  { name: 'A gold reef', stone: 0.7, gold: 2.2, add: 0.1, fall: 1, weight: 2, tint: '#e6bc3e', blurb: 'gold threaded thick through the deep rock', wet: 1, gems: 1.3 },
+  { name: 'Building stone', stone: 2.2, gold: 0.6, add: 0.05, fall: 0.8, weight: 2, tint: '#ddd5c0', blurb: 'sound, even beds of good stone', wet: 0.6, gems: 0.6 },
+  { name: 'Poor ground', stone: 0.4, gold: 0.35, add: 0, fall: 1, weight: 3, tint: '#6b6762', blurb: 'thin, worked-out rock: little to dig', wet: 1.4, gems: 0.5 },
+  { name: 'Sound rock', stone: 1.2, gold: 1, add: 0, fall: 0.3, weight: 2, tint: '#7d8ea6', blurb: 'hard rock that holds its roof', wet: 0.4, gems: 0.8 },
+  { name: 'Shattered ground', stone: 1.4, gold: 1.6, add: 0.1, fall: 2.5, weight: 2, tint: '#b0604c', blurb: 'faulted rock, rich and loose: it falls in', wet: 1.8, gems: 1.6 },
 ];
 /**
  * Core samples (#924 m3): a finished Prospector's Lodge drills a core at any tile its people has seen, for `cost`, one at a
@@ -4083,6 +4111,12 @@ export const TIDINGS = { at: [140, 290], jitter: 50, fade: 30,
 export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100,
   /** Every `every` seconds each price moves this far back toward where it started, so a glut or a shortage fades. */
   recover: 1, every: 10 };
+/**
+ * Gems at the Market (#924 m4): a lot of `lot` gems sells for `price` gold to start. Each lot sold, by anyone, takes `step` off
+ * the price, down to `min`; every `MARKET.every` seconds it climbs `recover` back toward `price`. Gems cannot be bought. A
+ * glut is everyone's: a rival dumping gems cheapens yours, and a patient seller gets the most.
+ */
+export const GEMS = { lot: 20, price: 120, step: 8, min: 30, recover: 2 };
 
 export const START_RES = { food: 300, wood: 250, stone: 150, gold: 100 };
 /** Extra to start with when starting in a later epoch. */

@@ -3,7 +3,7 @@ import { forgeStep } from './forge';
 import { faultStep } from './fault';
 import { delveStep } from './delve';
 import { hengeStep } from './henge';
-import { deepenStep, strand } from './shafts';
+import { deepenStep, seepStep, strand } from './shafts';
 import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
@@ -29,7 +29,7 @@ import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { fleeStep } from './flee';
 import { applyCommand } from './commands';
-import { AGES, AURA, AUTO_WORK, TICK_HZ, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, AUTO_WORK, TICK_HZ, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, GEMS, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
 import { AIR, BARGE, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
 import { layLodes } from './lodes';
@@ -659,6 +659,11 @@ function driftMarket(s: GameState): void {
     const d = home - s.market[r];
     s.market[r] += d > 0 ? Math.min(d, MARKET.recover) : -Math.min(-d, MARKET.recover);
   }
+  // Gems (#924 m4) climb back toward their price; absent until the first lot is sold.
+  if (s.market.gems !== undefined) {
+    s.market.gems = Math.min(GEMS.price, s.market.gems + GEMS.recover);
+    if (s.market.gems >= GEMS.price) delete s.market.gems;
+  }
 }
 
 export function step(s: GameState, cmds: readonly Command[] = []): void {
@@ -711,6 +716,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   tideStep(s);
   hengeStep(s);
   deepenStep(s);
+  seepStep(s);
   delveStep(s, ungarrison);
   underStep(s);
   forgeStep(s);

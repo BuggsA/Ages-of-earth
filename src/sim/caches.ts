@@ -57,7 +57,8 @@ export function dropOre(s: GameState, u: Unit): void {
     spill(s, u.ore.id, u.ore.n, u.x, u.y, u.ore.from);
     delete u.ore;
   }
-  if (u.carry > 0 && u.carryRare) {
+  // Gems (#924 m4) are no key ore: they go down with the miner.
+  if (u.carry > 0 && u.carryRare && u.carryRare !== 'gems') {
     spill(s, u.carryRare, u.carry, u.x, u.y, u.owner);
     u.carry = 0;
   }

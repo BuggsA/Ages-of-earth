@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, AI_BEGGARS, AI_HUNT, HUNT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, GEMS, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, AI_BEGGARS, AI_HUNT, HUNT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
@@ -46,7 +46,7 @@ import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, freeShaft, nearestTemple, TILE_OF_RARE } from './units';
-import { blastProblem, deepenProblem, depthOf, propProblem, seamOf, seamProblem, siteGrade, spentAt } from './shafts';
+import { blastProblem, deepenProblem, depthOf, floodedAt, propProblem, pumpCost, pumpProblem, pumping, seamOf, seamProblem, siteGrade, spentAt, wetLayer } from './shafts';
 import { coreProblem, coresOf, drillingLeft, kindOf, lodeOfSite, patchOf } from './lodes';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findPath, findRoute } from './path';
@@ -608,6 +608,11 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;
     }
+  }
+  // Gems (#924 m4) are sold while a lot fetches `SHAFT.aiGems`: below it, they wait for the price to climb back.
+  if ((p.gems ?? 0) >= GEMS.lot && (s.market.gems ?? GEMS.price) >= SHAFT.aiGems) {
+    issue({ t: 'trade', p: p.id, res: 'gems', buy: false });
+    return;
   }
   // On the Deep Road (#906) the next climb is paid in stone: gold beyond its own buys the stone, and food or wood piled past it is sold for gold.
   const deep = deepNext(p);
@@ -3553,11 +3558,43 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
       }
       if (done) break;
     }
+    // The wet deep (#924 m4): a pump goes up at a shaft that has broken into the water, or is about to, with wood and gold to
+    // spare; and a shaft never breaks into it without one, nor before it can raise one.
+    const wet = wetLayer();
+    for (const b of done || wet < 0 ? [] : v.buildings) {
+      if (b.type !== 'shaft' || pumpProblem(s, b)) continue;
+      const seam = seamOf(s, b);
+      if (depthOf(b) < wet && !(seam && spentAt(b, seam) && !deepenProblem(s, b))) continue;
+      const cost = pumpCost(s, p.id);
+      if (!RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + SHAFT.aiPump)) continue;
+      spend(v, cost);
+      issue({ t: 'pump', p: p.id, building: b.id });
+      done = true;
+      break;
+    }
+    // Gems: a clever computer with a Market sets a pumped shaft in the wet deep to them while a lot fetches enough, and back to
+    // gold when the price falls.
+    const gems = s.market.gems ?? GEMS.price;
+    for (const b of done || wet < 0 || !AI_LEVELS[p.ai!].clever || !v.buildings.some((m) => m.type === 'market' && m.built) ? [] : v.buildings) {
+      if (b.type !== 'shaft' || !b.built || depthOf(b) < wet || !pumping(s, b) || floodedAt(b, wet)) continue;
+      const now = seamOf(s, b);
+      if (now !== 'gems' && gems >= SHAFT.aiGems && !seamProblem(s, b, 'gems')) {
+        issue({ t: 'seam', p: p.id, building: b.id, seam: 'gems' });
+        done = true;
+        break;
+      }
+      if (now === 'gems' && gems < SHAFT.aiGems && !seamProblem(s, b, 'gold')) {
+        issue({ t: 'seam', p: p.id, building: b.id, seam: 'gold' });
+        done = true;
+        break;
+      }
+    }
     for (const b of done ? [] : v.buildings) {
       if (b.type !== 'shaft' || deepenProblem(s, b)) continue;
       const seam = seamOf(s, b);
       if (!seam || (seam !== 'stone' && seam !== 'gold') || !spentAt(b, seam)) continue;
       const next = STRATA[depthOf(b) + 1];
+      if (next.fill > 0 && !b.pump) continue;
       if (!blastProblem(s, b) && (v.budget.gold ?? 0) >= (next.blast.gold ?? 0) + SHAFT.aiBlast && afford(v, next.blast)) {
         spend(v, next.blast);
         issue({ t: 'deepen', p: p.id, building: b.id, blast: true });

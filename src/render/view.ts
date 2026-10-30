@@ -1583,6 +1583,14 @@ export class View {
           this.cue('caveIn', ev.x, ev.y, ev.owner === this.viewer ? 1 : 0.6);
           break;
         }
+        case 'flood': {
+          // The water breaks into a Mine Shaft's wet deep (#924 m4): a plume of spray from the pithead and the roar under it.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.3);
+          if (ev.why === 'inrush') this.effects.burst(at, { count: 16, speed: 0.8, up: 1.8, life: 1.6, size: 0.12, grow: 1.6, gravity: 1.2, drag: 0.8, soft: true, colors: ['#a8c8d8', '#7aa0b4', '#dfeef4'] });
+          this.cue('inrush', ev.x, ev.y, ev.owner === this.viewer ? (ev.why === 'inrush' ? 1 : 0.5) : 0.5);
+          break;
+        }
         case 'blast': {
           // A Mine Shaft blasted a layer deeper (#924 m2): the charge goes off below, a muffled boom and smoke up the shaft.
           if (!this.sees(ev.x, ev.y)) break;

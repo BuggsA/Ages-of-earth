@@ -129,8 +129,8 @@ export const R_COCKLE = 11;
 export const R_GLOWCAP = 12;
 export type RareId = 'salt' | 'saltpetre' | 'bloodiron' | 'glowcap';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron', 'glowcap'];
-/** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings. */
-export type SeamId = 'stone' | 'gold' | RareId;
+/** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings; gems in the wet deep only (#924 m4). */
+export type SeamId = 'stone' | 'gold' | RareId | 'gems';
 
 /** A core sample (#924 m3): where it was drilled, the lode found there (`lodes.ts`), the lodge that drew it, and when it is ready. */
 export interface CoreSample {
@@ -283,8 +283,8 @@ export interface Unit {
   cool: number;
   carry: number;
   carryRes: Res | null;
-  /** A rare ore in the basket (#356): its paid into `Player.rare`, not the four stocks. */
-  carryRare?: RareId | null;
+  /** A rare ore in the basket (#356): its paid into `Player.rare`, not the four stocks. Gems (#924 m4) ride as gold and are paid into `Player.gems`. */
+  carryRare?: RareId | 'gems' | null;
   /** A trader's load: a bit for each player whose toll it has paid since it was loaded (safe passage, #334). */
   tolled?: number;
   /** Fraction of the next carried unit gathered so far. */
@@ -510,6 +510,10 @@ export interface Building {
   shut?: number[];
   /** A Mine Shaft (#924 m3): the ground below it (`lodes.ts`: a `LODES` kind, and a rare seam held there), stamped when it is placed. Absent: common ground (an older save). */
   lode?: number;
+  /** A Mine Shaft (#924 m4): per layer, how high the water stands in it, 0 dry to 1 flooded. Absent: dry. */
+  water?: number[];
+  /** A Mine Shaft (#924 m4): a pump stands at its pithead, keeping the wet layers dry while the pithead holds. Absent: none. */
+  pump?: 'steam' | 'mill';
 }
 
 export type Ent = Unit | Building;
@@ -1067,6 +1071,8 @@ export interface Player {
   blood?: number;
   /** Rare ores mined (#356); absent until the first is brought home. */
   rare?: Partial<Record<RareId, number>>;
+  /** Gems dug in the wet deep (#924 m4), kept apart from the four stocks and sold at the Market for gold. Absent: none. */
+  gems?: number;
   /** Powder kegs in store (#577): ground in the Age of Alchemy, laid in the Age of Sappers; absent until the first is ground. */
   kegs?: number;
   /** Seconds of milling toward the next keg (#577); absent when none is under way. */
@@ -1231,7 +1237,7 @@ export type GameEvent =
   | { k: 'placed'; id: number; owner: number; type: BuildingType }
   | { k: 'built'; id: number; owner: number; type: BuildingType }
   | { k: 'epoch'; owner: number; epoch: number; age?: AgeId; back?: boolean }
-  | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number; rare?: RareId }
+  | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number; rare?: RareId; /** Gems from the wet deep (#924 m4). */ gems?: true }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
   /** A coppice stool or a planted sapling (#501) grew into a full tree on `tile`. */
@@ -1253,6 +1259,8 @@ export type GameEvent =
   /** A unit caught on the flats by the rising tide (#739) was swept ashore and hurt (`drowned`: no shore near, it was lost). */
   /** A layer of a Mine Shaft fell in (#924 m2): an unshored layer (`fall`), firedamp after a blast, or a fallen pithead's miners stranded. */
   | { k: 'caveIn'; owner: number; id: number; x: number; y: number; layer: number; dead: number; why: 'fall' | 'firedamp' | 'stranded' }
+  /** A wet layer floods (#924 m4): the water broke in on a full basket (`inrush`) or rose to the roof (`rose`); `dead` drowned, `up` were driven up. */
+  | { k: 'flood'; owner: number; id: number; x: number; y: number; layer: number; dead: number; up: number; why: 'inrush' | 'rose' }
   /** A Mine Shaft blasted a layer deeper (#924 m2). */
   | { k: 'blast'; owner: number; id: number; x: number; y: number; layer: number }
   | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean; /** Swept by this people's Tide Gate scour (#785). */ by?: number }
@@ -1370,7 +1378,7 @@ export type GameEvent =
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   /** A Wonder's foundation was laid (#361): every player hears of it, so the whole build can be contested. */
   | { k: 'wonderRising'; owner: number; id: number; x: number; y: number }
-  | { k: 'trade'; owner: number; res: Res; buy: boolean }
+  | { k: 'trade'; owner: number; res: Res | 'gems'; buy: boolean; /** Gold a lot of gems fetched (#924 m4). */ gold?: number }
   /** An explorer of `owner` came on a rival army of `n` soldiers at (x, y) (#454 s3). */
   | { k: 'sighted'; owner: number; x: number; y: number; n: number }
   | { k: 'defeated'; owner: number }
@@ -1557,7 +1565,10 @@ export interface GameState {
   shots: Shot[];
   rng: number;
   /** Gold for 100 of each resource at the market; it rises as people buy and falls as they sell. */
-  market: Record<'food' | 'wood' | 'stone', number>;
+  market: Record<'food' | 'wood' | 'stone', number> & {
+    /** Gold for a lot of gems (#924 m4, `GEMS`): falls as anyone sells, every seller's alike. Absent: `GEMS.price` (an older save). */
+    gems?: number;
+  };
   /** No fighting between players until this tick (a peace treaty set before the match). */
   peaceUntil: number;
   /** Ticks a finished wonder must stand to win. */
@@ -1796,6 +1807,8 @@ export type Command =
   | { t: 'deepen'; p: number; building: number; /** Blast the layer open at once, from the Gunpowder Age (#924 m2). */ blast?: boolean }
   /** Shore a layer of a Mine Shaft with timber props (#924 m2). */
   | { t: 'prop'; p: number; building: number; layer: number }
+  /** Raise a pump at a Mine Shaft's pithead (#924 m4): a steam engine from the Industrial Age, or a windmill pump for a people that walked the Age of Dykes. */
+  | { t: 'pump'; p: number; building: number }
   /** A Prospector's Lodge drills a core sample at a tile (#924 m3). */
   | { t: 'core'; p: number; building: number; x: number; y: number }
   /** Send one of a Mine Shaft's miners to a layer it reaches (#924 m1): from the layer with the least left to dig. */
@@ -1843,7 +1856,7 @@ export type Command =
   /** Move `n` citizens from one job to another without picking them: idle first, then those carrying nothing, in id order. */
   | { t: 'reassign'; p: number; from: Job; to: Job; n: number }
   /** A rare ore (#356) can only be sold, a lot of it for gold at a flat price. */
-  | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId; buy: boolean }
+  | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId | 'gems'; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
   /** The polis (#501): citizens take up arms where they stand, or soldiers lay them down near home. */
   | { t: 'arm'; p: number; ids: number[] }
