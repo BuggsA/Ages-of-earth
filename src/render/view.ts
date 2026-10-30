@@ -1543,6 +1543,22 @@ export class View {
           this.cue('tideWash', this.rig.target.x, this.rig.target.z, ev.level === 0 || ev.bared === 0 ? 0.45 : 0.3);
           this.resources.markDirty();
           break;
+        case 'caveIn': {
+          // A layer of a Mine Shaft falls in (#924 m2): a cough of dust from the pithead and a dull thud from under the ground.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.2);
+          this.effects.burst(at, { count: 14, speed: 0.7, up: 1.2, life: 2.2, size: 0.16, grow: 2.6, gravity: -0.3, drag: 1, soft: true, colors: ['#8a7d6c', '#6e6355', '#a69886'] });
+          this.cue('caveIn', ev.x, ev.y, ev.owner === this.viewer ? 1 : 0.6);
+          break;
+        }
+        case 'blast': {
+          // A Mine Shaft blasted a layer deeper (#924 m2): the charge goes off below, a muffled boom and smoke up the shaft.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.3);
+          this.effects.burst(at, { count: 18, speed: 0.9, up: 1.6, life: 2.8, size: 0.2, grow: 3, gravity: -0.5, drag: 1, soft: true, colors: ['#3a3430', '#5a524a', '#7a7064'] });
+          this.cue('kegBlow', ev.x, ev.y, 0.55);
+          break;
+        }
         case 'tideSwept': {
           // Caught on the flats (#739): a wave breaking over them where they stood.
           if (!this.sees(ev.x, ev.y)) break;

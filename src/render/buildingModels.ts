@@ -717,8 +717,10 @@ function shaft(k: Kit, e: number, st: Style, variant: number): void {
   pad(k, 2, st.base);
   // The variant carries the seam and, from the deep mine (#924 m1), the layer reached: `seam + 8 * depth`. The pithead
   // grows with depth, so a rival sees a deep mine from outside: a taller headframe, a bigger spoil heap, a winding shed.
+  // Shored (#924 m2) adds 64: a stack of pit-props by the collar.
   const seam = variant % 8;
-  const deep = Math.floor(variant / 8);
+  const deep = Math.floor((variant % 64) / 8);
+  const shored = variant >= 64;
   const [rock, fleck] = SPOIL[Math.min(Math.max(seam, 0), SPOIL.length - 1)];
   // The collar and the hole.
   k.box(0.62, 0.03, 0.62, '#1c1712', -0.25, 0.02, -0.2);
@@ -779,6 +781,15 @@ function shaft(k: Kit, e: number, st: Style, variant: number): void {
   for (const z of [0.45, 0.78]) {
     k.box(0.36, 0.2, 0.22, e >= 3 ? '#4a4a4e' : WOOD, -0.65, 0.04, z);
     k.sphere(0.1, fleck, -0.65, 0.24, z).scale.set(1.3, 0.5, 0.8);
+  }
+  if (shored) {
+    // Pit-props stacked crosswise by the collar, timber waiting to go down.
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3 - i; j++) {
+        const log = k.cyl(0.035, 0.035, 0.5, 5, i % 2 ? '#a87a44' : WOOD, 0.62 + (j - (2 - i) / 2) * 0.075, 0.035 + i * 0.065, -0.05);
+        log.rotation.x = Math.PI / 2;
+      }
+    }
   }
   // A pick and a shovel against the collar.
   const haft = k.cyl(0.018, 0.018, 0.55, 4, WOOD, 0.25, 0.0, -0.75);

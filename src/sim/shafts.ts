@@ -5,10 +5,16 @@
  * The deep mine (#924 m1, `docs/deep-mine.md`): a shaft is sunk down through the layers of `STRATA`. Each layer holds finite
  * veins, richer the deeper, and room for a few miners; a spent vein is still dug at the ground's plain grade, so a shaft is
  * never worse than it was before it had layers.
+ *
+ * Props, cave-ins and blasting (#924 m2): a layer below the first is shored with timber, or dug unshored, faster, with a chance
+ * on the match's dice of a cave-in on every full basket. From the Gunpowder Age a layer is blasted open at once, with a chance of
+ * firedamp above. A pithead that falls strands the miners below it.
  */
 import { MEGALITH, SHAFT, STRATA, EPOCHS, secs } from './data';
+import { roll } from './animals';
 import { deepQuarry } from './henge';
 import { mineable } from './household';
+import { maxHp } from './world';
 import type { Building, GameState, Order, Res, SeamId, Unit } from './types';
 import { R_BLOODIRON, R_GLOWCAP, R_GOLD, R_SALT, R_SALTPETRE, R_STONE, T_ROCK } from './types';
 
@@ -115,11 +121,114 @@ function takeVein(b: Building, layer: number, seam: SeamId): void {
   row[seam] = (row[seam] ?? 0) + 1;
 }
 
-/** The share of an open deposit's pace a miner in this layer digs a seam at: the plain grade, more while the layer's vein lasts. */
+/**
+ * The share of an open deposit's pace a miner in this layer digs a seam at: the plain grade, more while the layer's vein lasts,
+ * and more again where the layer is dug unshored (#924 m2). Never less than the plain grade (rule 1).
+ */
 export function digShare(s: GameState, b: Building, seam: SeamId, layer: number): number {
   const floor = shaftShare(s, b, seam);
-  if (!floor || veinLeft(b, layer, seam) <= 0) return floor;
-  return Math.max(floor, SHAFT.grade[groundAt(s, b)[seam]!] + STRATA[layer].add);
+  if (!floor) return 0;
+  const rush = safeAt(b, layer) ? 0 : STRATA[layer].rush;
+  if (veinLeft(b, layer, seam) <= 0) return floor + rush;
+  return Math.max(floor, SHAFT.grade[groundAt(s, b)[seam]!] + STRATA[layer].add) + rush;
+}
+
+// ---- Props, cave-ins and blasting (#924 m2) ----------------------------------------------------------------------
+
+/** Whether a layer is safe to dig: it never falls in (the first), or it is shored with props. */
+export const safeAt = (b: Building, layer: number): boolean => !(STRATA[layer]?.fall > 0) || !!b.propped?.[layer];
+
+/** Whether a layer is shut by a cave-in's rubble now. */
+export const shutAt = (s: GameState, b: Building, layer: number): boolean => (b.shut?.[layer] ?? 0) > s.tick;
+
+/** Seconds until a caved-in layer is cleared, or 0. */
+export const shutLeft = (s: GameState, b: Building, layer: number): number => (shutAt(s, b, layer) ? Math.ceil((b.shut![layer] - s.tick) / secs(1)) : 0);
+
+/** Why a layer of a shaft can't be shored now, or null. Its cost is checked where it is paid. */
+export function propProblem(b: Building, layer: number): string | null {
+  if (b.type !== 'shaft') return 'Only a Mine Shaft is shored';
+  if (!b.built) return 'Finish the shaft first';
+  if (!STRATA[layer] || layer > depthOf(b)) return 'The shaft is not sunk that deep yet';
+  if (!(STRATA[layer].fall > 0)) return `${STRATA[layer].name} stands without props`;
+  if (b.propped?.[layer]) return `${STRATA[layer].name} is shored already`;
+  return null;
+}
+
+/** The layer a shaft's Shore button props: the deepest it reaches that still wants props, or -1. */
+export function toShore(b: Building): number {
+  for (let l = depthOf(b); l > 0; l--) if (!safeAt(b, l)) return l;
+  return -1;
+}
+
+/** Shore a layer with props (paid by the caller): safe from now on, and a cave-in's rubble there is cleared at once. */
+export function prop(b: Building, layer: number): void {
+  b.propped ??= [];
+  while (b.propped.length <= layer) b.propped.push(false);
+  b.propped[layer] = true;
+  if (b.shut?.[layer]) b.shut[layer] = 0;
+}
+
+/** A layer falls in: the miners at its face die, in id order, and it is shut `SHAFT.shut` seconds. Returns how many died. */
+export function caveIn(s: GameState, b: Building, layer: number, why: 'fall' | 'firedamp'): number {
+  let dead = 0;
+  for (const e of s.ents) {
+    if (!crewman(e, b) || e.order.layer !== layer || e.order.phase !== 'work') continue;
+    e.hp = 0;
+    dead++;
+  }
+  b.shut ??= [];
+  while (b.shut.length <= layer) b.shut.push(0);
+  b.shut[layer] = s.tick + secs(SHAFT.shut);
+  s.events.push({ k: 'caveIn', owner: b.owner, id: b.id, x: b.x, y: b.y, layer, dead, why });
+  return dead;
+}
+
+/** A full basket dug in an unshored layer: a roll of the match's dice whether the layer falls in. True if it did. */
+export function riskLoad(s: GameState, b: Building, layer: number): boolean {
+  if (safeAt(b, layer)) return false;
+  if (roll(s) >= STRATA[layer].fall) return false;
+  caveIn(s, b, layer, 'fall');
+  return true;
+}
+
+/** Why a shaft can't be blasted a layer deeper now, or null. Its charge is checked where it is paid. */
+export function blastProblem(s: GameState, b: Building): string | null {
+  const why = deepenProblem(s, b);
+  if (why) return why;
+  if (s.players[b.owner].epoch < SHAFT.blastAge) return `Blasting comes with the ${EPOCHS[SHAFT.blastAge].name}`;
+  return null;
+}
+
+/** Blast a shaft a layer deeper at once (paid by the caller), with a roll for firedamp in the layer above. */
+export function blast(s: GameState, b: Building): void {
+  const above = depthOf(b);
+  b.depth = above + 1;
+  s.events.push({ k: 'blast', owner: b.owner, id: b.id, x: b.x, y: b.y, layer: b.depth });
+  const chance = safeAt(b, above) && STRATA[above].fall > 0 ? SHAFT.firedampShored : SHAFT.firedamp;
+  if (roll(s) < chance) caveIn(s, b, above, 'firedamp');
+}
+
+/** A shaft's winch is hurt: one sunk `SHAFT.winchDepth` layers down, under `SHAFT.winchHurt` of its health. */
+export const winchHurt = (s: GameState, b: Building): boolean => depthOf(b) >= SHAFT.winchDepth && b.hp < maxHp(s, b) * SHAFT.winchHurt;
+
+/**
+ * A pithead has fallen (#924 m2): the miners at its faces are stranded. Those below the first layer die with the winch; those in
+ * the first climb out hurt, off the face, so a second call passes them by. Their next step finds the shaft gone and sends them on.
+ * Called by the first of its miners to find it fallen, and as it is cleared away, whichever comes first.
+ */
+export function strand(s: GameState, b: Building): void {
+  let dead = 0;
+  for (const e of s.ents) {
+    if (!crewman(e, b) || e.order.phase !== 'work') continue;
+    if ((e.order.layer ?? 0) > 0) {
+      e.hp = 0;
+      dead++;
+    } else {
+      e.hp = Math.max(1, Math.floor(e.hp * SHAFT.strandHurt));
+      e.order.phase = 'go';
+    }
+  }
+  if (dead) s.events.push({ k: 'caveIn', owner: b.owner, id: b.id, x: b.x, y: b.y, layer: depthOf(b), dead, why: 'stranded' });
 }
 
 /** Whether a unit works this shaft (on its way to it, at it, or hauling from it). */
@@ -158,7 +267,7 @@ export function roomLeft(s: GameState, b: Building): number {
  */
 export function placeFor(s: GameState, b: Building, u: Unit, seam: SeamId, want?: number): number {
   const { at } = crewOf(s, b, u);
-  const open = (l: number) => l >= 0 && l <= depthOf(b) && at[l] < STRATA[l].room;
+  const open = (l: number) => l >= 0 && l <= depthOf(b) && at[l] < STRATA[l].room && !shutAt(s, b, l);
   if (want !== undefined && open(want) && veinLeft(b, want, seam) > 0) return want;
   for (let l = depthOf(b); l >= 0; l--) if (open(l) && veinLeft(b, l, seam) > 0) return l;
   if (want !== undefined && open(want)) return want;
@@ -169,7 +278,8 @@ export function placeFor(s: GameState, b: Building, u: Unit, seam: SeamId, want?
 /** One miner's stroke at the face: what it digs in a tick, and the vein it takes from while that lasts. */
 export function digAt(s: GameState, b: Building, seam: SeamId, layer: number, rate: number, u: Unit): void {
   const vein = veinLeft(b, layer, seam) > 0;
-  u.frac += rate * digShare(s, b, seam, layer);
+  // A hurt winch (#924 m2) hauls slowly from below the first layer.
+  u.frac += rate * digShare(s, b, seam, layer) * (layer > 0 && winchHurt(s, b) ? SHAFT.winchSlow : 1);
   while (u.frac >= 1) {
     u.frac -= 1;
     u.carry++;

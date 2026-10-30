@@ -13,7 +13,7 @@ import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, journeyOf, keepsakeProblem, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
-import { crewOf, deepen, deepenProblem, depthOf, resOfSeam, roomLeft, seamOf, seamProblem, veinLeft } from './shafts';
+import { blast, blastProblem, crewOf, deepen, deepenProblem, depthOf, prop, propProblem, resOfSeam, roomLeft, seamOf, seamProblem, shutAt, veinLeft } from './shafts';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, isCarrier, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
@@ -809,19 +809,35 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'deepen': {
       const b = myBuilding(s, c.p, c.building);
       if (!b) return;
-      const why = deepenProblem(s, b);
+      const why = c.blast ? blastProblem(s, b) : deepenProblem(s, b);
       if (why) return refuse(s, c.p, why);
-      const cost = STRATA[depthOf(b) + 1].sink;
+      const next = STRATA[depthOf(b) + 1];
+      const cost = c.blast ? next.blast : next.sink;
       const short = shortfall(p, cost);
       if (short) return refuse(s, c.p, short);
       pay(p, cost);
-      deepen(s, b);
+      // Blasted (#924 m2): open at once, with a roll for firedamp above; else sunk over time.
+      if (c.blast) blast(s, b);
+      else deepen(s, b);
+      break;
+    }
+    case 'prop': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = propProblem(b, c.layer);
+      if (why) return refuse(s, c.p, why);
+      const cost = STRATA[c.layer].prop;
+      const short = shortfall(p, cost);
+      if (short) return refuse(s, c.p, short);
+      pay(p, cost);
+      prop(b, c.layer);
       break;
     }
     case 'toLayer': {
       const b = myBuilding(s, c.p, c.building);
       if (!b || b.type !== 'shaft' || !b.built) return;
       if (c.layer < 0 || c.layer > depthOf(b)) return refuse(s, c.p, 'The shaft is not sunk that deep yet');
+      if (shutAt(s, b, c.layer)) return refuse(s, c.p, `${STRATA[c.layer].name} is shut by a cave-in: shore it to clear it now`);
       const { at } = crewOf(s, b);
       if (at[c.layer] >= STRATA[c.layer].room) return refuse(s, c.p, `${STRATA[c.layer].name} has room for ${STRATA[c.layer].room} miners`);
       const seam = seamOf(s, b);

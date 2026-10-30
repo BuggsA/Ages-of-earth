@@ -3,9 +3,12 @@
  * selection panel's portrait. Layers are bands in the earth's colours (`STRATA[].tint`), seams glint in them while their
  * veins last, tiny miners stand at their faces. The layers it reaches are solid, the worked ones brightest; the layers
  * below are ghosted until reached; a spent layer is dulled. Clicking a band sends a miner there (`toLayer`).
+ *
+ * Props and cave-ins (#924 m2): an unshored layer that may fall in shows cracks across it; a shored one, timber props at the
+ * shaft's sides with a cap beam over the face; a layer shut by a cave-in, rubble heaped over its face and a darker band.
  */
 import { STRATA, SHAFT } from '../sim/data';
-import { crewOf, deepeningLeft, depthOf, digShare, seamOf, veinLeft } from '../sim/shafts';
+import { crewOf, deepeningLeft, depthOf, digShare, safeAt, seamOf, shutLeft, veinLeft } from '../sim/shafts';
 import type { Building, GameState, SeamId } from '../sim/types';
 
 const W = 116;
@@ -80,8 +83,33 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
       }
     }
     const room = L.room;
-    const tip = `<b>${L.name}</b>${reached ? '' : `Sink the shaft to reach it (${Object.entries(L.sink).map(([r, v]) => `${v} ${r}`).join(', ')}, ${L.time} seconds). `}${(Object.entries(L.veins) as [SeamId, number][]).map(([m, v]) => `${SHAFT.seams[m].name}: ${veinLeft(b, l, m)} of ${v} left`).join(', ') || 'No vein'}. Room for ${room} miners${reached ? `, ${at[l]} here` : ''}.${reached && seam ? ` Digs ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}%.` : ''}${reached ? ' Click to send a miner here.' : ''}`;
-    parts.push(`<g data-layer="${l}" data-shaft="${b.id}" data-tip="${tip.replace(/"/g, '&quot;')}" opacity="${op}" class="${reached ? 'cut-reach' : ''}"><path d="${band}" fill="${fill}"/><path d="${facet}" fill="#000" opacity="0.12"/>${glints.join('')}${worked ? `<path d="M0 ${y0 + 0.5} H${W}" stroke="#fff" stroke-opacity="0.35" stroke-width="1"/>` : ''}</g>`);
+    // Props, cracks and rubble (#924 m2), drawn only in the layers reached.
+    const shut = reached ? shutLeft(s, b, l) : 0;
+    const risky = reached && L.fall > 0 && !safeAt(b, l);
+    const shored = reached && L.fall > 0 && safeAt(b, l);
+    const marks: string[] = [];
+    if (risky) {
+      // Two jagged cracks, one each side of the shaft, from the band's roof down.
+      for (const [x0, dir] of [[SX - 14, -1], [SX + SW + 12, 1]] as [number, number][]) {
+        const d = `M${x0} ${y0 + 1} l${dir * 3} ${(h * 0.22).toFixed(1)} l${-dir * 2.5} ${(h * 0.14).toFixed(1)} l${dir * 4} ${(h * 0.24).toFixed(1)} m${-dir * 4} ${(-h * 0.1).toFixed(1)} l${-dir * 4} ${(h * 0.12).toFixed(1)}`;
+        marks.push(`<path d="${d}" stroke="#1a120c" stroke-width="0.9" fill="none" opacity="0.8"/>`);
+      }
+    }
+    if (shored) {
+      // Timber sets: a post either side of the face and a cap beam over it.
+      for (const x of [SX - 22, SX - 3, SX + SW + 1, SX + SW + 20]) marks.push(`<rect x="${x}" y="${(y0 + 3).toFixed(1)}" width="2" height="${(h - 4).toFixed(1)}" fill="#a87a44"/>`);
+      marks.push(`<rect x="${SX - 23}" y="${(y0 + 2).toFixed(1)}" width="23" height="2" fill="#c4935a"/><rect x="${SX + SW}" y="${(y0 + 2).toFixed(1)}" width="23" height="2" fill="#c4935a"/>`);
+    }
+    if (shut > 0) {
+      // Rubble heaped over the face, in the band's own stone.
+      const yb = y0 + h;
+      const rock = mix(L.tint, '#2a2a2a', 0.35);
+      marks.push(`<path d="M${SX - 26} ${yb} L${SX - 18} ${yb - h * 0.55} L${SX - 9} ${yb - h * 0.4} L${SX - 2} ${yb - h * 0.7} L${SX} ${yb}Z M${SX + SW} ${yb} L${SX + SW + 4} ${yb - h * 0.6} L${SX + SW + 13} ${yb - h * 0.45} L${SX + SW + 24} ${yb}Z" fill="${rock}" stroke="#1a120c" stroke-width="0.6"/>`);
+    }
+    const state = shut > 0 ? ` Caved in: cleared in ${shut} seconds, or at once if shored.` : risky ? ` Unshored: ${Math.round(L.rush * 100)} points faster, a ${Math.round(L.fall * 100)}% chance of a cave-in each basket. Shore it (P).` : shored ? ' Shored with props.' : '';
+    const tip = `<b>${L.name}</b>${reached ? '' : `Sink the shaft to reach it (${Object.entries(L.sink).map(([r, v]) => `${v} ${r}`).join(', ')}, ${L.time} seconds). `}${(Object.entries(L.veins) as [SeamId, number][]).map(([m, v]) => `${SHAFT.seams[m].name}: ${veinLeft(b, l, m)} of ${v} left`).join(', ') || 'No vein'}. Room for ${room} miners${reached ? `, ${at[l]} here` : ''}.${reached && seam ? ` Digs ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}%.` : ''}${state}${reached && !shut ? ' Click to send a miner here.' : ''}`;
+    const dark = shut > 0 ? `<path d="${band}" fill="#000" opacity="0.28"/>` : '';
+    parts.push(`<g data-layer="${l}" data-shaft="${b.id}" data-tip="${tip.replace(/"/g, '&quot;')}" opacity="${op}" class="${reached ? 'cut-reach' : ''}"><path d="${band}" fill="${fill}"/><path d="${facet}" fill="#000" opacity="0.12"/>${glints.join('')}${dark}${marks.join('')}${worked ? `<path d="M0 ${y0 + 0.5} H${W}" stroke="#fff" stroke-opacity="0.35" stroke-width="1"/>` : ''}</g>`);
   }
   // The shaft: down to the deepest layer reached, and a dashed stretch into the next while it is sunk.
   const bottom = TOP + (depth + 1) * h;
@@ -107,6 +135,6 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
     }
   }
   const svg = `<svg class="cutaway${open ? ' cut-open' : ''}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="The shaft, cut away">${parts.join('')}</svg>`;
-  const key = `${depth}:${sinking}:${at.join(',')}:${STRATA.map((_, l) => Math.ceil(veinsOf(b, l).left / 10)).join(',')}:${seam}:${open}`;
+  const key = `${depth}:${sinking}:${at.join(',')}:${STRATA.map((_, l) => Math.ceil(veinsOf(b, l).left / 10)).join(',')}:${seam}:${open}:${STRATA.map((_, l) => `${safeAt(b, l) ? 1 : 0}${shutLeft(s, b, l)}`).join(',')}`;
   return { svg, key };
 }

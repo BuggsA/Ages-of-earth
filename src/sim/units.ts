@@ -20,7 +20,7 @@ import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
 import { finishTame, songOf, tames, wildBeast } from './tame';
 import { catchIn, nextSnare } from './snares';
-import { TILE_OF_SEAM, digAt, placeFor, resOfSeam, roomLeft, roomOf, seamOf, seamProblem } from './shafts';
+import { TILE_OF_SEAM, digAt, placeFor, resOfSeam, riskLoad, roomLeft, roomOf, seamOf, seamProblem, strand } from './shafts';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
@@ -514,10 +514,16 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
 /**
  * A Mine Shaft's miner (#681): digging its seam for good and hauling it to a drop site, as a farmer works a field. Each layer
  * the shaft reaches has room for a few (#924 m1); a miner takes a place at the face when it gets there, moving down to a layer
- * whose vein still holds once its own is spent. While the shaft is sunk deeper it digs nothing.
+ * whose vein still holds once its own is spent. While the shaft is sunk deeper it digs nothing. Each full basket from an unshored
+ * layer risks a cave-in (#924 m2).
  */
 function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): void {
   const b = s.byId.get(o.target);
+  // A pithead brought down (#924 m2) strands its miners below, this one among them.
+  if (b && b.kind === 'building' && b.hp <= 0 && b.type === 'shaft' && b.owner === u.owner && o.phase === 'work') {
+    strand(s, b);
+    if (u.hp <= 0) return;
+  }
   if (!b || b.kind !== 'building' || b.hp <= 0 || b.type !== 'shaft' || b.owner !== u.owner) {
     if (u.carry > 0) setOrder(u, { k: 'deliver' });
     else setOrder(u, { k: 'idle' });
@@ -573,6 +579,8 @@ function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): vo
     if (b.deepening === undefined) digAt(s, b, seam, o.layer ?? 0, gatherRate(s, u, TILE_OF_SEAM[seam]) * DT, u);
     workEvent(s, u, 'mine', b.x, b.y);
     if (u.carry >= carryCap(s, u)) {
+      // A full basket from an unshored layer (#924 m2): the dice say whether it falls in on its miners, this one among them.
+      if (riskLoad(s, b, o.layer ?? 0)) return;
       u.frac = 0;
       o.phase = 'drop';
     }

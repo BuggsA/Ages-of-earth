@@ -46,7 +46,7 @@ import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, freeShaft, nearestTemple, TILE_OF_RARE } from './units';
-import { deepenProblem, depthOf, seamOf, seamProblem, siteGrade, spentAt } from './shafts';
+import { blastProblem, deepenProblem, depthOf, propProblem, seamOf, seamProblem, siteGrade, spentAt } from './shafts';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findPath, findRoute } from './path';
 import { isEnemy, maxHp, townCenters } from './world';
@@ -3505,13 +3505,34 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
 
   // The deep mine (#924 m1): a shaft whose seam is dug out in every layer it reaches is sunk a layer deeper, with wood to spare.
+  // From the Gunpowder Age (#924 m2) it is blasted open at once when the gold is there. Before either, an unshored layer below
+  // the first is shored, with wood to spare: the computer takes no chances with its miners.
   if (p.epoch >= 1 && s.tick - (mem.deepLook ?? -99999) > secs(10)) {
     mem.deepLook = s.tick;
+    let done = false;
     for (const b of v.buildings) {
+      if (b.type !== 'shaft' || !b.built) continue;
+      for (let l = 1; l <= depthOf(b) && !done; l++) {
+        if (propProblem(b, l)) continue;
+        const cost = STRATA[l].prop;
+        if ((v.budget.wood ?? 0) < (cost.wood ?? 0) + SHAFT.aiProp || !afford(v, cost)) continue;
+        spend(v, cost);
+        issue({ t: 'prop', p: p.id, building: b.id, layer: l });
+        done = true;
+      }
+      if (done) break;
+    }
+    for (const b of done ? [] : v.buildings) {
       if (b.type !== 'shaft' || deepenProblem(s, b)) continue;
       const seam = seamOf(s, b);
       if (!seam || (seam !== 'stone' && seam !== 'gold') || !spentAt(b, seam)) continue;
-      const cost = STRATA[depthOf(b) + 1].sink;
+      const next = STRATA[depthOf(b) + 1];
+      if (!blastProblem(s, b) && (v.budget.gold ?? 0) >= (next.blast.gold ?? 0) + SHAFT.aiBlast && afford(v, next.blast)) {
+        spend(v, next.blast);
+        issue({ t: 'deepen', p: p.id, building: b.id, blast: true });
+        break;
+      }
+      const cost = next.sink;
       if ((v.budget.wood ?? 0) < (cost.wood ?? 0) + SHAFT.aiSink || !afford(v, cost)) continue;
       spend(v, cost);
       issue({ t: 'deepen', p: p.id, building: b.id });
@@ -5861,7 +5882,9 @@ export function enemyTarget(s: GameState, p: Player): Building | null {
     const blood = !hemo ? 0 : e.type === 'transfusion' ? AI_HEMO.bomb : e.type === 'bloodtower' ? AI_HEMO.bomb / 2 : 0;
     // On a feast day a rival's fairground Market is where the gold is (#379): raid it while the purse is full.
     const feast = e.type === 'market' && e.built && ageDef(s.players[e.owner]).fairs && feastOpen(s) && fairground(s, e.owner, e) ? AI_FAIR.raid : 0;
-    const d = dx * dx + dy * dy - blood - feast + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
+    // A rival's deep pithead (#924 m2): bring it down and the miners below go with it.
+    const pit = e.type === 'shaft' && e.built ? SHAFT.aiRaid * depthOf(e) : 0;
+    const d = dx * dx + dy * dy - blood - feast - pit + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
     if (d < bestD) {
       bestD = d;
       best = e;
@@ -6501,6 +6524,21 @@ function pitchStation(s: GameState, v: View, mem: AiMemory, wave: Unit[], issue:
   issue({ t: 'build', p: p.id, ids: crew.map((u) => u.id), type: 'transfusion', tx: spot.tx, ty: spot.ty });
   spend(v, cost);
   mem.ordered.transfusion = s.tick;
+}
+
+/** The nearest rival pithead sunk below its first layer (#924 m2) the computer has seen within `SHAFT.aiRaidNear` tiles of home, or null. */
+export function rivalPithead(s: GameState, p: Player, home: { x: number; y: number }): Building | null {
+  let best: Building | null = null;
+  let bestD = SHAFT.aiRaidNear * SHAFT.aiRaidNear;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'shaft' || !e.built || e.hp <= 0 || depthOf(e) < 1 || !isEnemy(s, p.id, e.owner)) continue;
+    if (!p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
+    if (d >= bestD) continue;
+    bestD = d;
+    best = e;
+  }
+  return best;
 }
 
 /** The nearest rival War Camp the computer has seen within `AI_BLOOD.answer` tiles of home, or null. */
@@ -7144,6 +7182,17 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     const band = camp ? ready.filter(prowler) : [];
     if (camp && band.length >= AI_BLOOD.strike) {
       issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: camp.x, y: camp.y, amove: true });
+      return;
+    }
+  }
+  // A rival's deep pithead in reach (#924 m2): bring it down and the miners below go with it. Now and then, between waves, and
+  // not in a campaign chapter, whose play stays as its proof found it.
+  if (L.clever && !s.scenario && !mem.attacking && !plan.hold && s.tick >= s.peaceUntil && s.tick - (mem.pitRaid ?? -99999) > secs(SHAFT.aiRaidEvery)) {
+    const pit = rivalPithead(s, p, v.home);
+    const band = pit ? ready.filter(prowler) : [];
+    if (pit && band.length >= SHAFT.aiRaidBand) {
+      mem.pitRaid = s.tick;
+      issue({ t: 'attack', p: p.id, ids: band.slice(0, SHAFT.aiRaidBand * 2).map((u) => u.id), target: pit.id });
       return;
     }
   }
