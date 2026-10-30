@@ -1,4 +1,4 @@
-import { AMOUNT, BOAR, BOG_IRON, CAVE, FINDS, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, SPRING, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, CAVE, FINDS, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, SPRING, TRADE, VENT, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { Cave, FindKind, HomelandId, KeyId, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
@@ -67,6 +67,8 @@ export interface MapData {
   homeland: HomelandId;
   /** Spring heads by the towns (#701 s1): one tile each, where a channel dug beside it fills (`GameState.springs`). */
   springs: number[];
+  /** Vents of the earth's heat (#884): one tile each, by every town and a few out on the map (`GameState.vents`). */
+  vents: number[];
   /** One find near each town (#588): where it stands (tile center), what it is, and which town it stands near. Empty on campaign maps. */
   finds: { x: number; y: number; kind: FindKind; key: KeyId | null; near: number }[];
 }
@@ -687,6 +689,12 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     const keep = [...deer, ...relics, ...posts, ...ruins, ...wild, ...landmarks, ...camps, ...finds, ...caves.map((c) => ({ x: c.tile % w, y: Math.floor(c.tile / w) }))];
     springs.push(...placeSprings(seed, w, h, terrain, res, starts, keep));
   }
+  // A vent by every town (#884), after the springs and on dice of its own; like them, laid only where the map has deposits.
+  const vents: number[] = [];
+  if (deposits) {
+    const keep = [...deer, ...relics, ...posts, ...ruins, ...wild, ...landmarks, ...camps, ...finds, ...caves.map((c) => ({ x: c.tile % w, y: Math.floor(c.tile / w) })), ...springs.map((t) => ({ x: t % w, y: Math.floor(t / w) }))];
+    vents.push(...placeVents(seed, w, h, terrain, height, res, amount, starts, keep));
+  }
 
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
@@ -695,7 +703,104 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps, homeland, finds, springs };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps, homeland, finds, springs, vents };
+}
+
+/**
+ * Vents of the earth's heat (#884, the Age of Deep Forges). Every start gets one about `VENT.at` tiles out (to `VENT.wide`), on a tile
+ * whose 3 by 3 is open, level ground its people can walk to (felling trees if they must), two tiles clear of `keep` and of every other
+ * start's ring: so a Vent Forge can always be raised over it. A start with no such ground (a crowded islet) has the nearest level land
+ * cleared of trees, brush and ore for it. Then one more out on the map for every `VENT.per` towns, at least `VENT.apart` tiles from
+ * every start and `VENT.spread` from each other, as near halfway between two towns as the dice allow, for both to fight over. It changes
+ * no terrain or height. On dice of its own. Returns the tiles, the towns' in start order, then the open ones.
+ */
+function placeVents(seed: number, w: number, h: number, terrain: Uint8Array, height: Float32Array, res: Uint8Array, amount: Int32Array, starts: { x: number; y: number }[], keep: { x: number; y: number }[]): number[] {
+  const out: number[] = [];
+  const rng = mulberry32(seed ^ 0x7e47);
+  const land = (i: number) => terrain[i] === T_GRASS || terrain[i] === T_SAND;
+  const level = (cx: number, cy: number) => {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let y = cy - 1; y <= cy + 2; y++)
+      for (let x = cx - 1; x <= cx + 2; x++) {
+        const v = height[y * (w + 1) + x];
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
+      }
+    return hi - lo <= 1.1;
+  };
+  /** Whether a vent fits at (cx, cy): its 3 by 3 land (and bare, unless `clear`), level, clear of `keep` and of the other vents. */
+  const fits = (cx: number, cy: number, clear: boolean) => {
+    if (cx < 3 || cy < 3 || cx >= w - 3 || cy >= h - 3) return false;
+    for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) if (!land(y * w + x) || (!clear && res[y * w + x] !== R_NONE)) return false;
+    for (const k of keep) if (Math.abs(Math.floor(k.x) - cx) <= 3 && Math.abs(Math.floor(k.y) - cy) <= 3) return false;
+    for (const t of out) if (Math.abs((t % w) - cx) <= 4 && Math.abs(Math.floor(t / w) - cy) <= 4) return false;
+    for (const o of starts) {
+      const dx = o.x - cx;
+      const dy = o.y - cy;
+      if (dx * dx + dy * dy < (VENT.at - 1) * (VENT.at - 1)) return false;
+    }
+    return level(cx, cy);
+  };
+  const near2 = VENT.at * VENT.at;
+  for (const st of starts) {
+    const reach = reachFrom(w, h, terrain, res, st, true);
+    const spots: { x: number; y: number; score: number }[] = [];
+    const r = VENT.wide;
+    for (let y = Math.max(0, st.y - r); y <= Math.min(h - 1, st.y + r); y++)
+      for (let x = Math.max(0, st.x - r); x <= Math.min(w - 1, st.x + r); x++) {
+        const dx = x - st.x;
+        const dy = y - st.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > r * r) continue;
+        // About `VENT.at` out, give or take the dice.
+        spots.push({ x, y, score: -Math.abs(d2 - near2) / (2 * VENT.at) + rng() * 2 });
+      }
+    spots.sort((a, b) => b.score - a.score || a.y - b.y || a.x - b.x);
+    let at = spots.find((p) => reach[p.y * w + p.x] && fits(p.x, p.y, false));
+    if (!at) {
+      // No bare ground in reach: the nearest level land round the start, cleared.
+      at = spots.find((p) => fits(p.x, p.y, true));
+      if (at) {
+        for (let y = at.y - 1; y <= at.y + 1; y++)
+          for (let x = at.x - 1; x <= at.x + 1; x++) {
+            res[y * w + x] = R_NONE;
+            amount[y * w + x] = 0;
+          }
+      }
+    }
+    if (at) out.push(at.y * w + at.x);
+  }
+  // The open vents, out between the towns.
+  const open = Math.floor(starts.length / VENT.per);
+  for (let k = 0; k < open; k++) {
+    let best = -1;
+    let bestScore = -Infinity;
+    for (let tries = 0; tries < 900; tries++) {
+      const x = 3 + Math.floor(rng() * (w - 6));
+      const y = 3 + Math.floor(rng() * (h - 6));
+      let d1 = Infinity;
+      let d2 = Infinity;
+      for (const o of starts) {
+        const d = Math.sqrt((o.x - x) * (o.x - x) + (o.y - y) * (o.y - y));
+        if (d < d1) {
+          d2 = d1;
+          d1 = d;
+        } else if (d < d2) d2 = d;
+      }
+      if (d1 < VENT.apart) continue;
+      if (out.slice(starts.length).some((t) => ((t % w) - x) * ((t % w) - x) + (Math.floor(t / w) - y) * (Math.floor(t / w) - y) < VENT.spread * VENT.spread)) continue;
+      if (!fits(x, y, false)) continue;
+      // Halfway between two towns, and not far out at the map's edge.
+      const score = -(d2 - d1) - d1 * 0.25 + rng() * 3;
+      if (score > bestScore) {
+        bestScore = score;
+        best = y * w + x;
+      }
+    }
+    if (best >= 0) out.push(best);
+  }
+  return out;
 }
 
 /**

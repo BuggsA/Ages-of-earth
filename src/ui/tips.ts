@@ -1,4 +1,4 @@
-import { COCKLE, COCKLER, DELVE, HENGE, SEASON, TICK_HZ, UNDER } from '../sim/data';
+import { COCKLE, COCKLER, DELVE, HENGE, SEASON, TICK_HZ, UNDER, VENT } from '../sim/data';
 import { hiddenFrom } from '../sim/undercity';
 import { TIDE_GATE } from '../sim/data';
 import { AI_GATE_ANSWER } from '../sim/data';
@@ -541,6 +541,18 @@ const TIPS: Tip[] = [
     // The Age of the Undercity (#883): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'undercity',
     text: `Your town can go below now. Select a House, Storehouse, hall or Barrow and <b>Sink</b> it (<kbd>N</kbd>, ${UNDER.cost} stone a tile): in ${UNDER.sink} seconds rivals see bare earth, and no arrow, gun, ship or siege engine can reach it. It still houses, stores and shelters, but trains and researches nothing: <b>Surface</b> it (<kbd>N</kbd>) to work it. No walls or towers guard you now: a rival's foot soldiers who stand on a sunk building ${UNDER.find} seconds find it, so watch the bare ground.`,
+  },
+  {
+    id: 'forges',
+    // The Age of Deep Forges (#884): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'forges',
+    text: `Your people works on the earth's heat now. Raise a <b>${BUILDINGS.ventforge.name}</b> (<kbd>${BUILDINGS.ventforge.key}</kbd>) right over a vent (the cracked, steaming ground by your town; a few more lie out on the map): every building of yours within ${VENT.reach} tiles trains and researches ${VENT.drive - 100}% faster. Out of every forge's reach, a building works ${100 - VENT.cold}% slower, so raise your halls round the vents. A rival's soldiers standing by a vent turn its forge cold: select the forge and <b>Scald</b> (<kbd>X</kbd>) to let its steam out over them.`,
+  },
+  {
+    id: 'rivalForges',
+    // A rival in the Age of Deep Forges (#884): its town runs on its vents.
+    when: (s, me) => s.players.some((q) => q.id !== me && isEnemy(s, me, q.id) && ageOf(q) === 'forges'),
+    text: `A rival works on the earth's heat in the <b>Age of Deep Forges</b>: its Vent Forges drive the halls round them, and its town is slow away from them. Stand soldiers within ${VENT.hold} tiles of a forge's vent, with none of theirs there, and the forge goes cold; but beware its steam: a forge can scald all round its vent. Or raise a forge of your own on an open vent first.`,
   },
   {
     id: 'rivalUndercity',

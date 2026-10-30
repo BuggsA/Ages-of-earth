@@ -1,3 +1,4 @@
+import { scald, scaldProblem } from './forge';
 import { hiddenFrom, inert, sink, sinkProblem, surface, surfaceProblem } from './undercity';
 import { delve, delveProblem } from './delve';
 import { AUTO_WORK, BUILDINGS, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
@@ -203,7 +204,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'hallowed' ? `A rival's Henge holds this ground: nothing is raised within ${HENGE.hold} tiles of it` : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : problem === 'adrift' ? 'A Pontoon is raised beside the shore or beside another of your pontoons, where its builders can stand: to set one farther out, cast it off and tow it' : type === 'pontoon' && (problem === 'dry' || problem === 'water') ? 'A Pontoon is moored on open water that ships sail' : problem === 'beds' ? `A Cockler's Hut goes within ${COCKLER.reach} tiles of a cockle bed` : problem === 'barrage' ? 'A Tide Gate goes on a causeway tile of your own barrage, beside its pond' : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'hallowed' ? `A rival's Henge holds this ground: nothing is raised within ${HENGE.hold} tiles of it` : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : problem === 'adrift' ? 'A Pontoon is raised beside the shore or beside another of your pontoons, where its builders can stand: to set one farther out, cast it off and tow it' : type === 'pontoon' && (problem === 'dry' || problem === 'water') ? 'A Pontoon is moored on open water that ships sail' : problem === 'beds' ? `A Cockler's Hut goes within ${COCKLER.reach} tiles of a cockle bed` : problem === 'barrage' ? 'A Tide Gate goes on a causeway tile of your own barrage, beside its pond' : problem === 'vent' ? 'A Vent Forge is raised right over a vent of the earth\'s heat' : problem === 'hot' ? 'A vent\'s hot ground: only a Vent Forge is raised over a vent, and a people of the Deep Road keeps the ground round one clear' : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -699,6 +700,14 @@ export function applyCommand(s: GameState, c: Command): void {
       if (why) return refuse(s, c.p, why);
       if (c.up) surface(s, b!);
       else sink(s, b!);
+      break;
+    }
+    case 'scald': {
+      // The Age of Deep Forges (#884): a Vent Forge lets its steam out over its vent.
+      const b = myBuilding(s, c.p, c.building);
+      const why = scaldProblem(s, c.p, b);
+      if (why) return refuse(s, c.p, why);
+      scald(s, b!);
       break;
     }
     case 'bell': {

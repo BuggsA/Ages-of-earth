@@ -32,6 +32,7 @@ import { art as chariots } from './chariots';
 import { art as megaliths } from './megaliths';
 import { art as delvings } from './delvings';
 import { art as undercity } from './undercity';
+import { art as forges } from './forges';
 import { art as golden } from './golden';
 import { art as dykes } from './dykes';
 import { art as wild } from './wild';
@@ -52,7 +53,7 @@ import { art as hunt } from './hunt';
 export type { AgeArt } from './types';
 
 /** Every age's art. Each age's file is its own: edit `./<age>.ts`, never this index. */
-export const AGE_ART: Record<AgeId, AgeArt> = { stone, bronze, middle, gunpowder, industrial, atomic, merchant, iron, pilgrim, fair, reclaimer, sail, aeronaut, lightning, warband, steppe, ironblood, totalwar, horde, silk, hemocraft, bloodrite, fission, fusion, alchemy, sapper, searaider, missions, chariots, golden, dykes, wild, grove, rivers, hive, waterline, tides, wildwood, locks, floating, bloom, beggars, leviathans, mycelium, hunt, megaliths, delvings, undercity };
+export const AGE_ART: Record<AgeId, AgeArt> = { stone, bronze, middle, gunpowder, industrial, atomic, merchant, iron, pilgrim, fair, reclaimer, sail, aeronaut, lightning, warband, steppe, ironblood, totalwar, horde, silk, hemocraft, bloodrite, fission, fusion, alchemy, sapper, searaider, missions, chariots, golden, dykes, wild, grove, rivers, hive, waterline, tides, wildwood, locks, floating, bloom, beggars, leviathans, mycelium, hunt, megaliths, delvings, undercity, forges };
 
 /** A drawing as the markup placed on a button: the 32 by 32 box, painted in the age's ink unless the drawing sets its own. */
 export const drawing = (markup: string, size = 26): string => `<svg class="drawn" viewBox="0 0 32 32" width="${size}" height="${size}" fill="currentColor" aria-hidden="true">${markup}</svg>`;

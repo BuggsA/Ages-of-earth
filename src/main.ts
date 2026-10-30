@@ -1,4 +1,5 @@
 import { sink, sinkProblem } from './sim/undercity';
+import { forgeAt } from './sim/forge';
 import { delveProblem } from './sim/delve';
 import './ui/style.css';
 import { Music } from './audio/music';
@@ -1797,8 +1798,14 @@ function updatePlacement(clientX: number, clientY: number): void {
     return;
   }
   const n = BUILDINGS[placing].size;
-  const tx = Math.round(g.x - n / 2);
-  const ty = Math.round(g.y - n / 2);
+  let tx = Math.round(g.x - n / 2);
+  let ty = Math.round(g.y - n / 2);
+  // A Vent Forge (#884) goes right over a vent: the ghost snaps to the nearest one under the pointer.
+  if (placing === 'ventforge') {
+    const near = (s.vents ?? []).filter((t) => Math.abs((t % s.w) + 0.5 - g.x) <= 2.5 && Math.abs(Math.floor(t / s.w) + 0.5 - g.y) <= 2.5)[0];
+    const c = near === undefined ? null : forgeAt(s, near);
+    if (c && !placeProblem(s, 'ventforge', c.tx, c.ty, true, viewer)) ({ tx, ty } = c);
+  }
   // Only on ground the player has seen.
   let seen = true;
   for (let y = ty; y < ty + n && seen; y++) for (let x = tx; x < tx + n; x++) if (x < 0 || y < 0 || x >= s.w || y >= s.h || !s.players[viewer].seen[y * s.w + x]) seen = false;
@@ -1810,7 +1817,8 @@ function placeHere(shift: boolean): void {
   if (!s || !placing || !placeAt) return;
   if (!placeAt.ok) {
     // Ground the tide comes back to (#739) is said as such: it looks like land at low water.
-    hud.toast(placeProblem(s, placing, placeAt.tx, placeAt.ty, true, viewer) === 'tidal' ? "Can't build on the tidal flats: the sea comes back over them" : "Can't build there", 'bad');
+    const why = placeProblem(s, placing, placeAt.tx, placeAt.ty, true, viewer);
+    hud.toast(why === 'tidal' ? "Can't build on the tidal flats: the sea comes back over them" : why === 'vent' ? "A Vent Forge is raised right over a vent of the earth's heat" : why === 'hot' ? "A vent's hot ground: only a Vent Forge is raised over a vent, and a people of the Deep Road keeps the ground round one clear" : "Can't build there", 'bad');
     play('error');
     return;
   }
@@ -2929,6 +2937,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'vent': {
+        // The Deep Forges (#884): a forge of the viewer's gone cold under a rival's soldiers, or its steam let out.
+        if (ev.owner !== viewer) break;
+        if (ev.what === 'cold') {
+          hud.toast(`❄ ${s.players[ev.by!]?.name ?? 'A rival'}'s soldiers hold the vent under your Vent Forge: it has gone cold. Drive them off, or scald them`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        } else if (ev.what === 'scald' && ev.n) hud.toast(`♨ Your Vent Forge scalded ${ev.n} of the enemy round its vent`, 'good');
+        break;
+      }
       case 'sink': {
         // The Undercity (#883): a sunk building found by rival feet or a keg, told to both sides.
         if (ev.what !== 'found' && ev.what !== 'caved') break;
@@ -3785,6 +3802,29 @@ function frame(now: number): void {
     const spot = findSpot(s, 'henge', p.startX, p.startY, 5, 14, 1, (tx, ty) => !placeProblem(s, 'henge', tx, ty, true, owner));
     if (!spot) return 0;
     const b = placeBuilding(s, owner, 'henge', spot.tx, spot.ty, true);
+    view.rig.focus(b.x, b.y);
+    return b.id;
+  },
+  /**
+   * The Age of Deep Forges (testing, #884): turn a player to the age (having walked the road to it), give it stone and gold, and raise a
+   * finished Vent Forge over its home vent. Returns the forge's id, or 0 when there is no vent to raise it on.
+   */
+  forges(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.forges.tier;
+      p.age = 'forges';
+    });
+    p.walked = [...new Set([...(p.walked ?? []), 'megaliths', 'delvings', 'undercity'] as AgeId[])];
+    p.res.stone += 1000;
+    p.res.gold += 1000;
+    const vent = s.vents?.[owner];
+    if (vent === undefined) return 0;
+    const at = forgeAt(s, vent);
+    if (placeProblem(s, 'ventforge', at.tx, at.ty, true, owner)) return 0;
+    const b = placeBuilding(s, owner, 'ventforge', at.tx, at.ty, true);
     view.rig.focus(b.x, b.y);
     return b.id;
   },

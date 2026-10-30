@@ -1,5 +1,6 @@
 import { delvers, isBelow, isMouth } from '../sim/delve';
 import { sinkCost, sinkProblem, surfaceProblem } from '../sim/undercity';
+import { forgeDrives, forgeIdle, scaldProblem } from '../sim/forge';
 import { gathered, solstice } from '../sim/henge';
 import { crestSvg } from './crests';
 import { seasonAt, seasonOf } from '../sim/seasons';
@@ -12,7 +13,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { UNDER, DELVE, HENGE, SEASON, FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
+import { VENT, UNDER, DELVE, HENGE, SEASON, FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -1338,6 +1339,19 @@ export class Hud {
       const pond = pondBehind(s, b).length;
       status += ` · <span data-tip="<b>Tide Gate</b>Shut, the barrage holds its pond (${pond} tiles of flats) at every hour. The head of water is the pond held above the sea outside: with ${TIDE_GATE.least} tiles of head or more, opening the gate sends it out as a scour over up to ${TIDE_GATE.spread} tiles of bared flats a tile of head, within ${TIDE_GATE.reach} tiles of the gate: for ${TIDE_GATE.secs} seconds they are under water, and whoever stands there is swept off, ${TIDE_GATE.hurt} health lost, or drowned with no shore near. Open, the pond runs with the tide.">${!gateWorks(s, b) ? '💤 Shut: it works only in the Age of Tides' : pouring ? '🌊 Scouring: the pond is pouring out' : b.open ? '🚪 Open: the pond runs with the tide' : reach ? `⚠ Loaded: ${head} tiles of head, would scour ${reach} tiles of flats` : head ? `🚪 Shut: ${head} tiles of head, too little to scour` : '🚪 Shut: no head of water above the sea'}</span>`;
     }
+    // A Vent Forge (#884): hot or cold and why, and how many of its owner's buildings it drives.
+    if (b.built && b.type === 'ventforge') {
+      const still = forgeIdle(s, b);
+      const r2 = VENT.reach * VENT.reach;
+      const n = s.ents.filter((e) => e.kind === 'building' && e.owner === b.owner && e.built && e.hp > 0 && BUILDINGS[e.type].trains.length > 0 && (e.x - b.x) * (e.x - b.x) + (e.y - b.y) * (e.y - b.y) <= r2).length;
+      status += ` · <span data-tip="<b>Vent Forge</b>Hot, it drives every building of yours within ${VENT.reach} tiles: they train and research ${VENT.drive - 100}% faster. It goes cold while a rival's soldiers stand within ${VENT.hold} tiles of its vent and none of yours do. Scald lets its steam out: rivals within ${VENT.scald} tiles of the vent take ${VENT.burn}, and the forge lies cold ${VENT.spent} seconds.">${still ? `❄ ${still}` : `🔥 Hot: drives ${n} building${n === 1 ? ' that trains' : 's that train'}`}</span>`;
+    }
+    // The vents (#884): in the Deep Forges, whether a forge drives this building, or it works slow out of every one's reach.
+    if (mine && b.built && ageDef(p).vents && def.trains.length > 0 && b.type !== 'ventforge') {
+      status += forgeDrives(s, b)
+        ? ` · <span data-tip="<b>Driven by the vents</b>A hot Vent Forge of yours stands within ${VENT.reach} tiles: this building trains and researches ${VENT.drive - 100}% faster.">🔥 Driven: works ${VENT.drive - 100}% faster</span>`
+        : ` · <span data-tip="<b>Far from the vents</b>No hot Vent Forge of yours stands within ${VENT.reach} tiles, so this building works ${100 - VENT.cold}% slower. Raise one over a vent near it, or win its vent back.">❄ Cold: works ${100 - VENT.cold}% slower</span>`;
+    }
     // A dam (#701 s5): whether its turbines turn, how many of its owner's buildings they drive, and the burst it holds back.
     if (b.built && b.type === 'dam') {
       const still = damIdle(s, b);
@@ -1991,6 +2005,11 @@ export class Hud {
         if (k && k.building === b.type) {
           const why = keepsakeProblem(p, b);
           cmds.push({ key: 'J', pic: '', glyph: '🏺', title: 'Keep this one', desc: `Make this ${def.name} the ${ageDef(p).name}'s keepsake: when your people leaves the age, it keeps ${k.does}, on any road. Only one is kept; unchosen, the oldest is. Raze it and the keepsake is gone.`, ok: !why && b.keep !== ageOf(p), on: b.keep === ageOf(p), why: why ?? 'Already your keepsake', run: () => this.act.issue({ t: 'keepsake', p: viewer, building: b.id }) });
+        }
+        // The Deep Forges (#884): let a forge's steam out over its vent.
+        if (b.type === 'ventforge') {
+          const why = scaldProblem(s, viewer, b);
+          cmds.push({ key: 'X', pic: '', glyph: '♨', title: 'Scald', desc: `Let the forge's steam out over its vent: every rival on the ground within ${VENT.scald} tiles of it takes ${VENT.burn}. The forge then lies cold ${VENT.spent} seconds, driving nothing, and its vent breathes again after ${VENT.again}.`, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'scald', p: viewer, building: b.id }), this.act.sound('queue')) });
         }
         // The Undercity (#883): sink it, or bring it back up.
         if (UNDER.kinds.includes(b.type) && (b.sunk || ageDef(p).sinks || b.keep === 'undercity')) {
