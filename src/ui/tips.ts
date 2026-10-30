@@ -1,4 +1,4 @@
-import { COCKLE, COCKLER, DELVE, FAULT, HENGE, SEASON, TICK_HZ, UNDER, VENT } from '../sim/data';
+import { COCKLE, COCKLER, DELVE, FAULT, HENGE, LIVING, SEASON, TICK_HZ, UNDER, VENT } from '../sim/data';
 import { hiddenFrom } from '../sim/undercity';
 import { TIDE_GATE } from '../sim/data';
 import { AI_GATE_ANSWER } from '../sim/data';
@@ -553,6 +553,18 @@ const TIPS: Tip[] = [
     // The Age of Faults (#900): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'faults',
     text: `Your people can break the land now. Raise a <b>${BUILDINGS.faultengine.name}</b> (<kbd>${BUILDINGS.faultengine.key}</kbd>) within ${FAULT.tap} tiles of a vent, select it and <b>Crack</b> (<kbd>F</kbd>): click where the crack begins and where it ends, up to ${FAULT.len} tiles. After ${FAULT.charge} seconds the ground opens into a chasm no one crosses on foot: shut a pass, cut an army off, or open it under a rival's forward buildings. Every people sees the charge coming, and a rival holding your engine's vent stops the clock.`,
+  },
+  {
+    id: 'living',
+    // The Age of the Living Earth (#904): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'living',
+    text: `The land is yours to move. Raise a <b>${BUILDINGS.heartstone.name}</b> (<kbd>${BUILDINGS.heartstone.key}</kbd>) within ${LIVING.tap} tiles of a vent. Select it to <b>Raise a ridge</b> (<kbd>R</kbd>) no army crosses, or close a chasm; to <b>Swallow</b> (<kbd>W</kbd>) a district of your own below the ground in ${LIVING.gulp} seconds, where it rides out a warhead; and to wake <b>the Quake</b> (<kbd>Q</kbd>) anywhere on the map: ${LIVING.quake} seconds that every people sees, then the land splits and shakes for good, your own ground round the stone too. No Docks or Airfields now.`,
+  },
+  {
+    id: 'rivalLiving',
+    // A rival in the Age of the Living Earth (#904): its Quake and its vaults.
+    when: (s, me) => s.players.some((q) => q.id !== me && isEnemy(s, me, q.id) && ageOf(q) === 'living'),
+    text: `A rival moves the land in the <b>Age of the Living Earth</b>. When the earth groans and golden seams glow, its Heartstone is waking the Quake: ${LIVING.quake} seconds to raze the stone, or stand soldiers by its vent to stop the clock. Its ridges come down to kegs; fliers cross them. What it has sunk rides out a warhead, but foot soldiers who find it and kegs still cave it in.`,
   },
   {
     id: 'rivalFaults',

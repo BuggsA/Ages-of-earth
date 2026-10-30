@@ -13,6 +13,8 @@ const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
 /** A chasm (#900) on the minimap: near black, a cold teal cast. */
 const CHASM_RGB = [18, 30, 32];
+/** A ridge of the Living Earth (#904): dark moss-green rock. */
+const RIDGE_RGB = [64, 84, 52];
 const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), (s.flooded ?? 0) + (s.inundated ?? 0) + (s.tideTurns ?? 0));
 import { R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 import { R_COCKLE } from '../sim/types';
@@ -58,6 +60,8 @@ export class Minimap {
   private drainedSeen = 0;
   /** Tiles cracked open when the chasms were last painted (#900). */
   private crackedSeen = -1;
+  /** The chasm and ridge marks as last painted (#904: a chasm can close, a ridge come down). */
+  private chasmSeen: Uint8Array | null = null;
   private img: ImageData | null = null;
   private pings: Ping[] = [];
   private dragging = false;
@@ -125,6 +129,7 @@ export class Minimap {
     this.terr = Uint8Array.from(s.terrain);
     this.drainedSeen = drained(s);
     this.crackedSeen = -1;
+    this.chasmSeen = null;
     this.pings = [];
     this.waymarks.reset();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -166,12 +171,15 @@ export class Minimap {
       }
     }
     // Chasms (#900): ground split open shows as a black seam, teal at its lips.
-    if ((s.cracked ?? 0) !== this.crackedSeen && s.chasm) {
-      this.crackedSeen = s.cracked ?? 0;
+    // Ridges (#904) as dark green rock; a chasm closed or a ridge levelled is meadow again.
+    if ((s.cracked ?? 0) + (s.heaved ?? 0) !== this.crackedSeen && s.chasm) {
+      this.crackedSeen = (s.cracked ?? 0) + (s.heaved ?? 0);
+      const was = (this.chasmSeen ??= new Uint8Array(s.w * s.h));
       for (let i = 0; i < s.w * s.h; i++) {
-        if (!s.chasm[i]) continue;
-        this.land.set(CHASM_RGB, i * 3);
-        this.green[i] = 0;
+        if (s.chasm[i] === was[i]) continue;
+        was[i] = s.chasm[i];
+        this.land.set(s.chasm[i] === 1 ? CHASM_RGB : s.chasm[i] === 2 ? RIDGE_RGB : (i * 7) % 5 ? rgb('#6fa548') : rgb('#7fb354'), i * 3);
+        this.green[i] = s.chasm[i] ? 0 : 1;
       }
     }
     if (!reveal) this.waymarks.update(s, viewer);

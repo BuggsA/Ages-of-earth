@@ -32,6 +32,8 @@ const UNDER_SINK = { cost: 10, sink: 15, rise: 25, find: 5 };
 const VENT_HEAT = { reach: 9, drive: 150, cold: 75, hold: 4, scald: 5, burn: 60, spent: 20, again: 45 };
 /** The Faults' engines (#900, `FAULT`), named here so the age's and the engine's words can say them. */
 const FAULT_CRACK = { tap: 7, reach: 22, len: 12, charge: 40, fall: 50, hurl: 40, again: 90 };
+/** The Living Earth's Heartstone (#904, `LIVING`), named here so the age's and the stone's words can say them. */
+const LIVING_EARTH = { tap: 7, reach: 24, len: 10, rise: 20, quake: 90, wide: 9, again: 240, gulp: 4, district: 3, home: 12, shake: 60, shook: 30, backlash: 20, vault: 25 };
 /** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
 const HIVE_REACH = 6;
 const HIVE_TREES = 8;
@@ -261,6 +263,11 @@ export interface Age {
    * nothing crosses on foot (`FAULT`, `fault.ts`). A verb, carried into a Golden Age.
    */
   faults?: boolean;
+  /**
+   * The Age of the Living Earth (#904, the Deep Road's last age): a Heartstone by a vent raises ridges and closes chasms, swallows a
+   * district below the ground at once, and wakes the Quake (`LIVING`, `living.ts`). A verb, carried into a Golden Age.
+   */
+  living?: boolean;
 }
 
 /**
@@ -942,6 +949,28 @@ export const AGES: Record<AgeId, Age> = {
     vents: true,
     faults: true,
     carries: ['barrow', 'ventforge'],
+  },
+  // The Deep Road's last age (#876 s6, #904): past the Faults, as the Floating Cities lie past the Tides, a people that moves the land
+  // itself. The kaname-ishi at Kashima, the keystone said to pin the great catfish whose thrashing shakes Japan; Paricutín, which rose
+  // out of a Mexican cornfield in 1943 and stood a mountain within the year; Zhang Heng's bronze vessel of 132, that felt a quake far
+  // off before any rider brought word of it.
+  living: {
+    verb: 'Move the land itself: raise ridges that no army crosses and close the chasms, swallow a whole district below the ground in a breath, and wake the Quake that splits and shakes a rival town for good; and a town sunk in its deep vaults rides out a warhead',
+    door: 'No Dock, Airfield or Missile Silo: no navy or air of your own. The Quake charges longer than any warhead\'s clock, seen and felt by every people, and every great quake shakes your own ground round the Heartstone too',
+    good: 'The Deep Road\'s last word: a map that is yours to shape, and a town a warhead cannot reach',
+    routes: ['deep'],
+    keepsake: { building: 'heartstone', does: 'raising ridges and closing chasms, on any road' },
+    name: 'Age of the Living Earth',
+    short: 'Living Earth',
+    tier: 5,
+    blurb: `As the keystone at Kashima, the kaname-ishi, is said to pin the great catfish whose thrashing shakes Japan; as Paricutín rose out of a Mexican cornfield in 1943 and stood a mountain within the year; as Zhang Heng's bronze vessel of 132 felt a quake far off before any rider brought word: a people for whom the ground is alive. Raise a Heartstone (O, stone and gold, one to a people) within ${LIVING_EARTH.tap} tiles of a vent. Select it and Raise a ridge (R): click where it begins and where it ends, up to ${LIVING_EARTH.len} tiles long and within ${LIVING_EARTH.reach} tiles of the stone; ${LIVING_EARTH.rise} seconds on, the line heaves up into living rock that nothing crosses but fliers, and any chasm on it closes over. Swallow (W): click your own ground, and every House, Storehouse, hall and Barrow of yours within ${LIVING_EARTH.district} tiles goes below at once, in ${LIVING_EARTH.gulp} seconds. Sunk, they ride out a warhead in their deep vaults. The Quake (Q): click any ground on the map, as a warhead flies anywhere; the stone charges ${LIVING_EARTH.quake} seconds, longer than any warhead's clock, while every people sees the seams glow and feels the tremor. Then the ground splits in a cross of chasm and ridge ${LIVING_EARTH.wide} tiles out from its heart, for good: every building within ${LIVING_EARTH.wide} tiles is shaken (${LIVING_EARTH.shake}% of its strength near the heart, ${LIVING_EARTH.shook}% farther out, a sunk one a quarter of that), and your own buildings within ${LIVING_EARTH.home} tiles of the Heartstone lose ${LIVING_EARTH.backlash}%. A rival's soldiers holding the stone's vent stall its clock, and razing it loses the charge. Kegs still cave in what is sunk, and level a ridge. Fault Engines still crack, the forges drive and the tunnel runs. No Dock, Airfield or Missile Silo is raised.`,
+    noBuild: { buildings: ['dock', 'airfield', 'silo'], why: 'A people of the living earth keeps to the ground: no Dock, Airfield or Missile Silo until it rejoins the Atomic Age' },
+    delves: true,
+    sinks: true,
+    vents: true,
+    faults: true,
+    living: true,
+    carries: ['barrow', 'ventforge', 'faultengine'],
   },
   // The Water Road's sixth age (#739, s6 of #701): instead of the Atomic Age, a people that keeps the sea's hours. Reached for now by a
   // turn off the Atomic Age (the Age of Locks, s5, will lead here too). The tide wakes for the whole world when the first people enters.
@@ -1848,6 +1877,16 @@ export const ROADS: Road[] = [
     blurb: 'A turn, not a climb, for a people that worked the earth\'s heat before: break the land itself. Fault Engines by the vents crack the ground into chasms no one crosses on foot. What it gives up: the Missile Silo, and every charge is seen by every people.',
   },
   { from: 'faults', to: 'atomic', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Let the ground lie still: the ordinary Atomic Age, with Missile Silos. The chasms stay open for good; the engines sleep but for the one kept.' },
+  // The Deep Road's last age (#876 s6, #904): on from the Faults only; back to the Faults, or across to the Atomic.
+  {
+    from: 'faults',
+    to: 'living',
+    cost: { food: 2200, stone: 1600, gold: 1000 },
+    time: 100,
+    blurb: 'The Deep Road\'s last age, past the Atomic: from breaking the land to moving it. A Heartstone by the vent raises ridges no army crosses, swallows a district below the ground in a breath, and wakes the Quake; and what is sunk rides out a warhead. Paid in stone. What it gives up: Docks, Airfields and the Missile Silo, and a Quake that shakes your own ground too.',
+  },
+  { from: 'living', to: 'faults', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Back to the Age of Faults: the ridges stand and the chasms stay, but the Heartstone sleeps, all but the one you keep, and your vaults no longer turn a warhead.' },
+  { from: 'living', to: 'atomic', cost: { food: 500, gold: 400, stone: 200 }, time: 40, blurb: 'Cross to the ordinary Atomic Age, with Docks, Airfields and the Missile Silo: the ridges stand and the chasms stay, but the Heartstone sleeps, all but the one you keep.' },
 ];
 
 /**
@@ -3016,6 +3055,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
   // The Age of Deep Forges (#884, the Deep Road): raised over a vent, it drives the buildings round it (`VENT`, `forge.ts`).
   // The Age of Faults (#900, the Deep Road): raised by a vent, it cracks the ground into a chasm along a line (`FAULT`, `fault.ts`).
+  // The Living Earth (#904, the Deep Road): a living stone by a vent that raises ridges, swallows districts and wakes the Quake (`LIVING`, `living.ts`).
+  heartstone: { name: 'Heartstone', size: 3, hp: 3000, cost: { stone: 600, gold: 300 }, time: 70, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, ages: ['living'], menu: 'mil', key: 'O', blurb: `A great standing stone of green living rock veined with gold, one to a people, raised within ${LIVING_EARTH.tap} tiles of a vent and drawing on it. Raise a ridge (R) up to ${LIVING_EARTH.len} tiles long within ${LIVING_EARTH.reach} tiles: ${LIVING_EARTH.rise} seconds on, it heaves up into rock nothing crosses but fliers, closing any chasm on the line. Swallow (W) sinks every House, Storehouse, hall and Barrow of yours within ${LIVING_EARTH.district} tiles of a point in ${LIVING_EARTH.gulp} seconds. The Quake (Q), aimed anywhere on the map, charges ${LIVING_EARTH.quake} seconds, seen by every people, then splits and shakes the ground ${LIVING_EARTH.wide} tiles round where you aimed it, and your own ground round the stone. Its clock stops while a rival's soldiers hold its vent; raze it and the charge is lost.` },
   faultengine: { name: 'Fault Engine', size: 3, hp: 2400, cost: { stone: 450, gold: 150 }, time: 55, pop: 0, sight: 7, trains: [], drop: [], epoch: 5, ages: ['faults'], menu: 'mil', key: 'Q', blurb: `A great wedge of teal-veined stone driven into split rock, raised within ${FAULT_CRACK.tap} tiles of a vent of the earth's heat and drawing on it. Crack (F): click where the crack begins and where it ends, up to ${FAULT_CRACK.len} tiles long and within ${FAULT_CRACK.reach} tiles of the engine. It charges ${FAULT_CRACK.charge} seconds, seen by every people, then the ground opens into a chasm no one crosses on foot: buildings on it lose half their strength, and whoever stands there is thrown clear. Its clock stops while a rival's soldiers hold its vent; raze it and the charge is lost. It cracks again ${FAULT_CRACK.again} seconds after.` },
   ventforge: { name: 'Vent Forge', size: 3, hp: 2000, cost: { stone: 250, gold: 100 }, time: 45, pop: 0, sight: 6, trains: [], drop: [], epoch: 4, ages: ['forges'], menu: 'mil', key: 'V', blurb: `A forge of black basalt raised over a vent of the earth's heat, and over nothing else: one to a vent, and nothing else is built on a vent. It burns no wood. While it stands hot, every building of yours within ${VENT_HEAT.reach} tiles trains and researches half again as fast. It goes cold while a rival's soldiers stand within ${VENT_HEAT.hold} tiles of its vent and none of yours do. Scald (X) lets its steam out: every rival soldier within ${VENT_HEAT.scald} tiles of the vent takes ${VENT_HEAT.burn}, and the forge lies cold ${VENT_HEAT.spent} seconds.` },
   barrow: { name: 'Barrow', size: 2, hp: 1400, cost: { stone: 120, wood: 40 }, time: 35, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['delvings'], garrison: 12, menu: 'mil', key: 'C', blurb: 'A turf-roofed mouth of dressed stone into the earth. Shelters twelve (no riders), and joins the tunnel that runs to every Barrow and Town Center of yours: select it with people inside and Delve (D) to another mouth, and they go below and come up there, five tiles a second. One that falls spills those bound for it out where it stood.' },
@@ -3631,6 +3672,33 @@ export const VENT = { ...VENT_HEAT, at: 8, wide: 14, per: 2, apart: 18, spread: 
  * `aiNear` tiles of home, else under the rival building nearest home in reach.
  */
 export const FAULT = { ...FAULT_CRACK, cost: { stone: 300, gold: 100 } as Cost, clear: 3, most: 2, spanFrom: 2, take: 0.7, stay: 300, aiArmy: 5, aiNear: 26 };
+
+/**
+ * The Age of the Living Earth (#904, `living.ts`). A Heartstone stands with its centre within `tap` tiles of a vent's, one to a people
+ * (`most`), and charges only while no rival holds that vent. A ridge runs between two tiles at most `len` apart, both within `reach`
+ * of the stone; it costs `ridgeCost`, rises in `rise` seconds, and another may be ordered `reraise` seconds after. The Quake is aimed
+ * anywhere on the map, costs `quakeCost`, charges `quake` seconds and wakes again `again` seconds after: four seams split from its heart
+ * `wide` tiles out (two chasm, two ridge, square or slanting by where it was aimed), every building within `wide` is shaken `shake`
+ * hundredths of its strength within half of it and `shook` beyond (a sunk one `vault` hundredths of that), every land unit loses
+ * `knock`, and its people's own buildings within `home` of the Heartstone lose `backlash` hundredths. Swallow takes every building of
+ * its people that may sink (`UNDER.kinds`) within `district` tiles (a square) of a point within `reach` down in `gulp` seconds, for
+ * `gulpCost` stone a tile of footprint. A sunk building of a people that walked this age rides out a warhead (`silo.ts`). The computer:
+ * `take` the coin it climbs on from the Faults, keeps the age `stay` seconds at least, swallows the district under a rival warhead's ring
+ * within `aiRing` tiles of its buildings, wakes the Quake on the rival building it sees nearest home (clear of its own town), and raises a ridge across a rival army
+ * as the Faults crack one.
+ */
+export const LIVING = {
+  ...LIVING_EARTH,
+  ridgeCost: { stone: 250, gold: 50 } as Cost,
+  quakeCost: { stone: 800, gold: 600 } as Cost,
+  gulpCost: 5,
+  reraise: 30,
+  knock: 35,
+  most: 1,
+  take: 0.7,
+  stay: 300,
+  aiRing: 6,
+};
 
 export const HENGE = { hold: 7, reach: 6, most: 12, gift: { food: 8, gold: 5 } as Cost, solstice: 2 };
 export const SEASONS = [

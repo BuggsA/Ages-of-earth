@@ -5,6 +5,7 @@ import { hurt, peace } from './combat';
 import { distToRect } from './grid';
 import { isEnemy } from './world';
 import { breachAt } from './tides';
+import { levelRidges } from './living';
 import type { Building, Ent, GameState, Keg, Player, Unit } from './types';
 
 /**
@@ -134,6 +135,8 @@ function blow(s: GameState, k: Keg): void {
   for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building * (e.type === 'dyke' || e.type === 'sluice' || e.type === 'dam' ? BREACH.keg : 1) * caveIn(s, e, k.owner) : KEG.unit, k.owner, null);
   // A rival's causeway or barrage (#748) is packed stone on the sand: the blast breaches it.
   breachAt(s, k.x, k.y, KEG.reach, k.owner);
+  // A ridge of the Living Earth (#904) is rock heaved up, not bedrock: powder at its foot brings it down.
+  levelRidges(s, k.x, k.y, KEG.reach);
   const p = s.players[k.owner];
   p.stats.blown = (p.stats.blown ?? 0) + 1;
   s.events.push({ k: 'keg', owner: k.owner, x: k.x, y: k.y, what: 'blown' });

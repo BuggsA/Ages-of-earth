@@ -2,6 +2,7 @@ import { delvers, isBelow, isMouth } from '../sim/delve';
 import { sinkCost, sinkProblem, surfaceProblem } from '../sim/undercity';
 import { forgeDrives, forgeIdle, scaldProblem } from '../sim/forge';
 import { chargeOf, engineIdle, faultClock, spanOpen } from '../sim/fault';
+import { heaveReady, quakeReady, quakeWait, ridgeWait, stoneIdle, swallowReady } from '../sim/living';
 import { gathered, solstice } from '../sim/henge';
 import { crestSvg } from './crests';
 import { seasonAt, seasonOf } from '../sim/seasons';
@@ -14,7 +15,7 @@ import { peace, rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FAULT, VENT, UNDER, DELVE, HENGE, SEASON, FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
+import { LIVING, FAULT, VENT, UNDER, DELVE, HENGE, SEASON, FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -109,6 +110,8 @@ export interface HudActions {
   delveMode(from: number): void;
   /** The Age of Faults (#900): the next two clicks pick where a Fault Engine's crack begins and ends. */
   faultMode(engine: number): void;
+  /** The Living Earth (#904): the next clicks aim a Heartstone's order: a ridge's two ends, the Quake's heart, or the district to swallow. */
+  earthMode(stone: number, order: 'heave' | 'quake' | 'swallow'): void;
   select(ids: number[]): void;
   focus(x: number, y: number): void;
   sound(name: 'click' | 'error' | 'queue' | 'open'): void;
@@ -887,7 +890,7 @@ export class Hud {
         .join('') +
       (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
       (s.blooms ?? []).map((l) => `<div class="res" data-tip="<b>Bloom Seed</b>${seedTip(s, l, viewer)}">🌱 ${s.players[l.owner].name} ${bloomClock(s, l)}s</div>`).join('') +
-      (s.faults ?? []).map((f) => `<div class="res" data-tip="<b>A tremor builds</b>${s.players[f.owner].name}'s Fault Engine is charging: in ${faultClock(f)} seconds the ground along the glowing line opens into a chasm no one crosses on foot, and what stands there falls.${f.owner === viewer ? '' : ' Raze the engine to lose its charge, or hold its vent with soldiers to stall the clock.'}${f.held ? ' Its vent is held: the clock has stopped.' : ''}">〰 ${s.players[f.owner].name} ${faultClock(f)}s${f.held ? ' ⏸' : ''}</div>`).join('') +
+      (s.faults ?? []).map((f) => `<div class="res" data-tip="<b>${f.kind === 'quake' ? 'The Quake wakes' : 'A tremor builds'}</b>${f.kind === 'quake' ? `${s.players[f.owner].name}'s Heartstone is waking the Quake: in ${faultClock(f)} seconds the ground splits along the golden seams, in a cross of chasm and ridge, and every building within ${LIVING.wide} tiles of its heart is shaken hard. Sunk buildings ride it best.` : f.kind === 'ridge' ? `${s.players[f.owner].name}'s Heartstone is raising a ridge: in ${faultClock(f)} seconds the golden line heaves up into rock that nothing crosses but fliers, and any chasm on it closes.` : `${s.players[f.owner].name}'s Fault Engine is charging: in ${faultClock(f)} seconds the ground along the glowing line opens into a chasm no one crosses on foot, and what stands there falls.`}${f.owner === viewer ? '' : ` Raze the ${f.kind ? 'stone' : 'engine'} to lose its charge, or hold its vent with soldiers to stall the clock.`}${f.held ? ' Its vent is held: the clock has stopped.' : ''}">${f.kind === 'quake' ? '🌋' : f.kind === 'ridge' ? '⛰' : '〰'} ${s.players[f.owner].name} ${faultClock(f)}s${f.held ? ' ⏸' : ''}</div>`).join('') +
       (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${warnTip(s, l, viewer)}">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s${s.players[viewer].team !== s.players[l.owner].team && !revealed(s, l) ? ` · ${ringsFor(s, l, viewer).length} rings` : ''}</div>`).join('') +
       (p.kegs !== undefined || mills(p) || sappers(p) ? `<div class="res" data-tip="<b>Powder kegs</b>Ground from saltpetre at the Siege Workshops in the Age of Alchemy, ${KEG.ore} a keg, up to ${KEG.most} in store. In the Age of Sappers citizens and foot soldiers lay them at a rival building (K): ${KEG.fuse} seconds later each blows, wrecking every rival building within ${KEG.reach} tiles, unless a rival reaches it first and stamps it out.${mills(p) ? `<br>${millProblem(s, p) ?? `The mills grind: next keg in ${Math.max(0, Math.ceil((KEG.time - (p.grind ?? 0)) / Math.max(1, millsOf(s, viewer).length)))}s.`}` : ''}">🧨${kegsOf(p)}</div>` : '') +
       `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
@@ -1348,6 +1351,14 @@ export class Hud {
       const f = chargeOf(s, b);
       const still = f ? null : engineIdle(s, b);
       status += ` · <span data-tip="<b>Fault Engine</b>Ordered to crack, it charges ${FAULT.charge} seconds where every people sees the line, then the ground along it opens into a chasm no one crosses on foot. Its clock stops while a rival's soldiers hold its vent; raze it and the charge is lost.">${f ? (f.held ? `⏸ Stalled: a rival holds its vent, ${faultClock(f)}s left` : `〰 Charging: cracks in ${faultClock(f)}s`) : still ? `💤 ${still}` : '⚡ Ready to crack'}</span>`;
+    }
+    // A Heartstone (#904): what it charges and how long, or what it may do now.
+    if (b.built && b.type === 'heartstone') {
+      const f = chargeOf(s, b);
+      const still = f ? null : stoneIdle(s, b);
+      const q = quakeWait(s, b);
+      const r = ridgeWait(s, b);
+      status += ` · <span data-tip="<b>Heartstone</b>It raises ridges (R) and swallows districts (W), and wakes the Quake (Q). A charge is seen by every people; its clock stops while a rival's soldiers hold its vent, and razing it loses the charge.">${f ? `${f.held ? '⏸ Stalled: a rival holds its vent, ' : f.kind === 'quake' ? '🌋 The Quake wakes: ' : '⛰ A ridge rises: '}${faultClock(f)}s` : still ? `💤 ${still}` : `${q ? `🌋 Quake in ${q}s` : '🌋 The Quake is ready'}${r ? ` · ⛰ ridge in ${r}s` : ''}`}</span>`;
     }
     // A Vent Forge (#884): hot or cold and why, and how many of its owner's buildings it drives.
     if (b.built && b.type === 'ventforge') {
@@ -2020,6 +2031,15 @@ export class Hud {
         }
         // The Deep Forges (#884): let a forge's steam out over its vent.
         // The Faults (#900): crack the ground along a line.
+        // The Living Earth (#904): a Heartstone's three orders.
+        if (b.type === 'heartstone') {
+          const ridge = heaveReady(s, viewer, b);
+          cmds.push({ key: 'R', pic: '', glyph: '⛰', title: 'Raise a ridge', desc: `Then click where the ridge begins and where it ends, up to ${LIVING.len} tiles long and within ${LIVING.reach} tiles of the stone. ${LIVING.rise} seconds on, the golden line heaves up into living rock that nothing crosses but fliers, for good; any chasm on the line closes over into plain ground instead. What stands there loses ${FAULT.fall}% of its strength, and whoever stands there is thrown clear. Another may rise ${LIVING.reraise} seconds after. A rival's kegs bring a ridge down.`, cost: LIVING.ridgeCost, ok: !ridge, why: ridge ?? undefined, run: () => this.act.earthMode(b.id, 'heave') });
+          const gulp = swallowReady(s, viewer, b);
+          cmds.push({ key: 'W', pic: '', glyph: '🕳', title: 'Swallow', desc: `Then click your own ground within ${LIVING.reach} tiles of the stone: every House, Storehouse, hall and Barrow of yours within ${LIVING.district} tiles goes below at once, sunk in ${LIVING.gulp} seconds, for ${LIVING.gulpCost} stone a tile of their footprints. Sunk, they shelter and store but train nothing, and ride out a warhead in their deep vaults; surface each (N) when the danger is past.`, ok: !gulp, why: gulp ?? undefined, run: () => this.act.earthMode(b.id, 'swallow') });
+          const wake = quakeReady(s, viewer, b);
+          cmds.push({ key: 'Q', pic: '', glyph: '🌋', title: 'The Quake', desc: `Then click any ground on the map. The stone charges ${LIVING.quake} seconds, longer than any warhead's clock, while every people sees the golden seams and feels the tremor build. Then the ground splits from that heart in a cross of chasm and ridge ${LIVING.wide} tiles out, for good, and every building within ${LIVING.wide} tiles is shaken: ${LIVING.shake}% of its strength near the heart, ${LIVING.shook}% farther out, a sunk one a quarter of that; everyone on the ground there loses ${LIVING.knock}. Your own buildings within ${LIVING.home} tiles of the stone lose ${LIVING.backlash}%: every great quake shakes your own ground. A rival holding the stone's vent stops the clock, and the charge is lost if the stone falls. It wakes again ${LIVING.again} seconds after.`, cost: LIVING.quakeCost, ok: !wake, why: wake ?? undefined, run: () => this.act.earthMode(b.id, 'quake') });
+        }
         if (b.type === 'faultengine') {
           const why = engineIdle(s, b) ?? (peace(s) ? 'Not while the peace holds' : null) ?? shortfall(p, FAULT.cost);
           cmds.push({ key: 'F', pic: '', glyph: '⚡', title: 'Crack', desc: `Then click where the crack begins and where it ends, up to ${FAULT.len} tiles long and within ${FAULT.reach} tiles of the engine. It charges ${FAULT.charge} seconds, the line and the tremor seen and felt by every people; then the ground opens into a chasm no one crosses on foot, for good. Buildings on it lose ${FAULT.fall}% of their strength; whoever stands there is thrown clear and loses ${FAULT.hurl}. The clock stops while a rival holds the engine's vent, and the charge is lost if the engine falls.`, cost: FAULT.cost, ok: !why, why: why ?? undefined, run: () => this.act.faultMode(b.id) });

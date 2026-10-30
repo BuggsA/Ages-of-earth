@@ -3,16 +3,19 @@ import type { GameState } from '../sim/types';
 import { Kit, bake } from './kit';
 import { bakedMaterial } from './materials';
 import { heightAt } from './terrain';
-import { chasm, seam } from './deepModels';
+import { chasm, ridge, seam, vein } from './deepModels';
 
 /**
- * Chasms and the cracks charging toward them (#900, the Age of Faults). A chasm tile is drawn once the viewer has seen it; a charging
- * crack's seam is drawn for every people wherever it runs (the tremor is felt by all), throbbing as it charges. Models in `deepModels.ts`.
+ * Chasms and the cracks charging toward them (#900, the Age of Faults), and the Living Earth's ridges and golden seams (#904). A chasm
+ * or ridge tile is drawn once the viewer has seen it; a charging crack's seam (gold for a Heartstone's ridge or Quake) is drawn for
+ * every people wherever it runs (the tremor is felt by all), throbbing as it charges. Models in `deepModels.ts`.
  */
 export class ChasmView {
   readonly group = new THREE.Group();
   private pits: THREE.InstancedMesh | null = null;
+  private ridges: THREE.InstancedMesh | null = null;
   private seams: THREE.InstancedMesh | null = null;
+  private veins: THREE.InstancedMesh | null = null;
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private p = new THREE.Vector3();
@@ -31,6 +34,7 @@ export class ChasmView {
     make(k);
     const out = new THREE.InstancedMesh(bake(k.root), bakedMaterial, cap);
     out.receiveShadow = true;
+    out.castShadow = make === ridge;
     out.frustumCulled = false;
     this.group.add(out);
     return out;
@@ -38,33 +42,51 @@ export class ChasmView {
 
   /** `seenTile`: ever seen by the viewer (or everything shown, as in a replay). `now`: seconds, for the seams' throb. */
   update(s: GameState, seenTile: (x: number, y: number) => boolean, now: number): void {
-    if (s.chasm && s.cracked) {
-      this.pits = this.sized(this.pits, s.cracked, chasm);
+    const moved = (s.cracked ?? 0) + (s.heaved ?? 0);
+    if (s.chasm && moved) {
+      this.pits = this.sized(this.pits, s.cracked ?? 0, chasm);
+      this.ridges = this.sized(this.ridges, s.heaved ?? 0, ridge);
       let n = 0;
-      for (let i = 0; i < s.chasm.length && n < this.pits.instanceMatrix.count; i++) {
-        if (!s.chasm[i]) continue;
+      let r = 0;
+      for (let i = 0; i < s.chasm.length; i++) {
+        const c = s.chasm[i];
+        if (!c) continue;
         const x = (i % s.w) + 0.5;
         const y = Math.floor(i / s.w) + 0.5;
         if (!seenTile(x, y)) continue;
+        const mesh = c === 2 ? this.ridges : this.pits;
+        if ((c === 2 ? r : n) >= mesh.instanceMatrix.count) continue;
         this.q.setFromAxisAngle(this.up, (i % 4) * (Math.PI / 2));
         this.p.set(x, heightAt(s, x, y) + 0.01, y);
         this.sc.set(1, 1, 1);
         this.m.compose(this.p, this.q, this.sc);
-        this.pits.setMatrixAt(n++, this.m);
+        mesh.setMatrixAt(c === 2 ? r++ : n++, this.m);
       }
       this.pits.count = n;
       this.pits.instanceMatrix.needsUpdate = true;
-    } else if (this.pits) this.pits.count = 0;
+      this.ridges.count = r;
+      this.ridges.instanceMatrix.needsUpdate = true;
+    } else {
+      if (this.pits) this.pits.count = 0;
+      if (this.ridges) this.ridges.count = 0;
+    }
     const lines = s.faults ?? [];
+    const cracks = lines.filter((f) => !f.kind);
+    const golden = lines.filter((f) => f.kind);
+    this.seams = this.lay(s, this.seams, cracks, seam, now);
+    this.veins = this.lay(s, this.veins, golden, vein, now);
+  }
+
+  /** Draw these charges' lines with `make`'s seam, throbbing faster as each runs down and still while its vent is held. */
+  private lay(s: GameState, mesh: THREE.InstancedMesh | null, lines: NonNullable<GameState['faults']>, make: (k: Kit) => void, now: number): THREE.InstancedMesh | null {
     const total = lines.reduce((a, f) => a + f.line.length, 0);
     if (!total) {
-      if (this.seams) this.seams.count = 0;
-      return;
+      if (mesh) mesh.count = 0;
+      return mesh;
     }
-    this.seams = this.sized(this.seams, total, seam);
+    const out = this.sized(mesh, total, make);
     let n = 0;
     for (const f of lines) {
-      // Throbbing faster as the charge runs down; still while its vent is held.
       const beat = f.held ? 0.6 : 0.75 + 0.25 * Math.sin(now * (3 + 120 / Math.max(20, f.left)));
       for (let j = 0; j < f.line.length; j++) {
         const t = f.line[j];
@@ -76,15 +98,18 @@ export class ChasmView {
         this.p.set(x, heightAt(s, x, y) + 0.02, y);
         this.sc.set(1, beat * 2, 0.6 + beat * 0.6);
         this.m.compose(this.p, this.q, this.sc);
-        this.seams.setMatrixAt(n++, this.m);
+        out.setMatrixAt(n++, this.m);
       }
     }
-    this.seams.count = n;
-    this.seams.instanceMatrix.needsUpdate = true;
+    out.count = n;
+    out.instanceMatrix.needsUpdate = true;
+    return out;
   }
 
   clear(): void {
     if (this.pits) this.pits.count = 0;
+    if (this.ridges) this.ridges.count = 0;
     if (this.seams) this.seams.count = 0;
+    if (this.veins) this.veins.count = 0;
   }
 }
