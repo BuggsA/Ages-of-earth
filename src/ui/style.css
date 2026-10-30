@@ -464,6 +464,9 @@ body.online .tip-box { bottom: 330px; }
 .jr-list { list-style: none; padding: 0; margin: 4px 0; font-size: 13px; }
 .jr-list li { margin: 3px 0; }
 .jr-sub { color: var(--muted); font-size: 12px; margin: 2px 0 0 18px; }
+.phone-welcome { position: fixed; z-index: 60; }
+.phone-welcome p { line-height: 1.5; }
+.phone-welcome a { color: var(--gold-2); }
 .modal .card.wide { width: min(640px, calc(100% - 32px)); }
 .civ-tag { font-size: 11px; color: var(--muted); font-weight: 700; margin-left: 18px; }
 .chart-tabs { display: flex; gap: 4px; justify-content: center; margin: 12px 0 6px; }

@@ -37,6 +37,8 @@ import { isCarrier } from './sim/units';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import { journeyHtml } from './ui/journeyReport';
+import { phoneWelcome } from './ui/phoneWelcome';
+import { shareMatch } from './ui/shareCard';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
 import { KEYS, R_FISH, R_NONE, RES, T_WATER } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
@@ -1304,6 +1306,13 @@ document.addEventListener('click', (e) => {
     case 'replay-save':
       if (game) downloadReplay(game);
       break;
+    case 'share':
+      if (game && lastEnd) {
+        const s = game;
+        const world = !s.scenario && !online ? `${location.origin}${location.pathname}?${new URLSearchParams({ seed: String(s.seed), size: s.size, map: s.mapType })}` : undefined;
+        void shareMatch({ s, viewer, won: lastEnd.won, end: lastEnd.tick, minutes: Math.floor(lastEnd.tick / TICK_HZ / 60), world }, (msg, kind) => hud.toast(msg, kind));
+      }
+      break;
     case 'campaign':
       sound.play('click');
       closeSheets();
@@ -2549,6 +2558,7 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
       <button class="btn wide" data-act="replay-save">Download the replay</button>
+      <button class="btn wide" data-act="share" title="A picture of this match and your road through the ages, with a link to play the same world">Share</button>
       ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? (spectating ? '' : `<button class="btn wide primary" data-act="rematch" title="The same land, seats and peoples, from the start. Starts when everyone in the room asks; click again to take it back.">${rematchLabel()}</button>`) : '<button class="btn wide" data-act="restart" title="The same map, peoples and rivals">Play this seed again</button><button class="btn wide primary" data-act="new-map">Play again</button>'}
       <button class="btn wide" data-act="quit">Quit to title</button>
     </div></div>`;
@@ -4171,8 +4181,13 @@ const roomCode = new URLSearchParams(location.search).get('room')?.toUpperCase()
 startAttract(roomCode.length !== 5);
 if (roomCode.length === 5 && savedName()) connectRoom(roomCode, savedName(), new URLSearchParams(location.search).get('watch') === '1');
 else if (roomCode.length === 5) lobby.showEntry(roomCode);
-else $('title').classList.remove('hidden');
+else {
+  $('title').classList.remove('hidden');
+  phoneWelcome($('app'));
+}
 requestAnimationFrame(frame);
+// Offline play (public/sw.js): the built game only, so the dev server is never cached.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 // A scanned save-key link (#vault=KEY): the key leaves the address bar at once, then the player is asked.
 {
   const scanned = /^#vault=([A-Za-z0-9-]+)$/.exec(location.hash)?.[1];

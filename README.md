@@ -181,6 +181,8 @@ What players love most about the classics, and where to find it here, is written
 - **After the match,** a timeline charts everyone's score, population, army and gathering, with the moment each reached a new epoch. Hover a player's epoch in the table for the minute they reached each age.
 - **Tips for a first game** point the way, one at a time, and can be turned off.
 - **Fog of war** shared by allies; enemy buildings stay as you last saw them until you look again.
+- **Share a match.** The end screen's **Share** button makes a picture of the result and the road you walked through the ages, with a link that opens the same world for a friend (the share sheet on a phone; elsewhere the picture downloads and the text and link are copied). Room invites and world links show their own preview in chat apps.
+- **The site around it.** A guide built from the game's own data (`/guide/`, `/peoples/`, `/ages/`, from `src/site/pages.ts`), a sitemap, link-preview cards and app icons; it installs as an app and, once visited, plays offline (`public/sw.js`; online rooms still need the network). A phone or tablet with no mouse is told, once, that the game is made for a mouse and offered the link to send to a computer.
 
 ## Graphics and sound
 
