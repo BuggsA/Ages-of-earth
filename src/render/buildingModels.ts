@@ -3146,6 +3146,7 @@ function merchantMarket(k: Kit, st: Style): void {
     k.box(0.36, 0.46, 0.03, '#2a1f17', x, 0, 0.6);
     k.box(0.44, 0.06, 0.05, st.trim, x, 0.46, 0.61);
     window(k, st, x, 0.78, 0.6, 0.14, 0.2);
+    for (const dx of [-0.11, 0.11]) k.box(0.05, 0.22, 0.02, st.trim, x + dx, 0.77, 0.61);
   }
   // The roof ridge runs front to back; the stepped gable stands against its front end.
   k.prism(1.84, 0.7, 1.9, st.roof, 0, 1.1, -0.35).rotation.y = Math.PI / 2;
@@ -3182,6 +3183,13 @@ function merchantMarket(k: Kit, st: Style): void {
   k.box(0.34, 0.24, 0.26, '#d8c08a', -1.15, 0, 0.3);
   k.box(0.3, 0.22, 0.26, '#c8b07a', -1.12, 0.24, 0.3);
   k.cyl(0.12, 0.1, 0.28, 8, '#8a6440', 1.15, 0, 0.3);
+  // Sacks of coin and grain stacked by the arcade, and hanging lanterns at the door: a counting-house is full of small stores.
+  for (const [x, z, c] of [[-0.85, 0.42, '#d8c08a'], [-0.7, 0.5, '#c8b07a'], [0.9, 0.45, '#d8c08a'], [0.75, 0.52, '#c8b07a'], [1.0, 0.6, '#e2b23c']] as const) k.sphere(0.13, c, x, 0.12, z).scale.set(1, 0.85, 1);
+  for (const x of [-0.28, 0.28]) {
+    k.cyl(0.012, 0.012, 0.16, 4, IRON_DARK, x, 0.38, 0.66);
+    k.glow(k.sphere(0.06, '#ffd890', x, 0.34, 0.66));
+  }
+  for (const [x, z] of [[1.3, 0.1], [1.15, -0.05]]) k.cyl(0.12, 0.1, 0.28, 8, '#8a6440', x, 0, z);
   banner(k, -1.35, 0, 1.35, 1.3);
 }
 
