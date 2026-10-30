@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed' | 'scald' | 'forgeCold' | 'forgeWarm' | 'tremor' | 'quake'
+  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed' | 'scald' | 'forgeCold' | 'forgeWarm' | 'tremor' | 'quake' | 'deepRumble' | 'greatQuake' | 'heave' | 'swallow'
   | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise' | 'krakenGrip' | 'krakenRise' | 'webRot' | 'webBurn' | 'webGrown' | 'hawkCry';
 
 export interface SoundSettings {
@@ -832,6 +832,36 @@ export class Sound {
         this.noise(out, t + 0.05, { dur: 1.8, filter: 'lowpass', f: 700, to: 80, q: 0.7, peak: 0.1, attack: 0.03 });
         this.tone(out, t + 0.1, { f: 40, to: 26, type: 'sine', dur: 2.6, peak: 0.09, attack: 0.1, lp: 140 });
         for (let i = 0; i < 6; i++) this.noise(out, t + 0.5 + i * 0.19, { dur: 0.1, filter: 'bandpass', f: 500 + i * 140, q: 1.2, peak: 0.025, attack: 0.004 });
+        break;
+      case 'deepRumble':
+        // The Quake wakes (#904), heard by every people: a groan from far under the ground, two deep notes beating slowly against each
+        // other as the earth draws breath, and a bell-like hum of the stone over them.
+        this.tone(out, t, { f: 29, to: 33, type: 'sine', dur: 4.2, peak: 0.09, attack: 1.6, lp: 110 });
+        this.tone(out, t + 0.1, { f: 31, to: 30, type: 'sine', dur: 4.0, peak: 0.07, attack: 1.4, lp: 110 });
+        this.tone(out, t + 0.6, { f: 58, to: 55, type: 'triangle', dur: 3.0, peak: 0.03, attack: 1.0, lp: 220 });
+        this.tone(out, t + 1.2, { f: 220, to: 218, type: 'sine', dur: 2.4, peak: 0.012, attack: 0.8 });
+        this.noise(out, t + 0.8, { dur: 3.0, filter: 'lowpass', f: 160, to: 70, q: 0.6, peak: 0.05, attack: 1.2 });
+        break;
+      case 'greatQuake':
+        // The Quake strikes (#904): a cracking volley as the seams tear open, the roar of the whole ground heaving, and a long shuddering
+        // rumble that rolls on and on as the land settles into its new shape.
+        for (let i = 0; i < 4; i++) this.noise(out, t + i * 0.09, { dur: 0.1, filter: 'highpass', f: 1600 - i * 200, to: 800, q: 0.7, peak: 0.1, attack: 0.002 });
+        this.tone(out, t, { f: 70, to: 22, type: 'square', dur: 0.9, peak: 0.07, attack: 0.004, lp: 400 });
+        this.noise(out, t + 0.1, { dur: 3.2, filter: 'lowpass', f: 600, to: 60, q: 0.7, peak: 0.13, attack: 0.05 });
+        this.tone(out, t + 0.2, { f: 34, to: 20, type: 'sine', dur: 4.5, peak: 0.11, attack: 0.15, lp: 120 });
+        for (let i = 0; i < 10; i++) this.noise(out, t + 0.7 + i * 0.28, { dur: 0.14, filter: 'bandpass', f: 380 + (i % 3) * 160, q: 1.1, peak: 0.03 - i * 0.002, attack: 0.006 });
+        break;
+      case 'heave':
+        // A ridge rises (#904): a grinding scrape of rock on rock climbing in pitch, and the thump of the slabs settling.
+        this.noise(out, t, { dur: 1.2, filter: 'bandpass', f: 300, to: 900, q: 1.4, peak: 0.07, attack: 0.15 });
+        this.tone(out, t, { f: 45, to: 70, type: 'triangle', dur: 1.1, peak: 0.05, attack: 0.2, lp: 260 });
+        for (let i = 0; i < 3; i++) this.tone(out, t + 1.0 + i * 0.16, { f: 80 - i * 10, to: 40, type: 'sine', dur: 0.25, peak: 0.06, attack: 0.004, lp: 300 });
+        break;
+      case 'swallow':
+        // A district goes below at once (#904): a soft giving-way of earth, a long falling slide, and the hush as it closes over.
+        this.noise(out, t, { dur: 1.4, filter: 'lowpass', f: 900, to: 150, q: 0.7, peak: 0.07, attack: 0.05 });
+        this.tone(out, t + 0.05, { f: 140, to: 40, type: 'triangle', dur: 1.3, peak: 0.04, attack: 0.05, lp: 400 });
+        this.tone(out, t + 1.2, { f: 36, to: 30, type: 'sine', dur: 0.8, peak: 0.05, attack: 0.05, lp: 120 });
         break;
       case 'forgeCold':
         // A forge goes cold (#884): the roar of the vent sinking away, and the tick of cooling iron.

@@ -251,3 +251,71 @@ export function seam(k: Kit): void {
   k.glow(k.box(0.86, 0.025, 0.06, CRYSTAL, 0, 0.005, 0));
   k.glow(k.box(0.12, 0.025, 0.4, CRYSTAL, 0.22, 0.005, 0.1)).rotation.y = 0.7;
 }
+
+const LIVING = '#5f7a4e';
+const LIVING_DARK = '#46603a';
+const LIVING_DEEP = '#2e3e28';
+const MOSS = '#7a9a3e';
+const GOLD = '#f2c440';
+const GOLD_PALE = '#ffe9a0';
+
+/**
+ * A Heartstone (#904, the Living Earth): Kashima's keystone grown to a monolith. A tall standing stone of green living rock, veined
+ * with gold that glows from within, rises from a mossed mound; round its foot the ground has heaved up in four tilted slabs, and four
+ * gold seams run out from it over the floor in a cross, the shape the Quake splits the land in. The owner's banner on a pole of root.
+ */
+export function heartstone(k: Kit, base: string): void {
+  k.box(2.9, 0.05, 2.9, base, 0, -0.02, 0);
+  k.sphere(1.05, MOSS, 0, -0.55, 0, undefined, 9).scale.set(1, 0.6, 1);
+  // The four seams, in a cross, and the slabs heaved up between them.
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const c = Math.cos(a);
+    const sn = Math.sin(a);
+    k.glow(k.box(0.08, 0.03, 1.1, GOLD, sn * 0.9, 0.03, c * 0.9)).rotation.y = a;
+    const b = a + Math.PI / 4;
+    const slab = k.box(0.5, 0.75 + rnd(i, 3, 5) * 0.3, 0.2, i % 2 ? LIVING : LIVING_DARK, Math.sin(b) * 1.05, 0, Math.cos(b) * 1.05);
+    slab.rotation.y = b;
+    slab.rotation.x = -0.35;
+  }
+  // The stone itself, tapering, with its crown.
+  k.box(0.7, 1.9, 0.55, LIVING, 0, 0.05, 0).rotation.y = 0.15;
+  k.box(0.56, 0.5, 0.44, LIVING_DARK, 0.02, 1.9, 0).rotation.y = 0.2;
+  k.pyramid(0.5, 0.4, 0.4, LIVING_DEEP, 0.03, 2.38, 0);
+  // Its veins of gold, down the face and over the shoulder.
+  for (const [x, y, h, r] of [[0.08, 0.35, 1.3, 0.12], [-0.16, 0.9, 0.8, -0.2], [0.18, 1.6, 0.5, 0.3]] as const) k.glow(k.box(0.05, h, 0.04, GOLD, x, y, 0.28)).rotation.z = r;
+  k.glow(k.box(0.04, 0.6, 0.05, GOLD_PALE, -0.33, 1.2, 0.05));
+  // A few gold-veined stones at its foot.
+  for (const [x, z, s] of [[0.55, 0.45, 1], [-0.6, 0.5, 0.8], [0.45, -0.6, 0.7]] as const) {
+    k.rock(0.16 * s, LIVING_DEEP, x, 0.04, z);
+    k.glow(k.box(0.14 * s, 0.02, 0.02, GOLD, x, 0.14 * s, z + 0.05)).rotation.y = 0.6;
+  }
+  k.cyl(0.03, 0.04, 1.2, 5, '#4a3a24', -1.0, 0, -0.95);
+  k.team(k.box(0.34, 0.2, 0.02, TEAM, -0.83, 0.95, -0.95));
+  k.team(k.box(2.98, 0.08, 2.98, TEAM, 0, -0.06, 0));
+}
+
+/**
+ * A tile of ridge (#904): the ground heaved up into slabs of green living rock, tilted as they broke, too steep to climb, with gold in
+ * the cracks between them and moss at their foot. Drawn over the ground, one to a tile, so a line of them reads as one ridge.
+ */
+export function ridge(k: Kit): void {
+  k.box(1.02, 0.08, 1.02, LIVING_DEEP, 0, 0, 0);
+  k.box(0.9, 0.06, 0.9, MOSS, 0, 0.04, 0);
+  for (let i = 0; i < 3; i++) {
+    const x = (i - 1) * 0.3;
+    const h = 0.75 + rnd(i, 7, 3) * 0.4;
+    const s = k.box(0.3, h, 0.7, i % 2 ? LIVING : LIVING_DARK, x, 0.02, (rnd(i, 5, 9) - 0.5) * 0.2);
+    s.rotation.z = (i - 1) * 0.28 + (rnd(i, 3, 11) - 0.5) * 0.15;
+  }
+  k.glow(k.box(0.04, 0.5, 0.5, GOLD, -0.15, 0.1, 0));
+  k.glow(k.box(0.04, 0.4, 0.4, GOLD, 0.16, 0.1, 0.05));
+  k.rock(0.12, LIVING_DEEP, 0.35, 0.05, 0.38);
+}
+
+/** A tile of a Heartstone's charge (#904): a seam of gold in the ground, where a ridge will rise or the Quake split, seen by every people. */
+export function vein(k: Kit): void {
+  k.box(0.9, 0.02, 0.14, LIVING_DEEP, 0, 0, 0);
+  k.glow(k.box(0.86, 0.025, 0.07, GOLD, 0, 0.005, 0));
+  k.glow(k.box(0.14, 0.025, 0.36, GOLD_PALE, -0.2, 0.005, -0.08)).rotation.y = -0.6;
+}

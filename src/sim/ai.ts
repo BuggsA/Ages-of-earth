@@ -21,6 +21,8 @@ import { hiddenFrom, sinkProblem, surfaceProblem } from './undercity';
 import { forgeAt, forgeHot, forgeOver, scaldProblem, ventOf } from './forge';
 import { engineIdle, faultProblem } from './fault';
 import { FAULT } from './data';
+import { LIVING } from './data';
+import { districtAt, heaveProblem, quakeProblem, stoneIdle, swallowProblem } from './living';
 import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
@@ -345,6 +347,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   underWork(s, v, mem, issue);
   forgeWork(s, v, mem, issue);
   faultWork(s, v, mem, issue);
+  livingWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
   leviathanWork(s, v, mem, issue);
@@ -729,6 +732,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'forges') {
     // The Deep Road's fourth age (#884): a people that lived below goes on down to the earth's heat, on a coin of its own.
     roads[to] = hasWalked(p, 'undercity') && coin(s, p.id, 0xde14) < VENT.take;
+  } else if (roads[to] === undefined && to === 'living') {
+    // The Deep Road's last age (#904): a people that broke the land goes on to move it, on a coin of its own.
+    roads[to] = hasWalked(p, 'faults') && coin(s, p.id, 0xde16) < LIVING.take;
   } else if (roads[to] === undefined && to === 'faults') {
     // The Deep Road's fifth age (#900): a people that worked the earth's heat goes on to break the land, on a coin of its own.
     roads[to] = hasWalked(p, 'forges') && coin(s, p.id, 0xde15) < FAULT.take;
@@ -923,6 +929,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'forges' && s.tick - (mem.forges?.since ?? s.tick) < secs(VENT.stay)) return null;
   // The Faults (#900) are kept a while, so an engine is raised and cracks the ground at least once.
   if (walksWeb(v) && ageOf(p) === 'faults' && s.tick - (mem.faults?.since ?? s.tick) < secs(FAULT.stay)) return null;
+  // The Living Earth (#904) is kept a while, so its Heartstone is raised and the Quake woken at least once.
+  if (walksWeb(v) && ageOf(p) === 'living' && s.tick - (mem.living?.since ?? s.tick) < secs(LIVING.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
@@ -4473,6 +4481,108 @@ function faultWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   if (!line) return;
   issue({ t: 'fault', p: p.id, building: eng.id, ...line });
   f.crack = s.tick;
+}
+
+const LIVING_ROAD = ROADS.find((r) => r.from === 'faults' && r.to === 'living')!;
+
+/**
+ * The Age of the Living Earth (#904): the climb into it from the Faults, then a Heartstone by the vent nearest home. Then, in turn of need: when a rival warhead's ring falls
+ * within `LIVING.aiRing` tiles of its buildings, it swallows the district under the ring; when a rival army of `FAULT.aiArmy` comes
+ * within `FAULT.aiNear` of home and its engines are busy, it raises a ridge across the army's way; and otherwise it wakes the Quake on
+ * the rival building it has seen nearest home, `LIVING.wide` and `LIVING.home` out at least, so the shaking spares its own town.
+ */
+function livingWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  // From the Faults, kept their while, a town bound for the Living Earth (`wants`) saves for the road and turns once the Town Center is
+  // free: the age lies past the last epoch, where the climb in `nextRoad` never looks.
+  const kept = ageOf(p) === 'faults' && s.tick - (mem.faults?.since ?? s.tick) >= secs(FAULT.stay);
+  if (kept && walksWeb(v) && v.tc && !v.buildings.some((b) => b.advance >= 0) && wants(s, p, mem, 'living') && roadKnown(s, p, LIVING_ROAD) && !roadProblem(s, p, LIVING_ROAD)) {
+    if (v.tc.queue.length === 0 && afford(v, LIVING_ROAD.cost)) issue({ t: 'advance', p: p.id, building: v.tc.id, to: 'living' });
+    spend(v, LIVING_ROAD.cost);
+  }
+  if (!v.tc || !ageDef(p).living || !s.vents) return;
+  const m = (mem.living ??= { since: s.tick, ridge: -99999, quake: -99999, swallow: -99999 });
+  const d2 = (x: number, y: number) => (x - v.home.x) * (x - v.home.x) + (y - v.home.y) * (y - v.home.y);
+  const stone = v.buildings.find((b) => b.type === 'heartstone');
+  if (!stone) {
+    if (s.tick - (mem.ordered.heartstone ?? -99999) < secs(30)) return;
+    const vents = s.vents.filter((t) => d2((t % s.w) + 0.5, Math.floor(t / s.w) + 0.5) <= VENT.aiFrom * VENT.aiFrom).sort((a, b) => d2((a % s.w) + 0.5, Math.floor(a / s.w) + 0.5) - d2((b % s.w) + 0.5, Math.floor(b / s.w) + 0.5) || a - b);
+    for (const t of vents) {
+      // Out to the stone's full tap, and hard against its neighbours if it must: by now the forge, the engines and the halls crowd the vent.
+      const spot = findSpot(s, 'heartstone', (t % s.w) + 0.5, Math.floor(t / s.w) + 0.5, 3, LIVING.tap) ?? findSpot(s, 'heartstone', (t % s.w) + 0.5, Math.floor(t / s.w) + 0.5, 3, LIVING.tap, 0);
+      if (!spot) continue;
+      if (!construct(s, v, mem, 'heartstone', spot, 3, issue)) spend(v, buildingCostFor(s, p.id, 'heartstone'));
+      return;
+    }
+    return;
+  }
+  if (!stone.built) return;
+  // A warhead coming down on the town: swallow what stands under its ring.
+  if (s.tick - m.swallow >= secs(3)) {
+    for (const l of s.launches ?? []) {
+      if (!isEnemy(s, p.id, l.owner)) continue;
+      for (const g of ringsFor(s, l, p.id)) {
+        const tx = Math.floor(g.x);
+        const ty = Math.floor(g.y);
+        // Round the ring: the district on it, and the four beside it.
+        for (const [dx, dy] of [[0, 0], [-LIVING.aiRing, 0], [LIVING.aiRing, 0], [0, -LIVING.aiRing], [0, LIVING.aiRing]] as const) {
+          const x = tx + dx;
+          const y = ty + dy;
+          if (swallowProblem(s, p.id, stone, x, y) || districtAt(s, p.id, x, y).length === 0) continue;
+          issue({ t: 'swallow', p: p.id, building: stone.id, x, y });
+          m.swallow = s.tick;
+          return;
+        }
+      }
+    }
+  }
+  if (stoneIdle(s, stone) || s.tick - Math.max(m.ridge, m.quake) < secs(5)) return;
+  // A rival army coming at the town: a ridge across its road, if the engines can't crack one.
+  let n = 0;
+  let sx = 0;
+  let sy = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !MILITARY.includes(e.type) || domainOf(e.type) !== 'land' || !isEnemy(s, p.id, e.owner)) continue;
+    if (d2(e.x, e.y) > FAULT.aiNear * FAULT.aiNear || !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    n++;
+    sx += e.x;
+    sy += e.y;
+  }
+  const cracking = v.buildings.some((b) => b.type === 'faultengine' && b.built && !engineIdle(s, b));
+  if (n >= FAULT.aiArmy && !cracking && afford(v, LIVING.ridgeCost)) {
+    const ax = sx / n;
+    const ay = sy / n;
+    const d = Math.sqrt(d2(ax, ay));
+    if (d >= 1) {
+      const k = d > 8 ? (d - 3) / d : 0.6;
+      const mx = v.home.x + (ax - v.home.x) * k;
+      const my = v.home.y + (ay - v.home.y) * k;
+      const half = LIVING.len / 2 - 0.5;
+      const nx = (-(ay - v.home.y) / d) * half;
+      const ny = ((ax - v.home.x) / d) * half;
+      const line = { x0: Math.floor(mx + nx), y0: Math.floor(my + ny), x1: Math.floor(mx - nx), y1: Math.floor(my - ny) };
+      if (!heaveProblem(s, p.id, stone, line.x0, line.y0, line.x1, line.y1)) {
+        issue({ t: 'heave', p: p.id, building: stone.id, ...line });
+        m.ridge = s.tick;
+        return;
+      }
+    }
+  }
+  if (!afford(v, LIVING.quakeCost)) return;
+  // The Quake, on the rival building it has seen nearest home, but far enough out that the shaking spares its own town.
+  const clear = LIVING.wide + LIVING.home;
+  let best: Building | null = null;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || hiddenFrom(s, e, p.id) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if (d2(e.x, e.y) < clear * clear) continue;
+    if (!best || d2(e.x, e.y) < d2(best.x, best.y) || (d2(e.x, e.y) === d2(best.x, best.y) && e.id < best.id)) best = e;
+  }
+  if (!best) return;
+  const x = Math.floor(best.x);
+  const y = Math.floor(best.y);
+  if (quakeProblem(s, p.id, stone, x, y)) return;
+  issue({ t: 'quake', p: p.id, building: stone.id, x, y });
+  m.quake = s.tick;
 }
 
 /**

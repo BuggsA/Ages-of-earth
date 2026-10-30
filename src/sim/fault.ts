@@ -6,6 +6,7 @@ import { landmarkOnTile, postOnTile, ruinOnTile, walkable } from './grid';
 import { canAfford, maxHp, pay } from './world';
 import { B_RES, B_TERRAIN, R_NONE, T_ROCK, T_WATER } from './types';
 import type { Building, Fault, GameState, Player } from './types';
+import { heave, quake } from './living';
 
 /**
  * The Age of Faults (#900, the Deep Road's fifth age). A Fault Engine is raised within `FAULT.tap` tiles of a vent of the earth's heat
@@ -36,20 +37,26 @@ export function ventNear(s: GameState, x: number, y: number): number {
   return best;
 }
 
-/** The vent a Fault Engine draws on, or -1. */
-export const engineVent = (s: GameState, b: Building): number => (b.type === 'faultengine' ? ventNear(s, b.x, b.y) : -1);
+/** The vent a Fault Engine (or the Living Earth's Heartstone, #904) draws on, or -1. */
+export const engineVent = (s: GameState, b: Building): number => (b.type === 'faultengine' || b.type === 'heartstone' ? ventNear(s, b.x, b.y) : -1);
 
 /** Why a Fault Engine can't stand on this n-by-n square, or null: its centre goes within `FAULT.tap` tiles of a vent. */
 export function engineSpot(s: GameState, tx: number, ty: number, n: number): 'tap' | null {
   return ventNear(s, tx + n / 2, ty + n / 2) >= 0 ? null : 'tap';
 }
 
-/** Whether a tile may crack: land (not water or rock) off the map's rim, not yet chasm, and not by a vent, a trading post, a ruin or a landmark. */
+/** Whether a tile is a ridge the Living Earth raised (#904). */
+export const isRidge = (s: GameState, i: number): boolean => !!s.chasm && s.chasm[i] === 2;
+
+/**
+ * Whether a tile may crack (or rise into a ridge, #904): land (not water or rock) off the map's rim, not yet chasm or ridge, and not
+ * by a vent, a trading post, a ruin or a landmark.
+ */
 export function crackable(s: GameState, i: number): boolean {
   const x = i % s.w;
   const y = (i - x) / s.w;
   if (x < 1 || y < 1 || x >= s.w - 1 || y >= s.h - 1) return false;
-  if (s.terrain[i] === T_WATER || s.terrain[i] === T_ROCK || isChasm(s, i)) return false;
+  if (s.terrain[i] === T_WATER || s.terrain[i] === T_ROCK || (s.chasm && s.chasm[i])) return false;
   if (s.vents) for (const v of s.vents) if (Math.abs((v % s.w) - x) <= 1 && Math.abs(Math.floor(v / s.w) - y) <= 1) return false;
   return !postOnTile(s, x, y) && !landmarkOnTile(s, x, y) && !ruinOnTile(s, x, y);
 }
@@ -135,9 +142,9 @@ export function fault(s: GameState, b: Building, x0: number, y0: number, x1: num
   return f;
 }
 
-/** The middle of a charge's line, in map units. */
+/** The middle of a charge's line (a Quake's heart, #904), in map units. */
 export function middle(s: GameState, f: Fault): { x: number; y: number } {
-  const t = f.line[f.line.length >> 1] ?? 0;
+  const t = f.at ?? f.line[f.line.length >> 1] ?? 0;
   return { x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 };
 }
 
@@ -145,7 +152,7 @@ export function middle(s: GameState, f: Fault): { x: number; y: number } {
 export const faultClock = (f: Fault): number => Math.ceil(f.left / TICK_HZ);
 
 /** The nearest open tile within `FAULT.clear` a unit is thrown to from a chasm (a walker of `team`), or -1. */
-function clearOf(s: GameState, x: number, y: number, team: number): number {
+export function clearOf(s: GameState, x: number, y: number, team: number): number {
   const cx = Math.floor(x);
   const cy = Math.floor(y);
   const r = FAULT.clear;
@@ -165,18 +172,28 @@ function clearOf(s: GameState, x: number, y: number, team: number): number {
   return best;
 }
 
-/**
- * The ground opens along a charge's line: every tile of it that still may crack becomes chasm. Buildings on it lose `FAULT.fall`
- * hundredths of their strength (a field or other open ground falls in whole); land units on it are thrown to open ground within
- * `FAULT.clear` tiles and lose `FAULT.hurl`, or are lost with none; a relic lying there is thrown clear too. Returns the tiles opened.
- */
+/** The ground opens along a charge's line: every tile of it that still may crack becomes chasm (`split`). Returns the tiles opened. */
 export function crack(s: GameState, f: Fault): number {
   const open = f.line.filter((i) => crackable(s, i));
   if (!open.length) return 0;
-  const set = new Set(open);
+  split(s, open, f.owner, 1);
+  s.cracked = (s.cracked ?? 0) + open.length;
+  const st = s.players[f.owner].stats;
+  st.cracked = (st.cracked ?? 0) + open.length;
+  return open.length;
+}
+
+/**
+ * The land moves on these tiles (each one `crackable`), by `owner`'s hand: they become chasm (`mark` 1) or ridge (2, #904), `B_TERRAIN`
+ * either way. Trees, stone and gold on them are lost. Buildings on them lose `FAULT.fall` hundredths of their strength (a field or other
+ * open ground falls in whole); land units on them are thrown to open ground within `FAULT.clear` tiles and lose `FAULT.hurl`, or are
+ * lost with none; a relic lying there is thrown clear too.
+ */
+export function split(s: GameState, tiles: number[], owner: number, mark: 1 | 2): void {
+  const set = new Set(tiles);
   const chasm = (s.chasm ??= new Uint8Array(s.w * s.h));
-  for (const i of open) {
-    chasm[i] = 1;
+  for (const i of tiles) {
+    chasm[i] = mark;
     s.block[i] |= B_TERRAIN;
     // Trees, stone and gold go down into it.
     if (s.res[i] !== R_NONE) {
@@ -186,27 +203,26 @@ export function crack(s: GameState, f: Fault): number {
     }
   }
   s.blockVersion++;
-  s.cracked = (s.cracked ?? 0) + open.length;
   for (const b of s.ents) {
     if (b.kind !== 'building' || b.hp <= 0) continue;
     let on = false;
     for (let y = b.ty; y < b.ty + b.size && !on; y++) for (let x = b.tx; x < b.tx + b.size && !on; x++) on = set.has(y * s.w + x);
     if (!on) continue;
-    hurt(s, b, BUILDINGS[b.type].open ? b.hp : Math.round((maxHp(s, b) * FAULT.fall) / 100), f.owner, null);
+    hurt(s, b, BUILDINGS[b.type].open ? b.hp : Math.round((maxHp(s, b) * FAULT.fall) / 100), owner, null);
   }
   for (const u of s.ents) {
     if (u.kind !== 'unit' || u.hp <= 0 || u.inside || u.below !== undefined || domainOf(u.type) !== 'land') continue;
     if (!set.has(Math.floor(u.y) * s.w + Math.floor(u.x))) continue;
     const to = clearOf(s, u.x, u.y, s.players[u.owner]?.team ?? -1);
     if (to < 0) {
-      hurt(s, u, u.hp, f.owner, null);
+      hurt(s, u, u.hp, owner, null);
       continue;
     }
     u.x = (to % s.w) + 0.5;
     u.y = Math.floor(to / s.w) + 0.5;
     u.path = null;
     if (u.goal) u.wantPath = true;
-    hurt(s, u, FAULT.hurl, f.owner, null);
+    hurt(s, u, FAULT.hurl, owner, null);
   }
   for (const r of s.relics) {
     if (r.carrier || r.temple || !set.has(Math.floor(r.y) * s.w + Math.floor(r.x))) continue;
@@ -216,12 +232,12 @@ export function crack(s: GameState, f: Fault): number {
       r.y = Math.floor(to / s.w) + 0.5;
     }
   }
-  const st = s.players[f.owner].stats;
-  st.cracked = (st.cracked ?? 0) + open.length;
-  return open.length;
 }
 
-/** Every tick: each charge runs down unless a rival holds its engine's vent; at zero the ground opens. Charges whose engine fell are lost. */
+/**
+ * Every tick: each charge runs down unless a rival holds its engine's vent; at zero the ground opens (or a Heartstone's ridge rises or
+ * its Quake strikes, #904). Charges whose engine fell are lost.
+ */
 export function faultStep(s: GameState): void {
   if (!s.faults?.length) return;
   const second = s.tick % TICK_HZ === 0;
@@ -230,22 +246,23 @@ export function faultStep(s: GameState): void {
     const b = s.byId.get(f.engine);
     if (!b || b.kind !== 'building' || b.hp <= 0) {
       const mid = middle(s, f);
-      s.events.push({ k: 'fault', owner: f.owner, id: f.engine, what: 'lost', x: mid.x, y: mid.y });
+      s.events.push({ k: 'fault', owner: f.owner, id: f.engine, what: 'lost', kind: f.kind, x: mid.x, y: mid.y });
       done.push(f);
       continue;
     }
     if (second) {
       const by = holder(s, engineVent(s, b), b.owner);
-      if (by >= 0 && !f.held) s.events.push({ k: 'fault', owner: f.owner, id: b.id, what: 'stall', by, x: b.x, y: b.y });
-      else if (by < 0 && f.held) s.events.push({ k: 'fault', owner: f.owner, id: b.id, what: 'go', x: b.x, y: b.y });
+      if (by >= 0 && !f.held) s.events.push({ k: 'fault', owner: f.owner, id: b.id, what: 'stall', kind: f.kind, by, x: b.x, y: b.y });
+      else if (by < 0 && f.held) s.events.push({ k: 'fault', owner: f.owner, id: b.id, what: 'go', kind: f.kind, x: b.x, y: b.y });
       f.held = by >= 0 ? true : undefined;
     }
     if (f.held) continue;
     if (--f.left > 0) continue;
     const mid = middle(s, f);
-    const n = crack(s, f);
-    b.crackAt = s.tick;
-    s.events.push({ k: 'fault', owner: f.owner, id: b.id, what: 'crack', n, x: mid.x, y: mid.y });
+    const n = f.kind === 'ridge' ? heave(s, f) : f.kind === 'quake' ? quake(s, f, b) : crack(s, f);
+    if (f.kind === 'quake') b.quakeAt = s.tick;
+    else b.crackAt = s.tick;
+    s.events.push({ k: 'fault', owner: f.owner, id: b.id, what: f.kind === 'ridge' ? 'rise' : f.kind === 'quake' ? 'quake' : 'crack', kind: f.kind, n, x: mid.x, y: mid.y });
     done.push(f);
   }
   if (done.length) s.faults = s.faults.filter((f) => !done.includes(f));

@@ -5,6 +5,7 @@ import { hurt, peace } from './combat';
 import { distToRect } from './grid';
 import { canAfford, isEnemy, maxHp, pay, statsOf } from './world';
 import { breachAt } from './tides';
+import { vaulted } from './living';
 import type { Arc, Building, BuildingType, Cost, Ent, GameState, Launch, Player, SalvoShot, Warning } from './types';
 
 /**
@@ -621,18 +622,27 @@ function strike(s: GameState, l: Launch, x: number, y: number): void {
   const w = kindOf(l);
   const R = WARHEADS[w].r;
   const hit: [Ent, number][] = [];
+  const vaults = new Map<number, number>();
   for (const e of s.ents) {
     // Friendly fire (the owner, 2026-10-25): the blast hurts anyone in it, the launcher's own people and allies too.
     if (e.hp <= 0) continue;
     if (e.kind === 'building') {
       const d = distToRect(x, y, e);
-      if (d < R) hit.push([e, d]);
+      if (d >= R) continue;
+      // A deep vault (#904): a people that walked the Living Earth rides a warhead out in what it has sunk.
+      if (vaulted(s, e)) vaults.set(e.owner, (vaults.get(e.owner) ?? 0) + 1);
+      else hit.push([e, d]);
     } else if (!e.inside && domainOf(e.type) === 'land') {
       const dx = e.x - x, dy = e.y - y;
       if (dx * dx + dy * dy < R * R) hit.push([e, Math.sqrt(dx * dx + dy * dy)]);
     }
   }
   for (const [e, d] of hit) hurt(s, e, blastDamage(w, d), owner, null);
+  for (const [o, n] of vaults) {
+    const st = s.players[o].stats;
+    st.vaulted = (st.vaulted ?? 0) + n;
+    s.events.push({ k: 'vault', owner: o, n, x, y });
+  }
   // A warhead tears up a rival's causeways too (#748): the road over the flats is cut, its barrage's pond let out.
   breachAt(s, x, y, R, owner);
   (s.blasts ??= []).push({ id: s.nextId++, x, y, r: R, until: s.tick + secs(SILO.lift) });

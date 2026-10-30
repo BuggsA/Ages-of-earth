@@ -1,5 +1,5 @@
 import { ventSpot } from './forge';
-import { engineSpot, isChasm } from './fault';
+import { engineSpot, isChasm, isRidge } from './fault';
 import { hallowed } from './henge';
 import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
 import { ageDef } from './ages';
@@ -101,7 +101,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'hallowed' | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage' | 'vent' | 'hot' | 'tap' | 'chasm';
+export type PlaceProblem = null | 'hallowed' | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage' | 'vent' | 'hot' | 'tap' | 'chasm' | 'ridge';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -145,6 +145,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
       if (!cause && !dyke && bared(s, i)) return 'tidal';
       // A chasm (#900) takes nothing but a Bridge over it.
       if (type !== 'bridge' && isChasm(s, i)) return 'chasm';
+      // A ridge (#904) takes nothing at all.
+      if (isRidge(s, i)) return 'ridge';
       if (s.terrain[i] === T_WATER && !cause && !float && ((!dyke && type !== 'bridge' && !(deepen && isChannel(s, i))) || isInund(s, i))) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
       if (s.res[i] !== R_NONE || (near && (relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)))) return 'blocked';
@@ -192,7 +194,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   const hot = ventSpot(s, type, tx, ty, n);
   if (hot) return hot;
   // A Fault Engine (#900) stands by a vent, to draw on it.
-  if (type === 'faultengine') {
+  // So does the Living Earth's Heartstone (#904), by the same rule.
+  if (type === 'faultengine' || type === 'heartstone') {
     const why = engineSpot(s, tx, ty, n);
     if (why) return why;
   }

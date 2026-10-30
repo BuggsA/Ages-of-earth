@@ -1595,6 +1595,22 @@ export class View {
         case 'fault': {
           // A Fault Engine (#900): the ground opening in a heave of rock-dust and a spray of teal shards where it is seen; the charge
           // and its loss are told by the HUD and the sound for everyone.
+          if (ev.what === 'rise' && this.sees(ev.x, ev.y)) {
+            // A Heartstone's ridge (#904): green rock heaving up in a shower of earth and a glint of gold.
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.4), { count: 34, speed: 1.8, up: 2.2, life: 1.6, size: 0.18, gravity: 0.4, drag: 0.6, colors: ['#5f7a4e', '#46603a', '#6a5a3a'] });
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 12, speed: 1.2, up: 1.6, life: 1.0, size: 0.06, gravity: 1.2, drag: 0.3, colors: ['#f2c440', '#ffe9a0'] });
+            this.cue('heave', ev.x, ev.y, 0.9);
+            break;
+          }
+          if (ev.what === 'quake') {
+            // The Quake (#904): heard by everyone, wherever it struck; where it is seen, the whole ground round its heart flung up in dust
+            // and gold, and a ring of dust thrown out along the seams.
+            this.cue('greatQuake', ev.x, ev.y, 1.2);
+            if (!this.sees(ev.x, ev.y)) break;
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.4), { count: 90, speed: 4.2, up: 2.4, life: 2.6, size: 0.28, gravity: 0.1, drag: 0.5, colors: ['#8a8682', '#6a5a3a', '#5f7a4e', '#a8a29a'] });
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: 30, speed: 2.6, up: 2.6, life: 1.6, size: 0.08, gravity: 1.2, drag: 0.3, colors: ['#f2c440', '#ffe9a0'] });
+            break;
+          }
           if (ev.what !== 'crack' || !this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.3), { count: 40, speed: 2.2, up: 1.6, life: 1.8, size: 0.2, gravity: -0.2, drag: 0.6, colors: ['#8a8682', '#6e6a66', '#a8a29a'] });
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 14, speed: 1.4, up: 1.8, life: 1.0, size: 0.06, gravity: 1.4, drag: 0.3, colors: ['#3ad6c8', '#9af2e8'] });

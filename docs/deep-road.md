@@ -47,5 +47,12 @@ The game is *Ages of Earth*: on this road a people stops building **on** the lan
   - **The Bridge answers it for anyone** from the Middle Ages on (`spanOpen`, `FAULT.spanFrom`), even in a rival's land; it is the Age of Locks' bridge, and it never sleeps over a chasm.
   - **Seeded matches stay put:** nothing changes until a people cracks the ground; the road is last in `ROADS` on its own coin (`0xde15`).
 
+- **s6, the Age of the Living Earth** (#904): `src/sim/living.ts` (`stoneIdle`, `heaveProblem`, `raiseRidge`, `heave`, `quakeSeams`, `quakeProblem`, `wake`, `quake`, `districtAt`, `swallowProblem`, `swallow`, `vaulted`, `levelRidges`; a ridge is 2 in `GameState.chasm`, counted in `heaved`; `Fault.kind`, `Fault.at`; `Building.quakeAt`), the `heave`, `quake` and `swallow` commands, `LIVING` in `data.ts`, the Heartstone, ridge and golden-seam models (`deepModels.ts`, `chasmView.ts`), the `peak` plate, emblem, palette, touches, hat, ground, air, sounds `deepRumble`, `greatQuake`, `heave`, `swallow`, `livingWork` in `ai.ts`.
+  - **A Heartstone of its own, not the engine's second order:** the issue asked for the Fault Engine to take the new orders, but every side age gets a building of its own as its keepsake (`docs/engagement.md`), and the engine is already the Faults' keepsake. So the Heartstone stands by a vent on the engine's rule (`engineSpot`) and charges on its clock (`faultStep`), stalled by a rival on its vent like an engine.
+  - **The three things:** ridges (and closing chasms), the Quake, and Swallow with its deep vaults. Swallow is Sink for a whole district at once in 4 seconds rather than 15, so a town can go under in the time a warhead's rings give it; the age keeps the Undercity's Sink too.
+  - **The Quake reaches anywhere,** as a warhead does: its price is the 90-second public charge, the vent a rival can hold, and its shaking of the caster's own ground round the stone.
+  - **Deep vaults:** `strike` in `silo.ts` passes over a sunk building whose people has walked the Living Earth (`vaulted`). Fallout touches only units, so nothing else changed there.
+  - **Seeded matches stay put:** nothing moves until a people walks the Faults; the road is last in `ROADS`, on its own coin (`0xde16`).
+
 ## Next
-- **s6, the Living Earth** (past Faults), **s7** the sweeps (`npx tsx scripts/routes.ts --seeds 6 deep`) and the `deep` route joining the computer's leanings.
+- **s7** the sweeps (`npx tsx scripts/routes.ts --seeds 6 deep`) and the `deep` route joining the computer's leanings.

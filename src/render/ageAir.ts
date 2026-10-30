@@ -36,6 +36,7 @@ export const AGE_AIR: Record<AgeId, Air> = {
   megaliths: air('#e6bfae', 0.24), // a solstice dawn on the stones
   delvings: air('#9a7a5a', 0.34), // lamp smoke and earth-dust from the shafts
   forges: air('#8a5a48', 0.32), // vent steam lit from below, ember-dark
+  living: air('#b8b060', 0.26), // pollen-gold haze over green, the earth breathing
   faults: air('#5e8682', 0.3), // rock-dust over the rift, lit teal off the crystal
   undercity: air('#c8b090', 0.3), // tuff dust and vent smoke in a Cappadocian dusk
   hunt: air('#b8905e', 0.24), // woodsmoke at dawn

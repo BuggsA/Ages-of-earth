@@ -1,6 +1,7 @@
 import { sink, sinkProblem } from './sim/undercity';
 import { forgeAt } from './sim/forge';
 import { faultProblem } from './sim/fault';
+import { heaveProblem, quakeProblem, swallowProblem } from './sim/living';
 import { delveProblem } from './sim/delve';
 import './ui/style.css';
 import { Music } from './audio/music';
@@ -10,7 +11,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, FAULT, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, FAULT, LIVING, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
@@ -134,10 +135,12 @@ let slingSpire = 0;
 let launchWarhead: WarheadKind | undefined;
 /** A salvo being aimed (#765): the points clicked so far, until there are `SALVO.trio`; null for a single launch. */
 let salvoAims: { x: number; y: number }[] | null = null;
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'delve' | 'fault' | null = null;
-/** The Fault Engine whose crack is being aimed (#900), and the tile it begins on once the first click is made. */
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'delve' | 'fault' | 'earth' | null = null;
+/** The Fault Engine whose crack is being aimed (#900), or the Heartstone whose order is (#904), and the tile a line begins on once the first click is made. */
 let faultEngine = 0;
 let faultFrom: { x: number; y: number } | null = null;
+/** The Heartstone's order being aimed (#904), while `targetMode` is 'earth'. */
+let earthOrder: 'heave' | 'quake' | 'swallow' = 'heave';
 /** The mouth a delve (#881) goes below from, while `targetMode` is 'delve'. */
 let delveFrom = 0;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
@@ -244,6 +247,14 @@ const hud = new Hud({
     targetMode = 'fault';
     placing = null;
     hud.toast(`Crack: click where the crack begins, then where it ends (up to ${FAULT.len} tiles)`, 'info');
+  },
+  earthMode: (stone, order) => {
+    faultEngine = stone;
+    faultFrom = null;
+    earthOrder = order;
+    targetMode = 'earth';
+    placing = null;
+    hud.toast(order === 'heave' ? `Raise a ridge: click where it begins, then where it ends (up to ${LIVING.len} tiles)` : order === 'quake' ? 'The Quake: click the ground it will split' : `Swallow: click your own ground; all that may sink within ${LIVING.district} tiles goes below`, 'info');
   },
   delveMode: (from) => {
     delveFrom = from;
@@ -1838,7 +1849,7 @@ function placeHere(shift: boolean): void {
   if (!placeAt.ok) {
     // Ground the tide comes back to (#739) is said as such: it looks like land at low water.
     const why = placeProblem(s, placing, placeAt.tx, placeAt.ty, true, viewer);
-    hud.toast(why === 'tidal' ? "Can't build on the tidal flats: the sea comes back over them" : why === 'vent' ? "A Vent Forge is raised right over a vent of the earth's heat" : why === 'hot' ? "A vent's hot ground: only a Vent Forge is raised over a vent, and a people of the Deep Road keeps the ground round one clear" : why === 'tap' ? `A Fault Engine is raised within ${FAULT.tap} tiles of a vent of the earth's heat` : why === 'chasm' ? 'The ground has split there: only a Bridge is laid over a chasm' : "Can't build there", 'bad');
+    hud.toast(why === 'tidal' ? "Can't build on the tidal flats: the sea comes back over them" : why === 'vent' ? "A Vent Forge is raised right over a vent of the earth's heat" : why === 'hot' ? "A vent's hot ground: only a Vent Forge is raised over a vent, and a people of the Deep Road keeps the ground round one clear" : why === 'tap' ? `A ${BUILDINGS[placing].name} is raised within ${FAULT.tap} tiles of a vent of the earth's heat` : why === 'chasm' ? 'The ground has split there: only a Bridge is laid over a chasm' : why === 'ridge' ? 'A ridge of living rock stands there: nothing is raised on it' : "Can't build there", 'bad');
     play('error');
     return;
   }
@@ -1963,6 +1974,32 @@ canvas.addEventListener('pointerdown', (e) => {
       play('error');
     } else {
       issue({ t: 'fault', p: viewer, building: faultEngine, x0: faultFrom.x, y0: faultFrom.y, x1: at.x, y1: at.y });
+      view.marker(s, at.x + 0.5, at.y + 0.5, true);
+    }
+    faultFrom = null;
+    targetMode = null;
+    return;
+  }
+  if (targetMode === 'earth') {
+    // The Living Earth (#904): a ridge's two ends, or one click for the Quake's heart or the district to swallow.
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (!g || !s) return;
+    const at = { x: Math.floor(g.x), y: Math.floor(g.y) };
+    const stone = s.byId.get(faultEngine) as Building | undefined;
+    if (earthOrder === 'heave' && !faultFrom) {
+      faultFrom = at;
+      view.marker(s, at.x + 0.5, at.y + 0.5, true);
+      hud.toast('Raise a ridge: now click where it ends', 'info');
+      return;
+    }
+    const why = earthOrder === 'heave' ? heaveProblem(s, viewer, stone, faultFrom!.x, faultFrom!.y, at.x, at.y) : earthOrder === 'quake' ? quakeProblem(s, viewer, stone, at.x, at.y) : swallowProblem(s, viewer, stone, at.x, at.y);
+    if (why) {
+      hud.toast(why, 'bad');
+      play('error');
+    } else {
+      if (earthOrder === 'heave') issue({ t: 'heave', p: viewer, building: faultEngine, x0: faultFrom!.x, y0: faultFrom!.y, x1: at.x, y1: at.y });
+      else issue({ t: earthOrder, p: viewer, building: faultEngine, x: at.x, y: at.y });
       view.marker(s, at.x + 0.5, at.y + 0.5, true);
     }
     faultFrom = null;
@@ -2986,6 +3023,24 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         // The Faults (#900): a charge is felt by every people; the crack, its stall and its loss told to all.
         const who = s.players[ev.owner]?.name ?? 'A rival';
         const mine = ev.owner === viewer;
+        if (ev.kind) {
+          // A Heartstone's ridge or Quake (#904), told the same way.
+          const what = ev.kind === 'quake' ? 'the Quake' : 'a ridge';
+          if (ev.what === 'charge') {
+            play(ev.kind === 'quake' ? 'deepRumble' : 'tremor');
+            if (mine) hud.toast(ev.kind === 'quake' ? `🌋 Your Heartstone wakes the Quake: it strikes in ${LIVING.quake} seconds, and shakes your own ground round the stone too` : `⛰ Your Heartstone raises a ridge: it rises in ${LIVING.rise} seconds`, 'info');
+            else {
+              hud.toast(ev.kind === 'quake' ? `⚠ The earth groans: ${who}'s Heartstone wakes the Quake, and in ${LIVING.quake} seconds the ground splits along the golden seams. Sink what you can, raze the stone, or hold its vent` : `⚠ The ground stirs: ${who}'s Heartstone raises a ridge along the golden line in ${LIVING.rise} seconds`, 'alert');
+              lastAlert = { x: ev.x, y: ev.y };
+            }
+          } else if (ev.what === 'stall' && mine) {
+            hud.toast(`⏸ ${s.players[ev.by!]?.name ?? 'A rival'}'s soldiers hold your Heartstone's vent: ${what} has stopped. Drive them off`, 'alert');
+            lastAlert = { x: ev.x, y: ev.y };
+          } else if (ev.what === 'lost') hud.toast(mine ? `✖ Your Heartstone fell: ${what} is lost` : `✔ ${who}'s Heartstone fell: ${what} is lost`, mine ? 'bad' : 'good');
+          else if (ev.what === 'rise') hud.toast(mine ? `⛰ The ridge rose: ${ev.n} tiles moved` : `⛰ ${who} raised a ridge: go round it, fly over it, or bring it down with kegs`, mine ? 'good' : 'alert');
+          else if (ev.what === 'quake') hud.toast(mine ? '🌋 The Quake struck: the land is split for good' : `🌋 ${who}'s Quake struck: the land is split in chasm and ridge`, mine ? 'good' : 'alert');
+          break;
+        }
         if (ev.what === 'charge') {
           play('tremor');
           if (mine) hud.toast(`〰 Your Fault Engine charges: the ground splits in ${FAULT.charge} seconds`, 'info');
@@ -2998,6 +3053,19 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           lastAlert = { x: ev.x, y: ev.y };
         } else if (ev.what === 'lost') hud.toast(mine ? '✖ Your Fault Engine fell: its charge is lost' : `✔ ${who}'s Fault Engine fell: its charge is lost`, mine ? 'bad' : 'good');
         else if (ev.what === 'crack') hud.toast(mine ? `⚡ The ground opened: ${ev.n} tiles of chasm` : `⚡ ${who} split the ground: a chasm of ${ev.n} tiles. Go round it, or lay a Bridge over it`, mine ? 'good' : 'alert');
+        break;
+      }
+      case 'swallow': {
+        // The Living Earth (#904): the viewer's district goes below at once.
+        if (ev.owner !== viewer) break;
+        play('swallow');
+        hud.toast(`🕳 The earth swallows ${ev.n} of your buildings: below in ${LIVING.gulp} seconds`, 'info');
+        break;
+      }
+      case 'vault': {
+        // The Living Earth (#904): the viewer's sunk buildings rode out a warhead.
+        if (ev.owner !== viewer) break;
+        hud.toast(`🛡 ${ev.n} of your sunk buildings rode out the warhead in their deep vaults`, 'good');
         break;
       }
       case 'vent': {
@@ -3505,7 +3573,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload' || targetMode === 'delve') return 'cur-garrison';
-  if (targetMode === 'fault') return 'cur-attack';
+  if (targetMode === 'fault' || targetMode === 'earth') return 'cur-attack';
   if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch' || targetMode === 'sling') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
@@ -3913,6 +3981,30 @@ function frame(now: number): void {
     const spot = findSpot(s, 'faultengine', (vent % s.w) + 0.5, Math.floor(vent / s.w) + 0.5, 3, FAULT.tap - 2, 1, (tx, ty) => !placeProblem(s, 'faultengine', tx, ty, true, owner));
     if (!spot) return 0;
     const b = placeBuilding(s, owner, 'faultengine', spot.tx, spot.ty, true);
+    view.rig.focus(b.x, b.y);
+    return b.id;
+  },
+  /**
+   * The Age of the Living Earth (testing, #904): turn a player to the age (having walked the road to it), give it stone and gold, and
+   * raise a finished Heartstone by its home vent. Returns the stone's id, or 0 when there is no room by the vent.
+   */
+  living(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.living.tier;
+      p.age = 'living';
+    });
+    p.walked = [...new Set([...(p.walked ?? []), 'megaliths', 'delvings', 'undercity', 'forges', 'faults'] as AgeId[])];
+    p.res.stone += 4000;
+    p.res.gold += 2000;
+    s.peaceUntil = 0;
+    const vent = s.vents?.[owner];
+    if (vent === undefined) return 0;
+    const spot = findSpot(s, 'heartstone', (vent % s.w) + 0.5, Math.floor(vent / s.w) + 0.5, 3, LIVING.tap - 2, 1, (tx, ty) => !placeProblem(s, 'heartstone', tx, ty, true, owner));
+    if (!spot) return 0;
+    const b = placeBuilding(s, owner, 'heartstone', spot.tx, spot.ty, true);
     view.rig.focus(b.x, b.y);
     return b.id;
   },

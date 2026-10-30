@@ -1,5 +1,6 @@
 import { scald, scaldProblem } from './forge';
 import { engineLimit, fault, faultProblem, isChasm, spanOpen } from './fault';
+import { heaveProblem, quakeProblem, raiseRidge, stoneLimit, swallow, swallowProblem, wake } from './living';
 import { hiddenFrom, inert, sink, sinkProblem, surface, surfaceProblem } from './undercity';
 import { delve, delveProblem } from './delve';
 import { AUTO_WORK, BUILDINGS, FAULT, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
@@ -200,14 +201,14 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = span ? null : buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? engineLimit(s, p, type) ?? heartBarred(s, p, type) ?? spireBarred(s, p, type);
+  const no = span ? null : buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? engineLimit(s, p, type) ?? stoneLimit(s, p, type) ?? heartBarred(s, p, type) ?? spireBarred(s, p, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'hallowed' ? `A rival's Henge holds this ground: nothing is raised within ${HENGE.hold} tiles of it` : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : problem === 'adrift' ? 'A Pontoon is raised beside the shore or beside another of your pontoons, where its builders can stand: to set one farther out, cast it off and tow it' : type === 'pontoon' && (problem === 'dry' || problem === 'water') ? 'A Pontoon is moored on open water that ships sail' : problem === 'beds' ? `A Cockler's Hut goes within ${COCKLER.reach} tiles of a cockle bed` : problem === 'barrage' ? 'A Tide Gate goes on a causeway tile of your own barrage, beside its pond' : problem === 'vent' ? 'A Vent Forge is raised right over a vent of the earth\'s heat' : problem === 'hot' ? 'A vent\'s hot ground: only a Vent Forge is raised over a vent, and a people of the Deep Road keeps the ground round one clear' : problem === 'tap' ? `A Fault Engine is raised within ${FAULT.tap} tiles of a vent of the earth's heat` : problem === 'chasm' ? 'The ground has split there: only a Bridge is laid over a chasm' : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'hallowed' ? `A rival's Henge holds this ground: nothing is raised within ${HENGE.hold} tiles of it` : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : problem === 'adrift' ? 'A Pontoon is raised beside the shore or beside another of your pontoons, where its builders can stand: to set one farther out, cast it off and tow it' : type === 'pontoon' && (problem === 'dry' || problem === 'water') ? 'A Pontoon is moored on open water that ships sail' : problem === 'beds' ? `A Cockler's Hut goes within ${COCKLER.reach} tiles of a cockle bed` : problem === 'barrage' ? 'A Tide Gate goes on a causeway tile of your own barrage, beside its pond' : problem === 'vent' ? 'A Vent Forge is raised right over a vent of the earth\'s heat' : problem === 'hot' ? 'A vent\'s hot ground: only a Vent Forge is raised over a vent, and a people of the Deep Road keeps the ground round one clear' : problem === 'tap' ? `A ${def.name} is raised within ${FAULT.tap} tiles of a vent of the earth's heat` : problem === 'chasm' ? 'The ground has split there: only a Bridge is laid over a chasm' : problem === 'ridge' ? 'A ridge of living rock stands there: nothing is raised on it' : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -711,6 +712,30 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = faultProblem(s, c.p, b, c.x0, c.y0, c.x1, c.y1);
       if (why) return refuse(s, c.p, why);
       fault(s, b!, c.x0, c.y0, c.x1, c.y1);
+      break;
+    }
+    case 'heave': {
+      // The Living Earth (#904): a Heartstone raises a ridge along a line.
+      const b = myBuilding(s, c.p, c.building);
+      const why = heaveProblem(s, c.p, b, c.x0, c.y0, c.x1, c.y1);
+      if (why) return refuse(s, c.p, why);
+      raiseRidge(s, b!, c.x0, c.y0, c.x1, c.y1);
+      break;
+    }
+    case 'quake': {
+      // The Living Earth (#904): a Heartstone wakes the Quake.
+      const b = myBuilding(s, c.p, c.building);
+      const why = quakeProblem(s, c.p, b, c.x, c.y);
+      if (why) return refuse(s, c.p, why);
+      wake(s, b!, c.x, c.y);
+      break;
+    }
+    case 'swallow': {
+      // The Living Earth (#904): a Heartstone swallows a district of its people's own town.
+      const b = myBuilding(s, c.p, c.building);
+      const why = swallowProblem(s, c.p, b, c.x, c.y);
+      if (why) return refuse(s, c.p, why);
+      swallow(s, b!, c.x, c.y);
       break;
     }
     case 'scald': {
