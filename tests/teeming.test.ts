@@ -15,8 +15,8 @@ describe('the teeming wild', () => {
         // Every town gets the same share: all of them, or (where a crowded map has no room for one) none.
         const shares = m.starts.map((st, k) => {
           const own = m.teem.filter((b) => nearest(b) === k);
-          const mammoths = own.filter((b) => b.kind === 'mammoth' && Math.abs(dist(b, st) - TEEM.mammothAt) <= 2).length;
-          const dens = own.filter((b) => b.kind === 'wolf' && dist(b, st) >= TEEM.denAt - 3 && dist(b, st) <= TEEM.denAt + 5).length / WOLF.pack;
+          const mammoths = own.filter((b) => b.kind === 'mammoth' && dist(b, st) >= TEEM.mammothAt - 3 && dist(b, st) <= TEEM.mammothAt + 4).length;
+          const dens = own.filter((b) => b.kind === 'wolf' && dist(b, st) >= TEEM.denAt - 4 && dist(b, st) <= TEEM.denAt + 9).length / WOLF.pack;
           return `${mammoths > 0} ${dens > 0}`;
         });
         expect(new Set(shares).size, `seed ${seed} ${players}p: ${shares.join(' | ')}`).toBe(1);
@@ -36,7 +36,7 @@ describe('the teeming wild', () => {
     expect(generateMap(5, 'small', 2, 'continental', false).teem).toEqual([]);
     const s = createGame({ seed: 5, size: 'medium', players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
     const teem = s.animals.filter((a) => a.id >= TEEM.idBase);
-    expect(teem.length).toBe(generateMap(5, 'medium', 2).teem.length);
+    expect(teem.length).toBe(generateMap(5, 'medium', 2, 'continental', true, true, 'glade').teem.length);
     expect(teem.length).toBeGreaterThan(0);
     // Every other thing keeps an id below the range.
     expect(s.nextId).toBeLessThan(TEEM.idBase);

@@ -117,6 +117,8 @@ function rot(s: GameState): void {
 
 export function updateAnimals(s: GameState, sp?: Spatial, sheep?: (a: Animal) => void): void {
   rot(s);
+  // A beast with no life left is gone, however it lost it (one set to nothing outright would fight on).
+  if (s.animals.some((a) => a.hp <= 0)) s.animals = s.animals.filter((a) => a.hp > 0);
   for (const a of s.animals) {
     a.px = a.x;
     a.py = a.y;

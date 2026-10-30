@@ -4126,9 +4126,11 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   if (!taming && v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
     let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
     // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it; not a Grove
-    // people, whose food is its gardens (a party of five out on the far hunt left it wanting no fields at all).
+    // people, whose food is its gardens (a party of five out on the far hunt left it wanting no fields at all), nor one bound for
+    // the Wild, which forages for the road and spares the beasts it will tame.
     let escort: Unit[] = [];
-    if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && !grows(v.p) && s.tick >= s.peaceUntil) {
+    const wildBound = v.p.epoch === 0 && mem.roads?.wild === true;
+    if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && !grows(v.p) && !wildBound && s.tick >= s.peaceUntil) {
       const far = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.far);
       // Spare soldiers as the wolf hunt below counts them: idle, at the legion's axe, or on a plain walk (a muster, not an attack).
       const idle = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u) || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege' && u.type !== 'hero');
