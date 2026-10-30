@@ -3195,7 +3195,6 @@ function merchantMarket(k: Kit, st: Style): void {
 
 /** The Aeronauts' House (#816): a flier's cottage under a rounded hangar roof, a small tethered balloon riding above it, a rooftop windsock, a round door and a rack of sandbags. */
 function aeroHouse(k: Kit, st: Style): void {
-  const SKY = '#76c6d6';
   const STEEL = '#d7e4e8';
   pad(k, 2, st.base);
   k.box(1.2, 0.62, 0.95, st.wall, 0, 0, -0.1);
