@@ -46,7 +46,8 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Nunito:wght@600;700;800;900&display=swap" />
+    <!-- Fonts load without holding up the first paint: the page draws in the fallback and swaps them in. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Nunito:wght@600;700;800;900&display=swap" media="print" onload="this.media='all'" />
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>

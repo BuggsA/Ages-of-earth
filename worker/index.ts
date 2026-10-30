@@ -1,4 +1,6 @@
 import { CODE_CHARS, CODE_LENGTH, validCode } from '../src/net/protocol';
+import { MAP_TYPES } from '../src/sim/data';
+import type { MapType } from '../src/sim/types';
 import { MAX_CLOUD_SAVE, MAX_PROGRESS_BODY, MAX_WEB_BODY, validSlot, validVaultKey } from '../src/net/vault';
 
 /**
@@ -21,17 +23,46 @@ interface Env {
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
+/** What a shared link's preview says: a room invite and a shared world get their own words. */
+function linkPreview(url: URL): { title: string; description: string } | null {
+  const q = url.searchParams;
+  const room = q.get('room')?.toUpperCase() ?? '';
+  if (validCode(room)) {
+    return q.get('watch') === '1'
+      ? { title: `Watch my Ages of Earth match (room ${room})`, description: 'An online match of Ages of Earth, a free real-time strategy game in your browser. Open the link to watch it live, from the Stone Age to the age of steam. No download.' }
+      : { title: `Join my Ages of Earth room: ${room}`, description: `You're invited to an online match of Ages of Earth, a free real-time strategy game in your browser. Open the link, pick a name and you're in room ${room}. No download.` };
+  }
+  const seed = Math.floor(Number(q.get('seed')));
+  if (seed >= 1 && seed <= 2 ** 31 - 1) {
+    const map = MAP_TYPES[q.get('map') as MapType] as { label: string; blurb: string } | undefined;
+    const size = ['small', 'medium', 'large'].includes(q.get('size') ?? '') ? `${q.get('size')} ` : '';
+    return {
+      title: `A world to play in Ages of Earth: ${map ? `${map.label}, ` : ''}seed ${seed}`,
+      description: `${map ? `${map.blurb} ` : ''}Someone shared this ${size}map with you in Ages of Earth, a free real-time strategy game in your browser: same land, same rivals. Open the link to play it. No download.`,
+    };
+  }
+  return null;
+}
+
 /** The page's preview tags say "/" and "./og-card.jpg"; link previews and crawlers want them whole. */
-async function siteMeta(req: Request, env: Env, origin: string): Promise<Response> {
+async function siteMeta(req: Request, env: Env, url: URL): Promise<Response> {
   const res = await env.ASSETS.fetch(req);
   if (!(res.headers.get('content-type') ?? '').includes('text/html')) return res;
+  const origin = url.origin;
   const whole = (path: string | null) => new URL(path ?? '/', `${origin}/`).toString();
   const fix = (attr: string) => ({ element: (el: Element) => void el.setAttribute(attr, whole(el.getAttribute(attr))) });
-  return new HTMLRewriter()
+  const preview = linkPreview(url);
+  const set = (value: string) => ({ element: (el: Element) => void el.setAttribute('content', value) });
+  const rw = new HTMLRewriter()
     // A canonical link can't be in index.html: Vite reads its href="/" as a file to bundle.
     .on('head', { element: (el) => void el.append(`<link rel="canonical" href="${origin}/" />`, { html: true }) })
-    .on('meta[property="og:url"], meta[property="og:image"], meta[name="twitter:image"]', fix('content'))
-    .transform(res);
+    .on('meta[property="og:image"], meta[name="twitter:image"]', fix('content'))
+    .on('meta[property="og:url"]', preview ? set(`${origin}/${url.search}`) : fix('content'));
+  if (preview) {
+    rw.on('meta[property="og:title"], meta[name="twitter:title"]', set(preview.title));
+    rw.on('meta[property="og:description"], meta[name="twitter:description"]', set(preview.description));
+  }
+  return rw.transform(res);
 }
 
 const text = (body: string, type: string) => new Response(body, { headers: { 'content-type': `${type}; charset=utf-8`, 'cache-control': 'public, max-age=3600' } });
@@ -43,7 +74,7 @@ export default {
     if (url.pathname === '/sitemap.xml') {
       return text(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${url.origin}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n</urlset>\n`, 'application/xml');
     }
-    if (url.pathname === '/' || url.pathname === '/index.html') return siteMeta(req, env, url.origin);
+    if (url.pathname === '/' || url.pathname === '/index.html') return siteMeta(req, env, url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     if (url.pathname === '/api/rooms' && req.method === 'POST') {
       const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH));

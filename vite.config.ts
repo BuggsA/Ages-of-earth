@@ -5,7 +5,13 @@ export default defineConfig(({ mode }) => ({
   base: './',
   // Online rooms only let in browsers running the same build (the rules must match exactly).
   define: { __BUILD__: JSON.stringify(process.env.AGES_BUILD ?? Date.now().toString(36)) },
-  build: { target: 'es2022', chunkSizeWarningLimit: 1500 },
+  build: {
+    target: 'es2022',
+    chunkSizeWarningLimit: 1500,
+    // Three.js in a file of its own: its name only changes when the library does, so a returning
+    // player's browser keeps it across our many deploys and fetches just the game's own code.
+    rolldownOptions: { output: { codeSplitting: { groups: [{ name: (id: string) => (id.includes('node_modules/three/') ? 'three' : null) }] } } },
+  },
   // In development, rooms are served by `wrangler dev` on port 8787.
   server: { proxy: { '/api': { target: 'http://localhost:8787', ws: true } } },
   // Two test tiers (AGENTS.md, "Checks"): `npm test` runs the quick tests in tests/, and
