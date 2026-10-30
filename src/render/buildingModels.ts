@@ -241,6 +241,65 @@ function ironHouse(k: Kit, st: Style): void {
   k.glow(k.octa(0.025, '#ff7a2a', 0.62, 0.12, 0.63));
 }
 
+/**
+ * The Iron Age's Town Center (#816): a hillfort. A ring of banked earth with a stake palisade on its crest and one timber
+ * gate, the thing that stands for the age across Iron Age Europe. Inside, the great roundhouse sits beside a smaller one and
+ * the bloomery fire, so a town of this age reads from afar as a walled mound, not a hall.
+ */
+function ironHillfort(k: Kit, st: Style): void {
+  pad(k, 4, st.base);
+  const R = 1.78;
+  const N = 18;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * 2 * Math.PI;
+    const x = Math.sin(a) * R;
+    const z = Math.cos(a) * R - 0.1;
+    // The gate faces +z (the front); leave the bank open there.
+    if (Math.cos(a) > 0.93) continue;
+    const bank = k.box(0.7, 0.34, 0.5, i % 2 ? '#6b5a3c' : '#756346', x, 0, z);
+    bank.rotation.y = a;
+    // Stakes along the crest, sharpened and leaning a little outward.
+    for (const d of [-0.22, 0.0, 0.22]) {
+      const sx = x + Math.cos(a) * d;
+      const sz = z - Math.sin(a) * d;
+      const h = 0.62 + ((i + Math.round(d * 10) + 9) % 3) * 0.08;
+      k.cyl(0.04, 0.05, h, 4, '#7a5a38', sx, 0.3, sz);
+      k.cone(0.05, 0.12, 4, '#8a6a44', sx, 0.3 + h, sz);
+    }
+    if (i % 2 === 0) k.box(0.52, 0.04, 0.05, '#5a4630', x, 0.62, z).rotation.y = a;
+  }
+  // The gate: two stout posts and a lintel across the gap, with a torch each side.
+  const gz = R - 0.1;
+  for (const x of [-0.42, 0.42]) {
+    k.cyl(0.09, 0.1, 1.15, 6, '#6b4b2f', x, 0, gz);
+    k.cone(0.1, 0.16, 6, '#8a6a44', x, 1.15, gz);
+    k.cyl(0.05, 0.06, 0.4, 5, '#6b4b2f', x * 1.35, 0.25, gz + 0.05);
+  }
+  k.box(1.0, 0.1, 0.12, '#5c4630', 0, 0.92, gz);
+  k.team(k.box(0.42, 0.18, 0.04, TEAM, 0, 0.62, gz + 0.02));
+  torch(k, -0.62, 0, gz + 0.25);
+  torch(k, 0.62, 0, gz + 0.25);
+  // The trodden way from the gate to the hearth.
+  k.box(0.7, 0.04, 1.0, st.trim, 0, 0.02, 1.15);
+  // The great roundhouse, a daub drum under a steep thatch cone, and a smaller one beside it.
+  const house = (x: number, z: number, r: number, h: number): void => {
+    k.cyl(r, r * 1.05, h, 12, st.wall, x, 0, z);
+    k.cone(r * 1.4, h * 2.4, 12, '#7d6a4c', x, h * 0.9, z);
+    k.cone(r * 0.8, h * 1.3, 12, '#8d7a58', x, h * 1.9, z);
+    k.cone(r * 0.2, h * 0.5, 8, '#4f4130', x, h * 3.05, z);
+    k.box(r * 0.45, h * 0.8, 0.03, '#2a1f17', x, 0, z + r * 1.02);
+  };
+  house(-0.15, -0.55, 0.78, 0.5);
+  house(-1.0, 0.55, 0.42, 0.3);
+  // The bloomery: a clay stack with a glowing mouth and a heap of ore, the age's wealth, and the town's banner.
+  k.cyl(0.17, 0.24, 0.55, 8, '#6a5848', 0.95, 0, 0.35);
+  k.glow(k.box(0.14, 0.12, 0.03, '#ff7a2a', 0.95, 0.1, 0.58));
+  k.glow(k.octa(0.05, '#ff9a3c', 0.95, 0.6, 0.35));
+  k.rock(0.12, '#3d3330', 0.55, 0.0, 0.7);
+  k.rock(0.09, '#4a3d38', 1.35, 0.0, 0.55);
+  banner(k, 0.45, 0, -0.1, 1.5, 1.2);
+}
+
 // ---- Storehouse ------------------------------------------------------------------------------------
 
 function storehouse(k: Kit, e: number, st: Style): void {
@@ -2978,6 +3037,8 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         k.glow(k.box(0.5, 0.4, 0.05, '#ff7a2a', 0, 0.2, 1.52));
         k.box(2.6, 0.18, 0.04, RUST, 0, 0.1, 1.5);
         k.glow(k.octa(0.08, '#ff9a3c', 1.1, 2.7, -1.1));
+      } else if (type === 'towncenter') {
+        // The hillfort (`ironHillfort`) is the whole look.
       } else if (big) {
         k.box(3.0, 0.2, 3.0, RUST, 0, 0, 0);
         torch(k, -1.4, 0, 2.05);
@@ -3106,7 +3167,7 @@ function aeroAirfield(k: Kit, st: Style): void {
 
 /** Buildings an age raises in a shape of its own (#816), in place of the trunk's model; its touches still follow. */
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
-  iron: { house: ironHouse },
+  iron: { house: ironHouse, towncenter: ironHillfort },
   aeronaut: { airfield: aeroAirfield },
 };
 
