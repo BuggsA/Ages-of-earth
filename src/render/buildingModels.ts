@@ -210,6 +210,37 @@ function house(k: Kit, e: number, st: Style): void {
   k.team(k.box(0.32, 0.05, 0.12, TEAM, 0, 0.47, 0.6));
 }
 
+/**
+ * The Iron Age's house (#816): a roundhouse of the kind raised across Iron Age Europe. A low drum of daub on wattle under a
+ * tall, steep cone of thatch that comes down almost to the ground, so a town of them reads as a field of haystacks, not boxes.
+ * Spears with iron heads lean by the door and a lump of bog iron, the age's wealth, glows on the step.
+ */
+function ironHouse(k: Kit, st: Style): void {
+  pad(k, 2, st.base);
+  const z = -0.18;
+  k.cyl(0.6, 0.63, 0.34, 12, st.wall, 0, 0, z);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * 2 * Math.PI;
+    k.cyl(0.025, 0.03, 0.34, 4, '#5c4630', Math.sin(a) * 0.63, 0, z + Math.cos(a) * 0.63);
+  }
+  // The thatch, weathered grey-brown in the bog-iron light, in two tones with a bound ring part way up and a capped peak.
+  k.cone(0.84, 1.0, 12, '#7d6a4c', 0, 0.32, z);
+  k.cone(0.5, 0.6, 12, '#8d7a58', 0, 0.73, z);
+  k.ring(0.44, 0.03, '#5a4a34', 0.8).position.z = z;
+  k.cone(0.12, 0.18, 8, '#4f4130', 0, 1.24, z);
+  k.box(0.24, 0.3, 0.03, '#2a1f17', 0, 0, z + 0.62);
+  // Spears racked at the left of the door, iron heads up, and the bloom of bog iron on the right.
+  for (const [x, lean] of [[-0.62, 0.1], [-0.74, 0.02], [-0.86, -0.06]] as const) {
+    const s = k.group(x, 0, 0.5);
+    s.rotation.x = -0.2;
+    s.rotation.z = lean;
+    k.cyl(0.014, 0.016, 0.82, 4, '#6b4b2f', 0, 0, 0, s);
+    k.cone(0.035, 0.16, 4, '#55575c', 0, 0.82, 0, s);
+  }
+  k.rock(0.09, '#3d3330', 0.62, 0.04, 0.55);
+  k.glow(k.octa(0.025, '#ff7a2a', 0.62, 0.12, 0.63));
+}
+
 // ---- Storehouse ------------------------------------------------------------------------------------
 
 function storehouse(k: Kit, e: number, st: Style): void {
@@ -2947,9 +2978,6 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         k.glow(k.box(0.5, 0.4, 0.05, '#ff7a2a', 0, 0.2, 1.52));
         k.box(2.6, 0.18, 0.04, RUST, 0, 0.1, 1.5);
         k.glow(k.octa(0.08, '#ff9a3c', 1.1, 2.7, -1.1));
-      } else if (type === 'house') {
-        k.box(1.45, 0.14, 1.2, RUST, -0.1, 0, -0.1);
-        k.glow(k.box(0.12, 0.1, 0.03, '#ff7a2a', 0.35, 0.3, 0.52));
       } else if (big) {
         k.box(3.0, 0.2, 3.0, RUST, 0, 0, 0);
         torch(k, -1.4, 0, 2.05);
@@ -3043,6 +3071,11 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   ventforge: (k: Kit, _e: number, st: Style) => ventforge(k, st.base),
   faultengine: (k: Kit, _e: number, st: Style) => faultengine(k, st.base),
   heartstone: (k: Kit, _e: number, st: Style) => heartstone(k, st.base),
+};
+
+/** Buildings an age raises in a shape of its own (#816), in place of the trunk's model; its touches still follow. */
+const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
+  iron: { house: ironHouse },
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
@@ -3264,6 +3297,7 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     else if (type === 'hive') hive(k, epoch, variant);
     else if (type === 'shaft') shaft(k, epoch, style, variant);
     else if (type === 'silo') silo(k, epoch, style, variant);
+    else if (look && AGE_SHAPES[look]?.[type]) AGE_SHAPES[look][type](k, style);
     else MAKERS[type](k, epoch, style);
     // A Watch Tower's `variant` is its step on the tower line; a Town Center's 1, that it was knelt from a Behemoth.
     if (type === 'tower' && variant) towerLevel(k, variant);
