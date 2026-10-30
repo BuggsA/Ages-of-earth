@@ -3343,6 +3343,7 @@ const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st
   iron: { house: ironHouse, towncenter: ironHillfort },
   merchant: { market: merchantMarket, barracks: merchantBarracks },
   aeronaut: { airfield: aeroAirfield, towncenter: aeroTerminal },
+};
 
 const cache = new Map<string, THREE.BufferGeometry>();
 
