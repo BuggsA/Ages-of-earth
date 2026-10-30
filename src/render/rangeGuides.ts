@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { BUILDINGS, INTERCEPT, LIGHTNING, SORTIE, type UnitStats } from '../sim/data';
+import { BUILDINGS, INTERCEPT, LIGHTNING, SORTIE, domainOf, type UnitStats } from '../sim/data';
+import { heightReach } from '../sim/terrain';
 import { ageDef, hasCoils } from '../sim/ages';
 import { gunRange, statsFor } from '../sim/stats';
 import type { Building, BuildingType, Ent, GameState } from '../sim/types';
@@ -31,6 +32,8 @@ export interface RangeGuide {
   band?: 'rearm' | 'turn' | 'reach';
   /** An Interceptor Battery's cover (#759 s2): drawn in pale teal, and through the fog, as the battery itself is. */
   cover?: boolean;
+  /** A ranged unit's reach on the land (#925): bulging out where it shoots downhill and pulled in uphill. */
+  high?: boolean;
 }
 
 function unitReach(st: UnitStats): Pick<RangeGuide, 'reach' | 'minimum'> | null {
@@ -46,10 +49,20 @@ export function selectedRange(s: GameState, viewer: number, e: Ent): RangeGuide 
   if (e.kind === 'unit') {
     if (e.inside) return null;
     const reach = unitReach(statsFor(s, viewer, e.type));
-    return reach ? { x: e.x, y: e.y, ...reach } : null;
+    return reach ? { x: e.x, y: e.y, ...reach, high: domainOf(e.type) !== 'air' } : null;
   }
   if (!e.built) return null;
   return BUILDINGS[e.type].guns ? { x: e.x, y: e.y, reach: gunRange(s, e.owner, e.type, e.level) + e.size / 2, minimum: 0 } : null;
+}
+
+/** Whether the land bends a guide's reach by at least half a tile somewhere round it (#925): then it is worth drawing unasked. */
+export function bent(s: GameState, g: RangeGuide): boolean {
+  if (!g.high) return false;
+  for (let i = 0; i < 16; i++) {
+    const a = i * Math.PI / 8;
+    if (Math.abs(heightReach(s, g.x, g.y, g.x + Math.cos(a) * g.reach, g.y + Math.sin(a) * g.reach)) >= 0.5) return true;
+  }
+  return false;
 }
 
 /** A defense's future reach, including this player's researched range. */
@@ -128,8 +141,12 @@ export class RangeGuides {
     this.mesh.renderOrder = 4;
   }
 
+  /** The reach toward each of the ring's directions, after the height of the land there. */
+  private reach = new Float32Array(SEGMENTS + 1);
+
   update(s: GameState, guides: readonly RangeGuide[], visible: (x: number, y: number) => boolean): void {
     let n = 0;
+    const reach = this.reach;
     const open = (x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h && visible(x, y);
     for (const g of guides.slice(0, MAX_RANGE_GUIDES)) {
       for (const minimum of [false, true]) {
@@ -137,17 +154,29 @@ export class RangeGuides {
         if (!(base > 0)) continue;
         const color = g.band ? BANDS[g.band] : g.cover ? COVER : g.field ? FIELD : minimum ? INNER : OUTER;
         const seen = g.cover ? (x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h : open;
+        // The outer reach follows the land as the rules do (#925): further where the ground falls away, shorter where it climbs.
+        // A few passes settle each direction's radius on the height of the ground it lands on.
+        for (let i = 0; i <= SEGMENTS; i++) {
+          let r = base;
+          if (g.high && !minimum) {
+            const c = Math.cos(i * Math.PI * 2 / SEGMENTS);
+            const sn = Math.sin(i * Math.PI * 2 / SEGMENTS);
+            for (let pass = 0; pass < 3; pass++) r = base + heightReach(s, g.x, g.y, g.x + c * r, g.y + sn * r);
+          }
+          reach[i] = r;
+        }
         for (let ring = 0; ring < RINGS; ring++) {
-          const radius = Math.max(0.01, base + (ring - 1) * FLANK);
           const k = ring === 1 ? 1 : FLANK_DIM;
           for (let i = 0; i < SEGMENTS; i++) {
             if (minimum && i % 4 >= 2) continue;
             const a = i * Math.PI * 2 / SEGMENTS;
             const b = (i + 1) * Math.PI * 2 / SEGMENTS;
-            const x0 = g.x + Math.cos(a) * radius;
-            const y0 = g.y + Math.sin(a) * radius;
-            const x1 = g.x + Math.cos(b) * radius;
-            const y1 = g.y + Math.sin(b) * radius;
+            const ra = Math.max(0.01, reach[i] + (ring - 1) * FLANK);
+            const rb = Math.max(0.01, reach[i + 1] + (ring - 1) * FLANK);
+            const x0 = g.x + Math.cos(a) * ra;
+            const y0 = g.y + Math.sin(a) * ra;
+            const x1 = g.x + Math.cos(b) * rb;
+            const y1 = g.y + Math.sin(b) * rb;
             // Test the midpoint too: don't bridge a hidden tile between two visible endpoints.
             if (!seen(x0, y0) || !seen(x1, y1) || !seen((x0 + x1) / 2, (y0 + y1) / 2)) continue;
             for (const [x, y] of [[x0, y0], [x1, y1]]) {

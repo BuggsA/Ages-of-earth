@@ -1,6 +1,7 @@
 import { canDelve } from './delve';
-import { COCKLE, BLOOMERY, AI_LEVELS, AUTO_WORK, BUILDINGS, GIANTS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
+import { COCKLE, BLOOMERY, AI_LEVELS, AUTO_WORK, BUILDINGS, GIANTS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TERRAIN, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
+import { climbPace, feelsHeight, reachAt } from './terrain';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
@@ -780,7 +781,9 @@ function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: bo
   const st = statsOf(s, u);
   if (st.attack <= 0) return null;
   if (!st.buildingsOnly) {
-    const t = nearestEnemyUnit(s, sp, u.owner, u.x, u.y, r, (o) => canHit(s, u, o));
+    // A ranged soldier standing its ground (#925) looks as far as the high ground lets it shoot, and takes only what it can reach.
+    const held = u.stance === 'stand' && feelsHeight(u, st);
+    const t = nearestEnemyUnit(s, sp, u.owner, u.x, u.y, held ? r + TERRAIN.reachUp : r, (o) => canHit(s, u, o) && (!held || gap(s, u, o) <= reachAt(s, u, st, o) + 0.15));
     if (t || !buildings) return t;
   }
   if (!buildings && !st.buildingsOnly) return null;
@@ -1062,7 +1065,7 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
       return;
     }
   }
-  if (d <= st.range + 0.15) {
+  if (d <= reachAt(s, u, st, t) + 0.15) {
     if (st.minRange && d < st.minRange) {
       // Too close to shoot: back off if allowed, else wait.
       if (u.stance === 'stand' || o.auto) {
@@ -2377,7 +2380,10 @@ export function walk(s: GameState, u: Unit): void {
   // Venom and stings slow it (the Age of the Hive); the woods round a Heart Tree speed its own people and hold back a rival (the Wildwood).
   // A Kraken's grip holds a ship still, and its own people's Kraken shoves it along (#789, the Age of Leviathans).
   const dom = domainOf(u.type);
-  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * stungPace(s, u) * woodPace(s, u) * (dom === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') : dom === 'water' ? seaPace(s, u) : 1) * DT;
+  // Uphill is slow going for an army (#925, the lay of the land); a people's workers know their own tracks, and beasts are sure-footed.
+  const climb = TERRAIN.climbers.includes(u.type) ? climbPace(s, u, u.path[u.pathI * 2], u.path[u.pathI * 2 + 1]) : 1;
+  const land = dom === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') * climb : 1;
+  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * stungPace(s, u) * woodPace(s, u) * (dom === 'land' ? land : dom === 'water' ? seaPace(s, u) : 1) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];

@@ -5,6 +5,7 @@ import { T_GRASS, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 import { isCanal, isInund, isPolder } from '../sim/water';
 import { bared, isCauseway } from '../sim/tides';
 import { isPond } from '../sim/tides';
+import { prominence } from '../sim/terrain';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { GROUND_AGES, GROUND_REACH, GROUND_STRENGTH, groundColor } from './ageGrounds';
 import type { AgeId, BuildingType } from '../sim/types';
@@ -24,6 +25,8 @@ const DIRT = C('#7a6c4c');
 const SAND = [C('#cdbb8c'), C('#bca97a')];
 const ROCK = [C('#7a7267'), C('#877f73'), C('#6c655b')];
 const CLIFF = C('#6a6156');
+/** Hill-shading (#925): the warm light a crest catches. */
+const CREST = C('#f3e7b8');
 const BED = [C('#b9a87a'), C('#8b9378')];
 const SNOWCAP = C('#d6d2ca');
 /**
@@ -360,6 +363,8 @@ export class TerrainView {
     const tile = y * w + x;
     let k = tile * 6;
     const { pos, col } = this;
+    // How far the tile stands above the ground round it, as the rules read a rise (#925).
+    const relief = prominence(s, x + 0.5, y + 0.5);
     const tmp = TMP;
     const tri = (pts: readonly (readonly [number, number])[], t: number) => {
       // Slope: steep faces show as rock whatever the tile.
@@ -409,6 +414,11 @@ export class TerrainView {
       if (trodden && this.townW[tile]) tmp.lerp(groundColor(TMP2, GROUND_AGES[this.townAge[tile]], x, y, t, fine), (GROUND_STRENGTH * this.townW[tile]) / 4);
       if (terr !== T_WATER && s.channel && besideCanal(s, x, y)) tmp.lerp(TOWPATH, 0.45);
       if (terr !== T_WATER && steep < 0.8) tmp.lerp(CLIFF, Math.min(1, (0.8 - steep) * 2.6));
+      // Hill-shading (#925): crests catch a warm light and hollows sit in soft shade, so the high ground reads without an overlay.
+      if (terr !== T_WATER) {
+        if (relief > 0) tmp.lerp(CREST, Math.min(0.24, relief * 0.4));
+        else tmp.multiplyScalar(1 - Math.min(0.16, -relief * 0.26));
+      }
       // A whisper of light and shade per facet keeps the low-poly look without the noise.
       tmp.multiplyScalar(0.975 + n * 0.05);
       for (const [px, py] of pts) {

@@ -4712,3 +4712,25 @@ export const BATTLE = { recent: 3, near: 8, join: 9, reach: 10, crushing: 0.8, w
  * once nothing armed and hostile is within `clear` tiles of the building and `hold` seconds have passed.
  */
 export const FLEE = { shelter: 14, run: 8, pad: 3, clear: 10, hold: 6 };
+
+/**
+ * The lay of the land t1: high ground (#925, `docs/lay-of-the-land.md`). Heights are the map's corner heights (`groundAt`),
+ * water counted at `sea`.
+ * - Reach: a ranged unit (not an aircraft, nor at one) shooting at a target lower than it by more than `rise` reaches
+ *   `reachPer` tiles further for each unit of height past `rise`, at most `reachUp`; shooting up at one higher by more than
+ *   `rise`, it falls short by the same, at most `reachDown`.
+ * - Sight: a unit standing higher than the mean of `ring` (eight) points `around` tiles out by more than `sightFrom` sees `sightPer`
+ *   tiles further for each unit of height past it, at most `sightMax`.
+ * - Climbing: a soldier of the line (`climbers`) walking up a slope steeper than `climbFrom` (height a tile) goes slower, its pace
+ *   divided by 1 + `climb` for each unit of slope past it, never under `climbMin` of its pace. The slope is read `look` tiles ahead.
+ *   Workers know their own tracks, and beasts are sure-footed.
+ */
+export const TERRAIN = {
+  sea: 0, rise: 0.3, reachPer: 2.5, reachUp: 2, reachDown: 1,
+  ring: 8, around: 6, sightFrom: 0.15, sightPer: 6, sightMax: 3,
+  climbFrom: 0.1, climb: 1.5, climbMin: 0.6, look: 0.5,
+  climbers: ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'blowpipe'] as UnitType[],
+};
+
+/** The computer holds the high ground (#925): its army waits on the highest open ground within `reach` tiles of its muster, if that stands `gain` higher. */
+export const AI_RIDGE = { reach: 5, gain: 0.3 };
