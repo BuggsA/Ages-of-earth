@@ -3193,6 +3193,59 @@ function merchantMarket(k: Kit, st: Style): void {
   banner(k, -1.35, 0, 1.35, 1.3);
 }
 
+/**
+ * The Merchants' Barracks (#816): a condottiere's company house, not a drill hall. A brick hall with a paymaster's window and
+ * a striped awning over the muster door, a contract board in the team's colour, and a yard with a pike rack and a quintain
+ * post to drill on. Swords here are hired (`AGES.merchant.hire`), so the building keeps the ledger as much as the weapons.
+ */
+function merchantBarracks(k: Kit, st: Style): void {
+  pad(k, 2.2, st.base);
+  // The hall, set back, with a plinth, a band course and a hipped roof.
+  k.box(1.7, 0.18, 1.1, st.wall2, 0, 0, -0.45);
+  k.box(1.6, 0.86, 1.0, st.wall, 0, 0.18, -0.45);
+  k.box(1.7, 0.07, 1.1, st.trim, 0, 0.62, -0.45);
+  k.prism(1.8, 0.55, 1.2, st.roof, 0, 1.04, -0.45);
+  // Muster door and the paymaster's barred window with a lit slot above.
+  k.box(0.38, 0.55, 0.03, '#2a1f17', -0.35, 0.18, 0.06);
+  k.box(0.46, 0.06, 0.05, st.trim, -0.35, 0.73, 0.07);
+  k.box(0.3, 0.26, 0.03, '#2a1f17', 0.4, 0.4, 0.06);
+  for (const dx of [-0.08, 0, 0.08]) k.box(0.02, 0.26, 0.04, IRON_DARK, 0.4 + dx, 0.4, 0.08);
+  k.box(0.4, 0.05, 0.06, st.trim, 0.4, 0.66, 0.08);
+  window(k, st, -0.35, 0.86, 0.06, 0.14, 0.14);
+  window(k, st, 0.4, 0.86, 0.06, 0.14, 0.14);
+  // The striped awning over the muster door, on two posts.
+  awning(k, -0.35, 0.88, 0.32, 0.7, 4, 1);
+  for (const x of [-0.65, -0.05]) k.cyl(0.018, 0.02, 0.84, 5, WOOD, x, 0, 0.52);
+  // The contract board: a post-framed board in the team's colour with pinned bills.
+  k.cyl(0.02, 0.025, 0.8, 5, st.post, 0.55, 0, 0.62);
+  k.cyl(0.02, 0.025, 0.8, 5, st.post, 1.0, 0, 0.62);
+  k.team(k.box(0.5, 0.36, 0.03, TEAM, 0.78, 0.5, 0.62));
+  k.box(0.56, 0.04, 0.05, st.trim, 0.78, 0.88, 0.62);
+  for (const [x, y] of [[0.68, 0.62], [0.85, 0.55]]) k.box(0.1, 0.13, 0.01, '#e8dcc0', x, y, 0.65);
+  // A coin chest and sacks at the paymaster's window.
+  k.box(0.24, 0.15, 0.16, '#5a3a22', 0.25, 0, 0.3);
+  k.box(0.26, 0.04, 0.18, '#e2b23c', 0.25, 0.15, 0.3);
+  // The yard: a pike rack and a quintain post with a swinging arm and a shield target.
+  k.box(0.5, 0.05, 0.06, WOOD, -0.85, 0.3, 0.6);
+  for (const x of [-1.05, -0.65]) k.cyl(0.02, 0.025, 0.4, 4, WOOD, x, 0, 0.6);
+  for (let i = 0; i < 4; i++) {
+    const sp = k.group(-1.0 + i * 0.12, 0, 0.6);
+    sp.rotation.x = -0.1;
+    k.cyl(0.012, 0.014, 1.1, 4, '#6b4b2f', 0, 0, 0, sp);
+    k.cone(0.03, 0.14, 4, '#9a9ca2', 0, 1.1, 0, sp);
+  }
+  k.cyl(0.04, 0.05, 0.9, 6, WOOD, -0.6, 0, 0.98);
+  k.box(0.7, 0.05, 0.05, WOOD, -0.6, 0.85, 0.98).rotation.y = 0.5;
+  k.cyl(0.13, 0.13, 0.03, 10, '#b8893a', -0.88, 0.62, 0.84).rotation.x = Math.PI / 2;
+  k.sphere(0.07, '#d8c08a', -0.32, 0.8, 1.12);
+  // Lanterns at the door, and a banner on the gable.
+  for (const x of [-0.62, -0.08]) {
+    k.cyl(0.012, 0.012, 0.14, 4, IRON_DARK, x, 0.62, 0.34);
+    k.glow(k.sphere(0.05, '#ffd890', x, 0.58, 0.34));
+  }
+  banner(k, 0.78, 1.05, -0.45, 0.75, 1.1);
+}
+
 /** The Aeronauts' Airfield (#816): no runway but a mooring mast, an airship riding at its nose with a winch house and fuel drums below. */
 function aeroAirfield(k: Kit, st: Style): void {
   k.box(3.9, 0.05, 3.9, '#8fa586', 0, -0.02, 0);
@@ -3288,9 +3341,8 @@ function aeroTerminal(k: Kit, st: Style): void {
 /** Buildings an age raises in a shape of its own (#816), in place of the trunk's model; its touches still follow. */
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
   iron: { house: ironHouse, towncenter: ironHillfort },
-  merchant: { market: merchantMarket },
+  merchant: { market: merchantMarket, barracks: merchantBarracks },
   aeronaut: { airfield: aeroAirfield, towncenter: aeroTerminal },
-};
 
 const cache = new Map<string, THREE.BufferGeometry>();
 
