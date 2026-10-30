@@ -1,5 +1,6 @@
 import { CODE_CHARS, CODE_LENGTH, validCode } from '../src/net/protocol';
 import { MAP_TYPES } from '../src/sim/data';
+import { SITE_PAGES } from '../src/site/pages';
 import type { MapType } from '../src/sim/types';
 import { MAX_CLOUD_SAVE, MAX_PROGRESS_BODY, MAX_WEB_BODY, validSlot, validVaultKey } from '../src/net/vault';
 
@@ -72,7 +73,8 @@ export default {
     const url = new URL(req.url);
     if (url.pathname === '/robots.txt') return text(`User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${url.origin}/sitemap.xml\n`, 'text/plain');
     if (url.pathname === '/sitemap.xml') {
-      return text(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${url.origin}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n</urlset>\n`, 'application/xml');
+      const urls = [`<url><loc>${url.origin}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>`, ...SITE_PAGES.map((p) => `<url><loc>${url.origin}/${p.path}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>`)];
+      return text(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  ${urls.join('\n  ')}\n</urlset>\n`, 'application/xml');
     }
     if (url.pathname === '/' || url.pathname === '/index.html') return siteMeta(req, env, url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
