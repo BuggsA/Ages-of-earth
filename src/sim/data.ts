@@ -4477,7 +4477,7 @@ export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refue
  * people with Launch Control fires one, and only it may raise a third silo (`trio`). A plain Atomic people pays `surcharge` more fuel for
  * each of the three (a Fission or Fusion people's silos are built to share a clock).
  */
-export const SALVO = { trio: 3, surcharge: 0.5 };
+export const SALVO = { trio: 3, surcharge: 0.2 };
 /**
  * Missile defence (#759 s2): a finished Interceptor Battery holds one charge. Exactly `fire` seconds before a rival warhead lands, each of its
  * live warheads whose ring, as the battery's team is shown it, lies within `reach` tiles of a charged battery draws one attempt: the nearest
@@ -4530,7 +4530,7 @@ export const WARHEADS = {
  * The flight (#772): `read` seconds after a rival missile starts to bend, the computer reads its course as a player would (where it is,
  * where it is going, how it turns) and stops clearing the rings the course has ruled out.
  */
-export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, own: 1, margin: 1.5, salvo: 1.8, salvoPlain: 2.4, read: 5 };
+export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, own: 1, margin: 1.5, salvo: 1.4, salvoPlain: 1.6, read: 5 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**
