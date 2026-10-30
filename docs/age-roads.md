@@ -86,12 +86,12 @@ The road wins at the plain road's rate on the maps it names, and walks deep on t
 
 | Route | Won | Lost | Unfinished | Route ages walked (per seed) |
 | --- | --- | --- | --- | --- |
-| Deep road | **12/16** | 1 | 3 | 4/5/4/4/0/2/4/5/2/4/0/3/0/5/4/3 of 6 |
-| Plain road | 12/16 | 1 | 3 | trunk only |
-| Army route | 13/16 | 1 | 2 | |
+| Deep road | **12/16** | 0 | 4 | 4/5/3/4/0/2/4/5/2/4/0/3/4/4/4/4 of 6 |
+| Plain road | 12/16 | 2 | 2 | trunk only |
+| Army route | 13/16 | 2 | 1 | |
 | Economy route | 12/16 | 2 | 2 | |
 
-The road wins at the plain road's rate: no must-pick and no never-pick, so no number on the road itself was tuned. On the first 6 seeds (`--detail`) a bound seat reaches the Megaliths by minute 7 to 11, the Undercity by 16 to 18 and the Deep Forges by 20 to 25, but the matches end by minute 22 to 38, so the Faults are reached on 3 seeds and the Living Earth on none: a Hard computer wins on the middle of the road. The two 0s are the Mongols (seed 405, who quarry no stone and take the plain road instead) and seed 1213, rushed at minute 14 before its Megaliths. **To the end, at peace** (the same seats, no war and no wonder win, 60 minutes, seeds 1, 102, 203, 304, 405, 506): before the fixes, 2 of 6 reached the Faults and none the Living Earth; after, every seat that can walk the road reached the Living Earth (5 of 5, at minutes 32, 40, 48, 32 and 56).
+The road wins at the plain road's rate: no must-pick and no never-pick, so no number on the road itself was tuned. On the first 6 seeds (`--detail`) a bound seat reaches the Megaliths by minute 7 to 11, the Undercity by 16 to 18 and the Deep Forges by 20 to 25, but the matches end by minute 22 to 38, so the Faults are reached on 2 seeds and the Living Earth on none: a Hard computer wins on the middle of the road. The two 0s are the Mongols (seed 405, who quarry no stone and take the plain road instead) and seed 1011. Before the fixes (6 seeds) it won 5/6 to the plain road's 5/6, and the Mongol seat stood in the Stone Age all match, bound to a road shut to it. **To the end, at peace** (the same seats, no war and no wonder win, 60 minutes, seeds 1, 102, 203, 304, 405, 506): before the fixes, 2 of 6 reached the Faults and none the Living Earth; after, every seat that can walk the road reached the Living Earth (5 of 5, at minutes 31, 39, 47, 31 and 58), and the Mongol seat climbed the plain road to the Atomic Age.
 
 What held it back was the computer, not the road: (1) stone. Past the Megaliths it gave stone the epoch's share (6% of hands in the Industrial tier) while the Faults ask 1,200 and the Living Earth 1,600; by minute 45 the deposits by home were dug out and three Mine Shafts at the open-ground grade brought in about 16 a minute, beside 9,000 gold and 14,000 wood. Now a Deep Road town past the Megaliths sends three times the share to stone, sinks up to 8 shafts, and buys the next climb's stone at the Market with its spare gold (`AI_DEEP`). (2) The cap: at 150 people a citizen queued at the Town Center never trains and the advance waits on an empty queue; one seat sat 20 minutes in the Deep Forges with the Faults paid for three times over. (3) The Fault Engine cracked under rival buildings before the Living Earth's price was set aside.
 

@@ -3705,8 +3705,7 @@ export const LIVING = {
  * 1,200, the Living Earth 1,600, the Quake 800), so `stone` times the epoch's share of hands go to the quarries, and it sinks up to
  * `shafts` Mine Shafts (not `SHAFT.aiMax`) once the deposits by home are dug out. While its store is short of the next climb's stone
  * (the Quake's, in the Living Earth), a clever town buys stone at the Market with gold beyond that climb's gold and `margin` more, and
- * sells food or wood piled `pile` past the climb's for the gold. A clever seat that settles a leaning (#749) leans to the `deep` route
- * on a coin of its own, one share among the routes open to it.
+ * sells food or wood piled `pile` past the climb's for the gold.
  */
 export const AI_DEEP = { stone: 3, shafts: 8, margin: 200, pile: 1500 };
 
