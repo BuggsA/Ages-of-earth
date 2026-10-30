@@ -2684,7 +2684,7 @@ export interface BuildingStats {
  * won't take the hand. The call of the wild (`callWild`): a Wild people's Hunting Camps draw a beast every `callEvery` seconds, the kind
  * not yet tamed first, up to `callCap` wolves and boars near each, and a mammoth while none is tamed (then each winter), `callMammoths` near (`call*`).
  * The computer takes the road on a coin of `aiTake` (raising the Hunting Camp that shows it once `aiClue` of the deed is in), tames within `aiNear` tiles of home (a wolf only with
- * `aiEscort` soldiers sent ahead at its pack), raises `aiDen` Dens and stays `aiStay` seconds before it climbs on.
+ * `aiEscort` soldiers sent ahead at its pack; once it holds `aiHerd` beasts, only a kind not yet tamed), raises `aiDen` Dens and stays `aiStay` seconds before it climbs on.
  */
 export const TAME = {
   reach: 1.1,
@@ -2700,6 +2700,7 @@ export const TAME = {
   callMammoths: 1,
   aiNear: 40,
   aiEscort: 4,
+  aiHerd: 3,
   aiTake: 0.3,
   aiClue: 0.8,
   aiDen: 1,

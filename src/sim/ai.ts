@@ -77,7 +77,7 @@ import { isMobile } from './steppe';
 import { flies, isRider, standardRival, standing } from './tribute';
 import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
-import { tames, wildBeast } from './tame';
+import { tames, wildBeast, type BeastKind } from './tame';
 import { grows } from './grove';
 import { keepsBees } from './hive';
 import { heartOf, treeToWake, treesRound, wakesForest } from './wildwood';
@@ -4258,11 +4258,15 @@ function wildRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   if (singers.length) return;
+  // With every kind it can find tamed and a herd in hand, the Den breeds the rest: a citizen always at the song is a gatherer lost.
+  const herd = v.army.filter((u) => u.type === 'warwolf' || u.type === 'tusker' || u.type === 'warmammoth').length;
+  const lacking = (k: BeastKind) => !p.tamed?.includes(k);
+  if (herd >= TAME.aiHerd && !s.animals.some((a) => wildBeast(a) && lacking(a.kind))) return;
   const escort = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || u.order.k === 'move'));
   let best: Animal | null = null;
   let bestD = TAME.aiNear * TAME.aiNear;
   for (const a of s.animals) {
-    if (!wildBeast(a) || s.tick - a.hurt < secs(TAME.wary) || (a.kind === 'wolf' && escort.length < TAME.aiEscort)) continue;
+    if (!wildBeast(a) || s.tick - a.hurt < secs(TAME.wary) || (a.kind === 'wolf' && escort.length < TAME.aiEscort) || (herd >= TAME.aiHerd && !lacking(a.kind))) continue;
     const d = (a.x - v.home.x) * (a.x - v.home.x) + (a.y - v.home.y) * (a.y - v.home.y);
     if (d < bestD) {
       bestD = d;
