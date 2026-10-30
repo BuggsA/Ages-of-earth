@@ -1,11 +1,15 @@
 /**
  * Mine Shafts (#681): stone and gold dug from the ground once the open deposits are gone. What the ground round a shaft holds
  * (old workings, mountain rock or plain earth) sets which seams it may dig and how fast; the numbers are `SHAFT` in `data.ts`.
+ *
+ * The deep mine (#924 m1, `docs/deep-mine.md`): a shaft is sunk down through the layers of `STRATA`. Each layer holds finite
+ * veins, richer the deeper, and room for a few miners; a spent vein is still dug at the ground's plain grade, so a shaft is
+ * never worse than it was before it had layers.
  */
-import { MEGALITH, SHAFT } from './data';
+import { MEGALITH, SHAFT, STRATA, EPOCHS, secs } from './data';
 import { deepQuarry } from './henge';
 import { mineable } from './household';
-import type { Building, GameState, Res, SeamId } from './types';
+import type { Building, GameState, Order, Res, SeamId, Unit } from './types';
 import { R_BLOODIRON, R_GLOWCAP, R_GOLD, R_SALT, R_SALTPETRE, R_STONE, T_ROCK } from './types';
 
 export type Grade = keyof typeof SHAFT.grade;
@@ -90,4 +94,119 @@ export function seamProblem(s: GameState, b: Building, seam: SeamId): string | n
 export function siteGrade(s: GameState, b: { tx: number; ty: number; size: number }): Grade {
   const g = groundAt(s, b);
   return g.stone === 'old' || g.gold === 'old' ? 'old' : g.stone!;
+}
+
+// ---- The deep mine (#924 m1) --------------------------------------------------------------------------------------
+
+/** The deepest layer a shaft reaches (0: the first). A shaft from an older save stands in the first. */
+export const depthOf = (b: Building): number => Math.min(b.depth ?? 0, STRATA.length - 1);
+
+/** How much of a seam's vein is left to dig in a layer of this shaft (0 where the layer holds none, or it is spent). */
+export function veinLeft(b: Building, layer: number, seam: SeamId): number {
+  const full = STRATA[layer]?.veins[seam] ?? 0;
+  return Math.max(0, full - (b.worked?.[layer]?.[seam] ?? 0));
+}
+
+/** Take one load's worth from a layer's vein. */
+function takeVein(b: Building, layer: number, seam: SeamId): void {
+  b.worked ??= [];
+  while (b.worked.length <= layer) b.worked.push({});
+  const row = (b.worked[layer] ??= {});
+  row[seam] = (row[seam] ?? 0) + 1;
+}
+
+/** The share of an open deposit's pace a miner in this layer digs a seam at: the plain grade, more while the layer's vein lasts. */
+export function digShare(s: GameState, b: Building, seam: SeamId, layer: number): number {
+  const floor = shaftShare(s, b, seam);
+  if (!floor || veinLeft(b, layer, seam) <= 0) return floor;
+  return Math.max(floor, SHAFT.grade[groundAt(s, b)[seam]!] + STRATA[layer].add);
+}
+
+/** Whether a unit works this shaft (on its way to it, at it, or hauling from it). */
+const crewman = (e: GameState['ents'][number], b: Building): e is Unit & { order: Extract<Order, { k: 'shaft' }> } =>
+  e.kind === 'unit' && e.hp > 0 && e.owner === b.owner && e.order.k === 'shaft' && e.order.target === b.id;
+
+/** A shaft's crew: how many hold a place in each layer it reaches, and how many are on their way without one. */
+export function crewOf(s: GameState, b: Building, skip?: Unit): { at: number[]; coming: number } {
+  const at = STRATA.map(() => 0);
+  let coming = 0;
+  for (const e of s.ents) {
+    if (e === skip || !crewman(e, b)) continue;
+    const l = e.order.layer;
+    if (l === undefined || l > depthOf(b)) coming++;
+    else at[l]++;
+  }
+  return { at, coming };
+}
+
+/** How many miners a shaft has room for, in all the layers it reaches. */
+export function roomOf(b: Building): number {
+  let n = 0;
+  for (let l = 0; l <= depthOf(b); l++) n += STRATA[l].room;
+  return n;
+}
+
+/** How many more miners a shaft takes: its room less its crew, those on their way too. */
+export function roomLeft(s: GameState, b: Building): number {
+  const c = crewOf(s, b);
+  return roomOf(b) - c.coming - c.at.reduce((a, n) => a + n, 0);
+}
+
+/**
+ * The layer a miner arriving at a shaft takes: its own while that still has a vein of the seam, else the deepest with room
+ * and a vein, else its own, else the deepest with room (dug at the plain grade). -1: no room at all.
+ */
+export function placeFor(s: GameState, b: Building, u: Unit, seam: SeamId, want?: number): number {
+  const { at } = crewOf(s, b, u);
+  const open = (l: number) => l >= 0 && l <= depthOf(b) && at[l] < STRATA[l].room;
+  if (want !== undefined && open(want) && veinLeft(b, want, seam) > 0) return want;
+  for (let l = depthOf(b); l >= 0; l--) if (open(l) && veinLeft(b, l, seam) > 0) return l;
+  if (want !== undefined && open(want)) return want;
+  for (let l = depthOf(b); l >= 0; l--) if (open(l)) return l;
+  return -1;
+}
+
+/** One miner's stroke at the face: what it digs in a tick, and the vein it takes from while that lasts. */
+export function digAt(s: GameState, b: Building, seam: SeamId, layer: number, rate: number, u: Unit): void {
+  const vein = veinLeft(b, layer, seam) > 0;
+  u.frac += rate * digShare(s, b, seam, layer);
+  while (u.frac >= 1) {
+    u.frac -= 1;
+    u.carry++;
+    if (vein && veinLeft(b, layer, seam) > 0) takeVein(b, layer, seam);
+  }
+}
+
+/** Whether every layer a shaft reaches has its vein of this seam dug out (a seam no layer holds counts as spent). */
+export function spentAt(b: Building, seam: SeamId): boolean {
+  for (let l = 0; l <= depthOf(b); l++) if (veinLeft(b, l, seam) > 0) return false;
+  return true;
+}
+
+/** Why a shaft can't be sunk a layer deeper now, or null. Its cost is checked where it is paid. */
+export function deepenProblem(s: GameState, b: Building): string | null {
+  if (b.type !== 'shaft') return 'Only a Mine Shaft is sunk';
+  if (!b.built) return 'Finish the shaft first';
+  if (b.deepening !== undefined) return 'Already sinking';
+  const next = STRATA[depthOf(b) + 1];
+  if (!next) return 'The shaft is as deep as it goes';
+  if (s.players[b.owner].epoch < next.epoch) return `${next.name} is reached from the ${EPOCHS[next.epoch].name}`;
+  return null;
+}
+
+/** Start sinking a shaft a layer deeper (paid by the caller). */
+export function deepen(s: GameState, b: Building): void {
+  b.deepening = s.tick + secs(STRATA[depthOf(b) + 1].time);
+}
+
+/** Seconds until a shaft being sunk reaches its next layer, or 0. */
+export const deepeningLeft = (s: GameState, b: Building): number => (b.deepening === undefined ? 0 : Math.max(0, Math.ceil((b.deepening - s.tick) / secs(1))));
+
+/** Each tick: shafts being sunk reach their next layer. */
+export function deepenStep(s: GameState): void {
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'shaft' || e.deepening === undefined || s.tick < e.deepening) continue;
+    e.depth = depthOf(e) + 1;
+    delete e.deepening;
+  }
 }

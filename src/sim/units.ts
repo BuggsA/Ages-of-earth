@@ -11,7 +11,7 @@ import { felled, isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { ageDef, canRaise, inField, prospect } from './ages';
 import { legionKind, legionary } from './legion';
-import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit, UnitType } from './types';
+import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, SeamId, Unit, UnitType } from './types';
 import { seasonOf } from './seasons';
 import { catchOf } from './year';
 import { RES, R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE, R_COCKLE } from './types';
@@ -20,7 +20,7 @@ import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
 import { finishTame, songOf, tames, wildBeast } from './tame';
 import { catchIn, nextSnare } from './snares';
-import { TILE_OF_SEAM, resOfSeam, seamOf, seamProblem, shaftShare } from './shafts';
+import { TILE_OF_SEAM, digAt, placeFor, resOfSeam, roomLeft, roomOf, seamOf, seamProblem } from './shafts';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
@@ -373,7 +373,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     }
     // The player's miner whose seam ran dry takes a Mine Shaft nobody works nearby before standing idle (#344, #681).
     if (person && next < 0 && !o.rare && !o.bog && u.carry === 0 && (o.res === 'stone' || o.res === 'gold')) {
-      const pit = freeShaft(s, u.owner, fx, fy, AUTO_WORK.shaft);
+      const pit = freeShaft(s, u.owner, fx, fy, AUTO_WORK.shaft, undefined, o.res);
       if (pit && !seamProblem(s, pit, o.res)) {
         if (seamOf(s, pit) !== o.res) pit.seam = o.res;
         setOrder(u, { k: 'shaft', target: pit.id, res: o.res, phase: 'go' });
@@ -511,7 +511,11 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
   if (!approach(u, { ...goalForBuilding(f, true), px: f.tx + 0.9 + spot * 3, py: f.ty + 0.9 + spot * 2 })) setOrder(u, { k: 'idle' });
 }
 
-/** A Mine Shaft's miner (#681): one to a shaft, digging its seam for good and hauling it to a drop site, as a farmer works a field. */
+/**
+ * A Mine Shaft's miner (#681): digging its seam for good and hauling it to a drop site, as a farmer works a field. Each layer
+ * the shaft reaches has room for a few (#924 m1); a miner takes a place at the face when it gets there, moving down to a layer
+ * whose vein still holds once its own is spent. While the shaft is sunk deeper it digs nothing.
+ */
 function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): void {
   const b = s.byId.get(o.target);
   if (!b || b.kind !== 'building' || b.hp <= 0 || b.type !== 'shaft' || b.owner !== u.owner) {
@@ -523,21 +527,12 @@ function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): vo
     setOrder(u, { k: 'build', target: b.id });
     return;
   }
-  const holder = b.farmer ? s.byId.get(b.farmer) : undefined;
-  if (holder && holder !== u && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'shaft' && holder.order.target === b.id) {
-    // Someone already works it: another free shaft nearby, or stand by.
-    const other = freeShaft(s, u.owner, b.x, b.y, 12);
-    if (other) setOrder(u, { k: 'shaft', target: other.id, res: resOfSeam(seamOf(s, other) ?? 'stone'), phase: 'go' });
-    else setOrder(u, { k: 'idle' });
-    return;
-  }
   const seam = seamOf(s, b);
   if (!seam) {
     if (u.carry > 0) setOrder(u, { k: 'deliver' });
     else setOrder(u, { k: 'idle' });
     return;
   }
-  b.farmer = u.id;
   const res = resOfSeam(seam);
   const rare = seam === 'stone' || seam === 'gold' ? null : seam;
   o.res = res;
@@ -560,14 +555,22 @@ function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): vo
   if (distToRect(u.x, u.y, b) - r <= REACH + 0.3) {
     if (walking(u)) stopWalking(u);
     face(u, b.x, b.y);
+    if (o.phase !== 'work') {
+      // At the pithead: a place at the face, or, the shaft full, another free shaft nearby, or stand by.
+      const layer = placeFor(s, b, u, seam, o.layer);
+      if (layer < 0) {
+        delete o.layer;
+        const other = freeShaft(s, u.owner, b.x, b.y, 12, new Set([b.id]), seam);
+        if (other) setOrder(u, { k: 'shaft', target: other.id, res: resOfSeam(seamOf(s, other) ?? 'stone'), phase: 'go' });
+        else setOrder(u, { k: 'idle' });
+        return;
+      }
+      o.layer = layer;
+    }
     o.phase = 'work';
     u.miss = 0;
     u.act = 'mine';
-    u.frac += gatherRate(s, u, TILE_OF_SEAM[seam]) * shaftShare(s, b, seam) * DT;
-    while (u.frac >= 1) {
-      u.frac -= 1;
-      u.carry++;
-    }
+    if (b.deepening === undefined) digAt(s, b, seam, o.layer ?? 0, gatherRate(s, u, TILE_OF_SEAM[seam]) * DT, u);
     workEvent(s, u, 'mine', b.x, b.y);
     if (u.carry >= carryCap(s, u)) {
       u.frac = 0;
@@ -579,19 +582,21 @@ function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): vo
   if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
 }
 
-/** The nearest built shaft of a people's within `r` tiles that no one works, or null. */
-export function freeShaft(s: GameState, owner: number, x: number, y: number, r: number, skip?: Set<number>): Building | null {
+/**
+ * The nearest built shaft of a people's within `r` tiles with room for another miner (#924 m1), or null. Given a seam, a shaft
+ * already worked on another one isn't free: its seam is its crew's.
+ */
+export function freeShaft(s: GameState, owner: number, x: number, y: number, r: number, skip?: Set<number>, seam?: SeamId): Building | null {
   let best: Building | null = null;
   let bestD = r;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'shaft' || e.owner !== owner || e.hp <= 0 || !e.built || skip?.has(e.id)) continue;
-    const holder = e.farmer ? s.byId.get(e.farmer) : undefined;
-    if (holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'shaft' && holder.order.target === e.id) continue;
     const d = distToRect(x, y, e);
-    if (d < bestD) {
-      bestD = d;
-      best = e;
-    }
+    if (d >= bestD) continue;
+    const left = roomLeft(s, e);
+    if (left <= 0 || (seam && left < roomOf(e) && seamOf(s, e) !== seam)) continue;
+    bestD = d;
+    best = e;
   }
   return best;
 }

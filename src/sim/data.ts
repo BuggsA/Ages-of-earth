@@ -2992,7 +2992,25 @@ export const SHAFT = {
   aiReach: 18,
   aiWood: 250,
   aiMax: 3,
+  aiSink: 100,
 };
+
+/**
+ * The deep mine (#924 m1, `docs/deep-mine.md`): the layers a Mine Shaft is sunk through, top first. A new shaft stands in the
+ * first; sinking it one layer deeper costs that layer's `sink` and takes `time` seconds, from age `epoch`, and the shaft digs
+ * nothing while it sinks. Each layer holds finite `veins` (per seam: how much there is to dig, for every shaft), dug at the
+ * ground's grade (`SHAFT.grade`) plus `add`, by up to `room` miners at a time. A spent vein, or a seam the layer doesn't hold,
+ * is still dug at the plain grade, so a shaft is never worse than it was (rule 1). `tint` is the band's colour in the cut-away.
+ * A later layer, or a later seam in one, is one more entry here.
+ *
+ * The computer sinks a shaft a layer deeper once the vein it digs is spent in every layer it has reached, with `SHAFT.aiSink`
+ * more wood in hand than the sinking costs.
+ */
+export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | RareId, number>>; add: number; room: number; sink: Cost; time: number; epoch: number; tint: string }[] = [
+  { name: 'Clay and gravel', veins: { stone: 250 }, add: 0.2, room: 2, sink: {}, time: 0, epoch: 1, tint: '#b48a5c' },
+  { name: 'Bedrock', veins: { stone: 450, gold: 400 }, add: 0.4, room: 3, sink: { wood: 200 }, time: 40, epoch: 1, tint: '#857868' },
+  { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662' },
+];
 
 /** The interceptor's numbers (`INTERCEPT`), named here so the battery's words can say them. */
 const INTERCEPT_REACH = 12;
@@ -3049,8 +3067,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed, its warhead lost. Warheads come from the people\'s store, not the silo: one at first, one more every 240 seconds, up to 3 counting those in the air, fired from any silo. At most 2 silos (3 with Launch Control, researched here, which opens the salvo (B): three silos firing at once), and every player sees a finished one on the map.' },
-  // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
-  shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
+  // Mine Shafts (#681): miners dig stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`), sunk through layers (`STRATA`, #924).
+  shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: `A timber headframe over a hole in the ground. Citizens dig stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft. Each layer holds a vein that digs faster until it runs out, and room for a few miners: sink the shaft deeper (wood, and time it digs nothing) to reach richer layers, down to ${STRATA[STRATA.length - 1].name.toLowerCase()}.` },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
   // The Age of Deep Forges (#884, the Deep Road): raised over a vent, it drives the buildings round it (`VENT`, `forge.ts`).

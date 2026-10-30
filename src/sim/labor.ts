@@ -187,7 +187,7 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
       const tile = findResource(s, kind, u.x, u.y, LABOR.reach, busy);
       // No deposit in reach: a free Mine Shaft set to (or able to dig) that stock (#681).
       if (tile < 0 && (to === 'stone' || to === 'gold') && u.type === 'citizen') {
-        const pit = freeShaft(s, p, u.x, u.y, LABOR.reach, pits);
+        const pit = freeShaft(s, p, u.x, u.y, LABOR.reach, pits, to);
         if (!pit || seamProblem(s, pit, to)) continue;
         pits.add(pit.id);
         if (seamOf(s, pit) !== to) pit.seam = to;
