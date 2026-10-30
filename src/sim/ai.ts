@@ -69,7 +69,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
+import { AI_DEEP, AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY, AI_MEWS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
@@ -176,13 +176,16 @@ function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   // tamed beasts for a legion) could leave a town with no soldiers to take one back.
   if (s.scenario || s.mode === 'lords' || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
   const wet = s.mapType === 'lakes' || s.mapType === 'sea';
-  // The Deep Road (#876) is not leaned to yet: its first age is taken on a coin of its own (`wants`), and leaving it out keeps every
-  // other leaning's dice where they were. It joins the leanings with its sweeps (#876 s7).
   const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && r !== 'deep' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
-  if (!open.length) return;
-  const route = open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
+  // The Deep Road (#906) is leaned to on a coin of its own, one share among the routes open, before the others are drawn: a seat that
+  // doesn't lean deep draws its route on the dice it always did. Never by a people that quarries no stone (`roadProblem`).
+  const deep = !isNomad(p) && leanAges(p, 'deep').length > 0 && coin(s, p.id, 0xde17) * (open.length + 1) < 1;
+  if (!open.length && !deep) return;
+  const route = deep ? 'deep' : open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
   mem.lean = route;
   const roads = (mem.roads ??= {});
+  // The Deep Road starts at the Stone Age's last turn (`ROADS`): a town leaning deep passes the others by, or it would never reach it.
+  if (deep) for (const r of ROADS) if (r.from === 'stone' && r.to !== 'megaliths' && isSideRoad(r)) roads[r.to] ??= false;
   // The Wild route's fork (the Bloom or Leviathans) is left to its own coin (`wants`): a people leaning wild walks one of them.
   // So is the rare Mycelium (#800), on a coin of its own where glowcaps are to be had.
   for (const a of leanAges(p, route)) if (a !== 'bloom' && a !== 'leviathans' && a !== 'mycelium') roads[a] ??= true;
@@ -268,6 +271,15 @@ function afford(v: View, cost: Cost): boolean {
   return RES.every((r) => !cost[r] || v.budget[r] >= cost[r]);
 }
 
+/**
+ * A climb paid for clears the Town Center's queue when the people is at its cap (#906): a citizen queued there never trains, and the
+ * advance waits on an empty queue. In 60-minute matches at peace, a Deep Road town sat 20 minutes in the Deep Forges with the Faults paid for.
+ */
+function unjam(v: View, issue: (c: Command) => void): void {
+  if (!v.tc || v.p.pop < v.p.cap) return;
+  for (let i = v.tc.queue.length - 1; i >= 0; i--) issue({ t: 'cancel', p: v.p.id, building: v.tc.id, index: i });
+}
+
 function spend(v: View, cost: Cost): void {
   for (const r of RES) v.budget[r] -= cost[r] ?? 0;
 }
@@ -346,8 +358,9 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   delveWork(s, v, mem, issue);
   underWork(s, v, mem, issue);
   forgeWork(s, v, mem, issue);
-  faultWork(s, v, mem, issue);
+  // The Living Earth's price is set aside (`livingWork`) before the engines crack the ground with what is left (#906).
   livingWork(s, v, mem, issue);
+  faultWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
   leviathanWork(s, v, mem, issue);
@@ -402,7 +415,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   } else if (kinOnly && !advancing && !threatNear(s, v).unit) {
     // Saving for the next call: the army and the rest wait on the food it needs, unless raiders are at the door.
     spend(v, KIN.cost);
-  } else if (tc && !advancing && !v.packing && !kinOnly && !climbReady && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2)) {
+  } else if (tc && !advancing && !v.packing && !kinOnly && !climbReady && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2) && p.pop < p.cap) {
     const cost = unitStats('citizen', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: tc.id, unit: 'citizen' });
@@ -425,6 +438,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const journey = advancing ? null : (!armyFirst && turnRoad(s, v, mem)) || (wantEpoch ? nextRoad(s, v, mem) : null);
   if (journey) {
     const { road, wait } = journey;
+    if (!wait && afford(v, road.cost)) unjam(v, issue);
     // The main road forward goes without a target, as it always has; any other road is named.
     if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost) && journey.back) issue({ t: 'stepBack', p: p.id, building: tc.id });
     else if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost)) issue({ t: 'advance', p: p.id, building: tc.id, ...(road === mainRoad(p) ? {} : { to: road.to }) });
@@ -575,6 +589,20 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
     if ((p.rare?.[r] ?? 0) >= ORE_TRADE.lot) {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;
+    }
+  }
+  // On the Deep Road (#906) the next climb is paid in stone: gold beyond its own buys the stone, and food or wood piled past it is sold for gold.
+  const deep = deepNext(p);
+  if (deep && p.res.stone < (deep.stone ?? 0)) {
+    if (p.res.gold >= (deep.gold ?? 0) + s.market.stone + AI_DEEP.margin) {
+      issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
+      return;
+    }
+    for (const r of ['food', 'wood'] as const) {
+      if (p.res[r] > (deep[r] ?? 0) + AI_DEEP.pile && s.market[r] > MARKET.min + 10) {
+        issue({ t: 'trade', p: p.id, res: r, buy: false });
+        return;
+      }
     }
   }
   // Sell what piles up for gold; buy what is short when gold piles up. On a chapter's clock, a smaller pile is worth selling.
@@ -895,6 +923,11 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v)) {
     for (const r of roadsFrom(p)) {
       if (!isSideRoad(r) || AGES[r.to].tier <= p.epoch || !(roadKnown(s, p, r) || clueRising(s, p, r)) || !wants(s, p, mem, r.to)) continue;
+      // A town in stone is shut for good to a people that quarries none (#877): one bound to the Deep Road (#906) climbs the plain way instead.
+      if (AGES[r.to].stonework && isNomad(p)) {
+        mem.roads![r.to] = false;
+        continue;
+      }
       // The Mycelium's long road to the Bloom (#800) is no road to save for until the web's harvest has opened it and half its price is
       // in store: held back for minutes, it left the weak gateway no army. The age's stay keeps the town there meanwhile.
       if (r.from === 'mycelium' && (!deedsDone(p, r, s) || costSum(p.res) < costSum(r.cost) * MYCELIUM.aiBanked)) continue;
@@ -3444,7 +3477,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
   // Mine Shafts (#681): once no deposit of a stock it wants lies near a drop of its own, a shaft near home, over old
   // workings if it finds them, else by rock, else on open ground. Looked at now and then, not every turn.
-  if (p.epoch >= 1 && n >= 12 && count(v, 'shaft') < SHAFT.aiMax && !recently('shaft', 40) && v.budget.wood >= SHAFT.aiWood && s.tick - (mem.shaftLook ?? -99999) > secs(15)) {
+  if (p.epoch >= 1 && n >= 12 && count(v, 'shaft') < (deepOn(p) ? AI_DEEP.shafts : SHAFT.aiMax) && !recently('shaft', 40) && v.budget.wood >= SHAFT.aiWood && s.tick - (mem.shaftLook ?? -99999) > secs(15)) {
     mem.shaftLook = s.tick;
     const want = wanted(v);
     const drops = v.buildings.filter((b) => b.built && BUILDINGS[b.type].drop.length);
@@ -3626,17 +3659,33 @@ export function floodBuildHeld(s: GameState, p: Player): boolean {
 /** A nomad people's lean on the epoch's shares (#501): it quarries no stone, so the stone hands go to the gold that buys it. */
 const nomadShare = (r: Res, share: Record<Res, number>): number => (r === 'stone' ? 0 : r === 'gold' ? 1 + share.stone / Math.max(0.01, share.gold) : 1);
 
+/** Whether a people stands on the Deep Road past the Megaliths (#906), where its climbs and orders are paid in stone. */
+function deepOn(p: Player): boolean {
+  const age = AGES[ageOf(p)];
+  return !age.stonework && !!age.routes?.includes('deep');
+}
+
+/** The price a Deep Road town (#906) saves its stone for: the climb on down the road, or in the Living Earth the Quake. Null off the road. */
+function deepNext(p: Player): Cost | null {
+  if (!deepOn(p)) return null;
+  const here = ageOf(p);
+  if (here === 'living') return LIVING.quakeCost;
+  return ROADS.find((r) => r.from === here && !TRUNK.includes(r.to) && !!AGES[r.to].routes?.includes('deep'))?.cost ?? null;
+}
+
 /** How many citizens each resource should have now: the epoch's shares, leaning away from what piles up. */
 function wanted(v: View, cold = false): Record<Res, number> {
   const share = SHARE[v.p.epoch];
   // A town raised in stone (#877) pays its timber in stone: hands move from the woods to the quarries.
   const stonework = !!AGES[ageOf(v.p)].stonework;
+  // So does the rest of the Deep Road (#906), in its climbs and orders: the Faults, the Living Earth and the Quake are paid in stone.
+  const deep = deepOn(v.p);
   const weight: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   let total = 0;
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean * (stonework && r === 'wood' ? MEGALITH.aiWood : stonework && r === 'stone' ? MEGALITH.aiStone : 1) * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1);
+    weight[r] = share[r] * lean * (stonework && r === 'wood' ? MEGALITH.aiWood : stonework && r === 'stone' ? MEGALITH.aiStone : deep && r === 'stone' ? AI_DEEP.stone : 1) * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -4435,7 +4484,9 @@ function faultWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     return;
   }
   const eng = engines.find((b) => b.built && !engineIdle(s, b));
-  if (!eng || s.tick - f.crack < secs(5) || !afford(v, FAULT.cost)) return;
+  // An army at the door is cracked across with what is in store; a rival building only with what is left once the road on is saved for (#906).
+  const store = RES.every((r) => p.res[r] >= (FAULT.cost[r] ?? 0));
+  if (!eng || s.tick - f.crack < secs(5) || !store) return;
   // A line `FAULT.len` long through (`mx`, `my`), square to the way from home to there.
   const across = (mx: number, my: number): { x0: number; y0: number; x1: number; y1: number } | null => {
     const dx = mx - v.home.x;
@@ -4468,7 +4519,7 @@ function faultWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     const k = d > 8 ? (d - 3) / d : 0.6;
     line = across(v.home.x + (ax - v.home.x) * k, v.home.y + (ay - v.home.y) * k);
   }
-  if (!line) {
+  if (!line && afford(v, FAULT.cost)) {
     const reach = FAULT.reach - 2;
     let best: Building | null = null;
     for (const e of s.ents) {
@@ -4497,6 +4548,7 @@ function livingWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   // free: the age lies past the last epoch, where the climb in `nextRoad` never looks.
   const kept = ageOf(p) === 'faults' && s.tick - (mem.faults?.since ?? s.tick) >= secs(FAULT.stay);
   if (kept && walksWeb(v) && v.tc && !v.buildings.some((b) => b.advance >= 0) && wants(s, p, mem, 'living') && roadKnown(s, p, LIVING_ROAD) && !roadProblem(s, p, LIVING_ROAD)) {
+    if (afford(v, LIVING_ROAD.cost)) unjam(v, issue);
     if (v.tc.queue.length === 0 && afford(v, LIVING_ROAD.cost)) issue({ t: 'advance', p: p.id, building: v.tc.id, to: 'living' });
     spend(v, LIVING_ROAD.cost);
   }
