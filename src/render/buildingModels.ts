@@ -2949,10 +2949,10 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.
-      if (['forge', 'wonder'].includes(type)) {
-        const span = type === 'wonder' ? 1.8 : big ? 1.4 : 0.7;
+      if (type === 'wonder') {
+        const span = 1.8;
         k.box(span * 2, 0.12, 0.04, '#76c6d6', 0, 0.55, span);
-        const h = type === 'wonder' ? 3.3 : big ? 2.5 : 1.6;
+        const h = 3.3;
         k.cyl(0.025, 0.025, h, 5, '#d7e4e8', span, 0, 0);
         k.box(0.48, 0.12, 0.1, '#76c6d6', span + 0.24, h, 0);
         k.box(0.12, 0.12, 0.11, '#f4efe4', span + 0.18, h, 0);
@@ -3274,6 +3274,45 @@ function merchantBarracks(k: Kit, st: Style): void {
   banner(k, 0.78, 1.05, -0.45, 0.75, 1.1);
 }
 
+/** The Aeronauts' Forge (#816): an engine works, a sawtooth-roofed shop with a hangar door, a gantry hoisting an engine, a propeller test stand out front and fuel drums, not a smithy. */
+function aeroForge(k: Kit, st: Style): void {
+  const SKY = '#76c6d6';
+  const STEEL = '#d7e4e8';
+  pad(k, 3, st.base);
+  // The shop: a cream hall with a sawtooth roof whose glazed faces catch the light, and a tall sliding hangar door.
+  k.box(2.3, 0.85, 1.4, st.wall, -0.3, 0, -0.55);
+  k.box(2.38, 0.06, 1.48, st.trim, -0.3, 0.85, -0.55);
+  for (let i = 0; i < 3; i++) {
+    const x = -1.05 + i * 0.75;
+    k.prism(0.75, 0.38, 1.4, SKY, x, 0.91, -0.55);
+    k.box(0.04, 0.3, 1.34, '#2a3f4f', x + 0.34, 0.93, -0.55);
+  }
+  k.box(0.9, 0.65, 0.03, '#2a3f4f', -0.6, 0, 0.16);
+  for (const x of [-0.9, -0.6, -0.3]) k.box(0.025, 0.65, 0.04, STEEL, x, 0, 0.17);
+  window(k, st, 0.4, 0.4, 0.16, 0.2, 0.2);
+  window(k, st, 0.8, 0.4, 0.16, 0.2, 0.2);
+  // The gantry over the yard: two legs, a beam, a hoist with an engine block slung under it.
+  for (const x of [0.55, 1.35]) k.cyl(0.04, 0.05, 1.5, 5, STEEL, x, 0, 0.85);
+  k.box(1.0, 0.07, 0.1, STEEL, 0.95, 1.5, 0.85);
+  k.cyl(0.008, 0.008, 0.4, 4, '#44484c', 0.95, 1.1, 0.85);
+  k.box(0.3, 0.2, 0.22, '#5b6168', 0.95, 0.85, 0.85);
+  for (const dx of [-0.08, 0, 0.08]) k.cyl(0.035, 0.035, 0.12, 6, '#8b9298', 0.95 + dx, 1.05, 0.85);
+  // The test stand: a trestle with a propeller on a hub, and a tailplane of ribs leaning by the door.
+  k.box(0.5, 0.25, 0.3, '#6a4e32', -1.2, 0, 0.9);
+  k.cyl(0.08, 0.08, 0.25, 8, '#5b6168', -1.2, 0.25, 0.9).rotation.x = Math.PI / 2;
+  k.sphere(0.07, SKY, -1.2, 0.38, 1.04);
+  k.box(0.07, 0.62, 0.02, '#c9a368', -1.2, 0.07, 1.06);
+  k.box(0.62, 0.07, 0.02, '#c9a368', -1.2, 0.35, 1.06).rotation.z = 0.5;
+  // Fuel drums and a pennant mast in the team's colour.
+  for (const [x, z] of [[1.7, 0.2], [1.85, 0.45], [1.7, 0.7]]) k.cyl(0.1, 0.1, 0.28, 8, '#5a6450', x, 0, z);
+  k.cyl(0.025, 0.03, 1.9, 5, STEEL, -1.4, 0, -0.1);
+  k.team(k.box(0.5, 0.2, 0.03, TEAM, -1.15, 1.55, -0.1));
+  for (const x of [-0.9, 0.2]) {
+    k.cyl(0.012, 0.012, 0.12, 4, IRON_DARK, x, 0.7, 0.2);
+    k.glow(k.sphere(0.045, '#ffd890', x, 0.66, 0.2));
+  }
+}
+
 /** The Aeronauts' Airfield (#816): no runway but a mooring mast, an airship riding at its nose with a winch house and fuel drums below. */
 function aeroAirfield(k: Kit, st: Style): void {
   k.box(3.9, 0.05, 3.9, '#8fa586', 0, -0.02, 0);
@@ -3370,7 +3409,7 @@ function aeroTerminal(k: Kit, st: Style): void {
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
   iron: { house: ironHouse, towncenter: ironHillfort },
   merchant: { market: merchantMarket, barracks: merchantBarracks },
-  aeronaut: { house: aeroHouse, airfield: aeroAirfield, towncenter: aeroTerminal },
+  aeronaut: { house: aeroHouse, forge: aeroForge, airfield: aeroAirfield, towncenter: aeroTerminal },
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
