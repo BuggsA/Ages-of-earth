@@ -261,7 +261,8 @@ kbd {
 .res.civ { display: flex; align-items: center; gap: 6px; min-width: 0; font: 700 13px 'Cinzel', serif; color: var(--gold-2); padding: 3px 9px; }
 .res.score { min-width: 0; color: var(--gold-2); }
 @keyframes flash { 0% { background: rgba(255, 90, 74, 0.55); } 100% { background: rgba(255, 255, 255, 0.05); } }
-.epoch-chip { display: flex; align-items: center; gap: 8px; font: 700 15px 'Cinzel', serif; color: var(--gold-2); white-space: nowrap; }
+/* A long age name ("Age of the Living Earth") takes two lines in the bar rather than crowding the resources. */
+.epoch-chip { display: flex; align-items: center; gap: 8px; max-width: 190px; font: 700 15px/1.05 'Cinzel', serif; color: var(--gold-2); }
 .epoch-chip .bar { width: 110px; height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .epoch-chip .bar i { display: block; height: 100%; background: linear-gradient(90deg, #c99a3a, #ffdf8a); }
 .clock { white-space: nowrap; font: 800 15px 'Nunito', sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -283,7 +284,8 @@ kbd {
 #minimap-box { width: 196px; height: 196px; padding: 6px; flex: none; align-self: flex-end; }
 #minimap { width: 100%; height: 100%; display: block; border-radius: 6px; cursor: crosshair; image-rendering: auto; }
 #selection { flex: 1; height: 160px; padding: 10px 12px; display: flex; gap: 12px; min-width: 0; overflow: hidden; }
-#commands { width: 300px; height: 160px; padding: 8px; flex: none; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr); gap: 5px; }
+/* Three rows of commands fit the panel; a fourth or fifth (some peoples, a build menu) grows it upward rather than cutting the last row off. */
+#commands { width: 300px; min-height: 160px; padding: 8px; flex: none; display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 44px; align-content: center; gap: 5px; }
 
 .cmd {
   position: relative; border: 1px solid rgba(201, 168, 98, 0.45); border-radius: 8px; background: linear-gradient(#323a4d, #222837); cursor: pointer;
@@ -461,7 +463,8 @@ body.online .tip-box { bottom: 330px; }
 /* Your road at the end (#743): every player's journey through the web. */
 .jr { margin: 10px 0 4px; text-align: left; }
 .jr summary { cursor: pointer; font-weight: 900; color: var(--muted); text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
-.jr-map { width: 100%; max-width: 420px; max-height: 300px; height: auto; margin: 6px auto; display: block; }
+/* At its own size (age names at 12px), shrunk only to fit the card's width; the card scrolls for a long road. */
+.jr-map { max-width: 100%; height: auto; margin: 6px auto; display: block; }
 .jr-node rect { fill: #1b2030; stroke: var(--edge-soft); stroke-width: 1.5; }
 .jr-node text { fill: var(--ink); font: 800 12px 'Nunito', sans-serif; }
 .jr-node.untaken { opacity: 0.45; }
@@ -483,28 +486,32 @@ body.online .tip-box { bottom: 330px; }
 .timeline { width: 100%; height: 150px; background: rgba(0, 0, 0, 0.25); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.06); }
 .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 
-/* The top bar narrows in steps rather than spilling off the screen: first the boxes tighten, then the
-   people's name and the button words give way to their crest and icons (each keeps its tooltip),
-   then the age's progress bar tucks under its name. Text never shrinks below 13px. */
+/* The top bar narrows in steps rather than spilling off the screen: first the button words give way
+   to icons (each keeps its tooltip), then the boxes tighten, then the people's name gives way to its
+   crest and the age's progress bar tucks under its name. Text never shrinks below 13px. */
 .tb-ico { display: none; }
+@media (max-width: 1440px) {
+  .tb-label { display: none; }
+  .tb-ico { display: inline; }
+  #god-age { max-width: 150px; }
+}
 @media (max-width: 1360px) {
   #topbar { gap: 8px; }
   .res { min-width: 0; padding-right: 8px; }
+  .epoch-chip { max-width: 170px; }
   .epoch-chip .bar { width: 70px; }
 }
 @media (max-width: 1180px) {
+  #topbar { gap: 6px; padding: 0 8px; }
   #commands { width: 260px; }
-  .res { font-size: 14px; gap: 4px; }
+  .res { font-size: 13px; gap: 4px; padding: 3px 6px 3px 4px; }
   .res.civ .civ-name { display: none; }
-  .tb-label { display: none; }
-  .tb-ico { display: inline; }
   .tb-btn { padding: 5px 8px; }
-  .epoch-chip { flex-direction: column; align-items: stretch; gap: 3px; font-size: 14px; line-height: 1; }
+  .epoch-chip { flex-direction: column; align-items: stretch; justify-content: center; gap: 3px; max-width: 130px; font-size: 13px; line-height: 1; text-align: center; }
   .epoch-chip .bar { width: auto; height: 5px; }
 }
 @media (max-width: 860px) {
-  #topbar { gap: 6px; padding: 0 6px; }
-  .res { font-size: 13px; padding: 3px 6px 3px 4px; }
+  #topbar { padding: 0 6px; }
   .res svg { width: 16px; height: 16px; }
   .tb-btn { padding: 5px 6px; }
 }
@@ -520,7 +527,7 @@ body.online .tip-box { bottom: 330px; }
   .sel-portrait { width: 80px; height: 94px; }
   .sel-portrait img { width: 80px; height: 80px; }
   #minimap-box { width: 140px; height: 140px; }
-  #commands { flex: 1; width: auto; height: 140px; }
+  #commands { flex: 1; width: auto; min-height: 140px; grid-auto-rows: 38px; }
   .cmd img { width: 34px; height: 34px; }
   .tip-box { bottom: 300px; max-height: calc(100% - 350px); }
 }
