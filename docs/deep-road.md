@@ -54,5 +54,10 @@ The game is *Ages of Earth*: on this road a people stops building **on** the lan
   - **Deep vaults:** `strike` in `silo.ts` passes over a sunk building whose people has walked the Living Earth (`vaulted`). Fallout touches only units, so nothing else changed there.
   - **Seeded matches stay put:** nothing moves until a people walks the Faults; the road is last in `ROADS`, on its own coin (`0xde16`).
 
+- **s7, the sweeps and the leaning** (#906): the `deep` route joins the computer's leanings (`settleLean` in `ai.ts`) on a coin of its own (`0xde17`), one share among the routes open, drawn before the others so no other leaning's dice move; a seat leaning deep chooses every Deep Road age and passes the Stone Age's other turns by. The sweeps are in `docs/age-roads.md`: the road wins at the plain road's rate (12 of 16 each), and at peace every seat that can walk it reaches the Living Earth within the hour (`tests/slow/ai-deep-road.test.ts`).
+  - **What held it back was stone** (rule 1, for the computer): past the Megaliths a Deep Road town now quarries at `AI_DEEP.stone` times the epoch's share, sinks up to `AI_DEEP.shafts` Mine Shafts, buys the next climb's stone at the Market with spare gold (`deepNext`), and sets the Living Earth's price aside before its engines crack under rival buildings (`livingWork` before `faultWork`; a crack across an army still uses the store).
+  - **The cap:** the Town Center no longer queues citizens at the cap, and a climb paid for clears a queue the cap holds up (`unjam`); a town at 150 people had sat 20 minutes in the Deep Forges with the Faults paid for. This holds on every road.
+  - **A people that quarries no stone** never leans deep, and drops a stone-built road it was bound to (`nextRoad`), climbing the plain way.
+
 ## Next
-- **s7** the sweeps (`npx tsx scripts/routes.ts --seeds 6 deep`) and the `deep` route joining the computer's leanings.
+- The road is built. Ideas left on the s5 and s6 notes in `docs/design-notes.md`: the computer holding a rival Heartstone's vent when a Quake wakes, bridging a rival's chasm, and a Quake on a river damming a lake.
