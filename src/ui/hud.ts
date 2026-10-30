@@ -42,7 +42,7 @@ import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
 import { kinCount, kinProblem, vowProblem, wayBarred, wayProblem } from '../sim/ways';
 import { catchIn, snareCap, snareFull, snareRate, snareWoods } from '../sim/snares';
 import { beaconProblem, lit } from '../sim/beacon';
-import { SEAMS, crewOf, deepenProblem, deepeningLeft, depthOf, digShare, groundAt, roomOf, seamOf, seamProblem, seamsAt, shaftShare, veinLeft } from '../sim/shafts';
+import { SEAMS, blastProblem, crewOf, deepenProblem, deepeningLeft, depthOf, digShare, groundAt, propProblem, roomOf, safeAt, seamOf, seamProblem, seamsAt, shaftShare, shutLeft, toShore, veinLeft, winchHurt } from '../sim/shafts';
 import { cutaway } from './cutaway';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
@@ -2004,7 +2004,21 @@ export class Hud {
           const next = STRATA[depthOf(b) + 1];
           if (next) {
             const why = deepenProblem(s, b) ?? shortfall(p, next.sink);
-            cmds.push({ key: 'D', pic: '', glyph: '⛏', title: `Sink to ${next.name}`, desc: `Sink the shaft a layer deeper, to ${next.name.toLowerCase()}: ${next.time} seconds, and it digs nothing meanwhile. ${(Object.entries(next.veins) as [SeamId, number][]).map(([m, v]) => `${v} ${SHAFT.seams[m].name.toLowerCase()}`).join(' and ')} to dig there, ${Math.round(next.add * 100)} points faster than the plain grade while it lasts, with room for ${next.room} more miners. The layers above stay open.`, cost: next.sink, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'deepen', p: viewer, building: b.id }), this.act.sound('queue')) });
+            cmds.push({ key: 'D', pic: '', glyph: '⛏', title: `Sink to ${next.name}`, desc: `Sink the shaft a layer deeper, to ${next.name.toLowerCase()}: ${next.time} seconds, and it digs nothing meanwhile. ${(Object.entries(next.veins) as [SeamId, number][]).map(([m, v]) => `${v} ${SHAFT.seams[m].name.toLowerCase()}`).join(' and ')} to dig there, ${Math.round(next.add * 100)} points faster than the plain grade while it lasts, with room for ${next.room} more miners. The layers above stay open.${next.fall > 0 ? ` It opens unshored: shore it (P) or risk a cave-in.` : ''}`, cost: next.sink, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'deepen', p: viewer, building: b.id }), this.act.sound('queue')) });
+            // Blasting (#924 m2): the layer opened at once with powder, from the Gunpowder Age; shown an age ahead, so it is looked for.
+            if (p.epoch >= SHAFT.blastAge - 1) {
+              const bwhy = blastProblem(s, b) ?? shortfall(p, next.blast);
+              const above = STRATA[depthOf(b)];
+              const risk = Math.round((safeAt(b, depthOf(b)) && above.fall > 0 ? SHAFT.firedampShored : SHAFT.firedamp) * 100);
+              cmds.push({ key: 'B', pic: '', glyph: '💥', title: `Blast to ${next.name}`, desc: `Blast the shaft open to ${next.name.toLowerCase()} at once, with no wait. The blast may wake firedamp: a ${risk}% chance that ${above.name.toLowerCase()} falls in on the miners at its face${above.fall > 0 ? ` (${Math.round(SHAFT.firedampShored * 100)}% where it is shored, ${Math.round(SHAFT.firedamp * 100)}% where not)` : ''}. From the ${EPOCHS[SHAFT.blastAge].name}.`, cost: next.blast, ok: !bwhy, why: bwhy ?? undefined, run: () => (this.act.issue({ t: 'deepen', p: viewer, building: b.id, blast: true }), this.act.sound('queue')) });
+            }
+          }
+          // Props (#924 m2): the deepest layer it reaches that is still unshored.
+          const l = toShore(b);
+          if (l > 0) {
+            const L = STRATA[l];
+            const pwhy = propProblem(b, l) ?? shortfall(p, L.prop);
+            cmds.push({ key: 'P', pic: '', glyph: '🪵', title: `Shore ${L.name}`, desc: `Prop ${L.name.toLowerCase()} with timber: safe for good, at the plain pace of its vein, and a cave-in's rubble there is cleared at once. Unshored, its miners dig ${Math.round(L.rush * 100)} points faster, but each full basket has a ${Math.round(L.fall * 100)}% chance of bringing the roof down on everyone at its face; the layer is then shut ${SHAFT.shut} seconds.`, cost: L.prop, ok: !pwhy, why: pwhy ?? undefined, run: () => (this.act.issue({ t: 'prop', p: viewer, building: b.id, layer: l }), this.act.sound('queue')) });
           }
         }
         // The seam a Mine Shaft digs (#681).
@@ -2170,8 +2184,11 @@ function shaftLine(s: GameState, b: Building): string {
   const vein = veinLeft(b, l, seam);
   const grade = groundAt(s, b)[seam]!;
   const ground = { old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[grade];
-  const tip = `<b>${ground}</b>A shaft digs at ${Math.round(SHAFT.grade[grade] * 100)}% of an open deposit's pace on its ground (old workings, a deposit worked out nearby, are best, then rock beside it, then plain ground), and faster while a layer's vein lasts. A spent vein still digs at the plain pace. Sink it deeper (D) for richer layers.`;
-  return `<span data-tip="${tip}">${STRATA[l].name}: ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}% · ${vein > 0 ? `${Math.ceil(vein / 10) * 10} left` : 'vein spent'}</span> · ${miners}`;
+  const tip = `<b>${ground}</b>A shaft digs at ${Math.round(SHAFT.grade[grade] * 100)}% of an open deposit's pace on its ground (old workings, a deposit worked out nearby, are best, then rock beside it, then plain ground), and faster while a layer's vein lasts. A spent vein still digs at the plain pace. Sink it deeper (D) for richer layers. Below the first, a layer dug unshored is faster but may fall in: shore it (P).`;
+  // The one hazard worth a word (#924 m2): a layer shut by a cave-in, a hurt winch, or the worked layer unshored.
+  const shut = STRATA.findIndex((_, k) => shutLeft(s, b, k) > 0);
+  const warn = shut >= 0 ? ` · ${STRATA[shut].name.toLowerCase()} caved in: ${shutLeft(s, b, shut)}s` : winchHurt(s, b) ? ' · winch hurt: slow haul' : !safeAt(b, l) ? ' · unshored' : '';
+  return `<span data-tip="${tip}">${STRATA[l].name}: ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}% · ${vein > 0 ? `${Math.ceil(vein / 10) * 10} left` : 'vein spent'}</span> · ${miners}${warn}`;
 }
 
 function hpBar(hp: number, max: number, frac: number): string {

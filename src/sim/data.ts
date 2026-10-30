@@ -2993,6 +2993,21 @@ export const SHAFT = {
   aiWood: 250,
   aiMax: 3,
   aiSink: 100,
+  // The deep mine m2 (#924, #929): props, cave-ins, blasting and the pithead as a target (`STRATA` holds each layer's own).
+  shut: 45,
+  blastAge: 3,
+  firedamp: 0.35,
+  firedampShored: 0.1,
+  strandHurt: 0.5,
+  winchDepth: 2,
+  winchHurt: 0.5,
+  winchSlow: 0.5,
+  aiProp: 60,
+  aiBlast: 150,
+  aiRaid: 600,
+  aiRaidNear: 40,
+  aiRaidBand: 4,
+  aiRaidEvery: 180,
 };
 
 /**
@@ -3005,11 +3020,22 @@ export const SHAFT = {
  *
  * The computer sinks a shaft a layer deeper once the vein it digs is spent in every layer it has reached, with `SHAFT.aiSink`
  * more wood in hand than the sinking costs.
+ *
+ * Props and cave-ins (#924 m2): a layer with a `fall` is shored for `prop` (wood, once). Unshored, its miners dig `rush` faster
+ * (the share of an open deposit's pace, over the vein's), but each full basket risks a cave-in, `fall` the chance, on the
+ * match's dice: the miners at its face die and the layer is shut `SHAFT.shut` seconds, or until it is shored. From age
+ * `SHAFT.blastAge` a layer is blasted open at once for `blast` instead of sunk, with a chance of firedamp in the layer above
+ * (`SHAFT.firedamp`, or `SHAFT.firedampShored` where that layer is shored): a cave-in there. A pithead that falls strands its
+ * miners: those below the first layer die; those in it climb out with `SHAFT.strandHurt` of their health. A shaft
+ * `SHAFT.winchDepth` layers down hauls by winch: below `SHAFT.winchHurt` of its health, its lower layers dig at
+ * `SHAFT.winchSlow` of their pace. The computer shores a layer once it has `SHAFT.aiProp` wood over the props, blasts with
+ * `SHAFT.aiBlast` gold over the charge; its bombers are drawn to a rival's deep pithead (`SHAFT.aiRaid` a layer), and between
+ * waves, at most every `SHAFT.aiRaidEvery` seconds, a band of `SHAFT.aiRaidBand` falls on one seen within `SHAFT.aiRaidNear` tiles.
  */
-export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | RareId, number>>; add: number; room: number; sink: Cost; time: number; epoch: number; tint: string }[] = [
-  { name: 'Clay and gravel', veins: { stone: 250 }, add: 0.2, room: 2, sink: {}, time: 0, epoch: 1, tint: '#b48a5c' },
-  { name: 'Bedrock', veins: { stone: 450, gold: 400 }, add: 0.4, room: 3, sink: { wood: 200 }, time: 40, epoch: 1, tint: '#857868' },
-  { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662' },
+export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | RareId, number>>; add: number; room: number; sink: Cost; time: number; epoch: number; tint: string; prop: Cost; rush: number; fall: number; blast: Cost }[] = [
+  { name: 'Clay and gravel', veins: { stone: 250 }, add: 0.2, room: 2, sink: {}, time: 0, epoch: 1, tint: '#b48a5c', prop: {}, rush: 0, fall: 0, blast: {} },
+  { name: 'Bedrock', veins: { stone: 450, gold: 400 }, add: 0.4, room: 3, sink: { wood: 200 }, time: 40, epoch: 1, tint: '#857868', prop: { wood: 120 }, rush: 0.15, fall: 0.04, blast: { gold: 150 } },
+  { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662', prop: { wood: 200 }, rush: 0.2, fall: 0.06, blast: { gold: 250 } },
 ];
 
 /** The interceptor's numbers (`INTERCEPT`), named here so the battery's words can say them. */
