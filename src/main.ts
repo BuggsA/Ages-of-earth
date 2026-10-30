@@ -34,7 +34,7 @@ import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
 import { AI_FLOAT, FLOAT } from './sim/data';
 import { mooringSpot } from './sim/floating';
 import { R_COCKLE } from './sim/types';
-import { AI_BARRAGE, BLOOM, INTERCEPT, SALVO, secs } from './sim/data';
+import { AI_BARRAGE, BLOOM, INTERCEPT, SALVO, STRATA, secs } from './sim/data';
 import { rooted, slingProblem } from './sim/bloom';
 import { isCarrier } from './sim/units';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
@@ -2750,6 +2750,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.owner === viewer) {
           hud.toast(`🌊 The barrage holds: ${ev.tiles} tiles of tidal flats are a pond now, wet at every hour. Tide Mills by it grind its flats twice, on the flood and on the ebb.`, 'good');
           play('pondShut');
+        }
+        break;
+      case 'caveIn':
+        // The deep mine (#924 m2): a cave-in on your own shaft is its one toast.
+        if (ev.owner === viewer) {
+          lastAlert = { x: ev.x, y: ev.y };
+          const L = STRATA[ev.layer]?.name.toLowerCase() ?? 'a layer';
+          const lost = ev.dead ? `${ev.dead} ${ev.dead === 1 ? 'miner' : 'miners'} lost` : 'nobody was at the face';
+          hud.toast(ev.why === 'stranded' ? `⛏ Your pithead has fallen: the winch is gone and ${ev.dead} ${ev.dead === 1 ? 'miner' : 'miners'} below are lost. (Space to look)` : ev.why === 'firedamp' ? `⛏ Firedamp! The blast brought down ${L}: ${lost}. It is shut ${SHAFT.shut}s, or shore it (P) to clear it now. (Space to look)` : `⛏ Cave-in! ${STRATA[ev.layer]?.name ?? 'A layer'} fell in: ${lost}. Shore it (P) to dig it safely and clear it now, or it is shut ${SHAFT.shut}s. (Space to look)`, 'alert');
         }
         break;
       case 'tideSwept':

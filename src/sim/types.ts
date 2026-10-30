@@ -193,8 +193,11 @@ export type Order =
   | { k: 'tame'; target: number; t: number }
   /** Walk the trap line (#485): empty a snare of its people's, on to the next with game in it, and the catch home. */
   | { k: 'snare'; target: number; phase: 'go' | 'work' | 'drop' }
-  /** Work a Mine Shaft (#681): dig its seam, carry the load to a drop site, and back. `res` is the stock the seam pays into, kept in step with it. */
-  | { k: 'shaft'; target: number; res: Res; phase: 'go' | 'work' | 'drop' }
+  /**
+   * Work a Mine Shaft (#681): dig its seam, carry the load to a drop site, and back. `res` is the stock the seam pays into, kept in step with it.
+   * `layer` (#924 m1): the layer of `STRATA` its place is in, once it has one at the shaft; absent on the way to it.
+   */
+  | { k: 'shaft'; target: number; res: Res; phase: 'go' | 'work' | 'drop'; layer?: number }
   /**
    * A priest turning an enemy to your side: `done` ticks of chanting so far. A Blood-rite priest (#355 s4) may instead chant a `rite`
    * over a living enemy: to `sacrifice` it for its blood, or to `curse` it.
@@ -487,6 +490,16 @@ export interface Building {
   snared?: number;
   /** A Mine Shaft (#681): the seam its miner digs (`SHAFT.seams`). Absent: the best its ground holds (`shafts.ts`). */
   seam?: SeamId;
+  /** A Mine Shaft (#924 m1): the deepest layer of `STRATA` it reaches, 0 the first. Absent: 0 (a shaft from an older save too). */
+  depth?: number;
+  /** A Mine Shaft being sunk a layer deeper (#924 m1): the tick it reaches it. While set it digs nothing. */
+  deepening?: number;
+  /** A Mine Shaft (#924 m1): per layer, how much of each vein it has dug (`STRATA[layer].veins`). Absent: none. */
+  worked?: Partial<Record<SeamId, number>>[];
+  /** A Mine Shaft (#924 m2): per layer, whether it is shored with timber props. Absent: none is. */
+  propped?: boolean[];
+  /** A Mine Shaft (#924 m2): per layer, the tick a cave-in's rubble is cleared by (the layer is shut till then). Absent: none. */
+  shut?: number[];
 }
 
 export type Ent = Unit | Building;
@@ -1226,6 +1239,10 @@ export type GameEvent =
   /** The tide turned to a new level (#739): `level` 0 is low water, `TIDE.flats.length` high; `rising` while it floods. `bared` tiles came out, `covered` went under. */
   | { k: 'tide'; level: number; rising: boolean; bared: number; covered: number }
   /** A unit caught on the flats by the rising tide (#739) was swept ashore and hurt (`drowned`: no shore near, it was lost). */
+  /** A layer of a Mine Shaft fell in (#924 m2): an unshored layer (`fall`), firedamp after a blast, or a fallen pithead's miners stranded. */
+  | { k: 'caveIn'; owner: number; id: number; x: number; y: number; layer: number; dead: number; why: 'fall' | 'firedamp' | 'stranded' }
+  /** A Mine Shaft blasted a layer deeper (#924 m2). */
+  | { k: 'blast'; owner: number; id: number; x: number; y: number; layer: number }
   | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean; /** Swept by this people's Tide Gate scour (#785). */ by?: number }
   /** A land unit stops on the shore to wait for the tide (#755), until tick `until`. */
   | { k: 'tideHold'; id: number; owner: number; x: number; y: number; until: number }
@@ -1570,6 +1587,10 @@ export interface AiMemory {
   dockless?: number;
   /** Tick it last looked whether the deposits near home are gone, for a Mine Shaft (#681). */
   shaftLook?: number;
+  /** Tick it last looked whether a shaft of its own has dug out every layer it reaches, to sink it deeper (#924 m1). */
+  deepLook?: number;
+  /** Tick its band last set out to bring down a rival's deep pithead (#924 m2). */
+  pitRaid?: number;
   /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
   scout?: { id: number; sent: number };
   /** The route this seat favours (#749): its side ages chosen from the start; 'none' for a seat that keeps an open mind. Settled on its first turn. */
@@ -1757,6 +1778,12 @@ export type Command =
   | { t: 'beacon'; p: number; building: number }
   /** Choose the seam a Mine Shaft digs (#681). */
   | { t: 'seam'; p: number; building: number; seam: SeamId }
+  /** Sink a Mine Shaft a layer deeper (#924 m1). */
+  | { t: 'deepen'; p: number; building: number; /** Blast the layer open at once, from the Gunpowder Age (#924 m2). */ blast?: boolean }
+  /** Shore a layer of a Mine Shaft with timber props (#924 m2). */
+  | { t: 'prop'; p: number; building: number; layer: number }
+  /** Send one of a Mine Shaft's miners to a layer it reaches (#924 m1): from the layer with the least left to dig. */
+  | { t: 'toLayer'; p: number; building: number; layer: number }
   /** Call citizens to arms at a War Camp in the Age of Total War (#313): up to `n`, the nearest first. */
   | { t: 'callUp'; p: number; building: number; n?: number }
   /** Strike camp (#297): pack a Town Center or House onto a wagon. At a Sluice (#701 s4) it opens or shuts the gate instead. */

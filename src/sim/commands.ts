@@ -3,7 +3,7 @@ import { engineLimit, fault, faultProblem, isChasm, spanOpen } from './fault';
 import { heaveProblem, quakeProblem, raiseRidge, stoneLimit, swallow, swallowProblem, wake } from './living';
 import { hiddenFrom, inert, sink, sinkProblem, surface, surfaceProblem } from './undercity';
 import { delve, delveProblem } from './delve';
-import { AUTO_WORK, BUILDINGS, FAULT, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, FAULT, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, STRATA, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { inBounds, placeProblem, stampBuilding, walkable } from './grid';
@@ -13,7 +13,7 @@ import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, journeyOf, keepsakeProblem, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
-import { resOfSeam, seamOf, seamProblem } from './shafts';
+import { blast, blastProblem, crewOf, deepen, deepenProblem, depthOf, prop, propProblem, resOfSeam, roomLeft, seamOf, seamProblem, shutAt, veinLeft } from './shafts';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, isCarrier, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
@@ -623,14 +623,12 @@ export function applyCommand(s: GameState, c: Command): void {
             }
             continue;
           }
-          // A Mine Shaft (#681): one miner to a shaft; the rest look for free shafts nearby.
+          // A Mine Shaft (#681): as many miners as it has room for in the layers it reaches (#924 m1); the rest look for free shafts nearby.
           if (b.type === 'shaft') {
-            const pit = fieldsGiven.size ? freeShaft(s, c.p, b.x, b.y, 12, fieldsGiven) : b;
+            const already = u.order.k === 'shaft' && u.order.target === b.id;
+            const pit = already || roomLeft(s, b) > 0 ? b : freeShaft(s, c.p, b.x, b.y, 12, undefined, seamOf(s, b) ?? undefined);
             const seam = pit && seamOf(s, pit);
-            if (pit && seam) {
-              fieldsGiven.add(pit.id);
-              giveOrder(u, { k: 'shaft', target: pit.id, res: resOfSeam(seam), phase: 'go' }, c.queue);
-            }
+            if (pit && seam && !(already && !c.queue)) giveOrder(u, { k: 'shaft', target: pit.id, res: resOfSeam(seam), phase: 'go' }, c.queue);
             continue;
           }
           // A snare (#485): walk the trap line from here.
@@ -806,6 +804,58 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = seamProblem(s, b, c.seam);
       if (why) return refuse(s, c.p, why);
       b.seam = c.seam;
+      break;
+    }
+    case 'deepen': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = c.blast ? blastProblem(s, b) : deepenProblem(s, b);
+      if (why) return refuse(s, c.p, why);
+      const next = STRATA[depthOf(b) + 1];
+      const cost = c.blast ? next.blast : next.sink;
+      const short = shortfall(p, cost);
+      if (short) return refuse(s, c.p, short);
+      pay(p, cost);
+      // Blasted (#924 m2): open at once, with a roll for firedamp above; else sunk over time.
+      if (c.blast) blast(s, b);
+      else deepen(s, b);
+      break;
+    }
+    case 'prop': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = propProblem(b, c.layer);
+      if (why) return refuse(s, c.p, why);
+      const cost = STRATA[c.layer].prop;
+      const short = shortfall(p, cost);
+      if (short) return refuse(s, c.p, short);
+      pay(p, cost);
+      prop(b, c.layer);
+      break;
+    }
+    case 'toLayer': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b || b.type !== 'shaft' || !b.built) return;
+      if (c.layer < 0 || c.layer > depthOf(b)) return refuse(s, c.p, 'The shaft is not sunk that deep yet');
+      if (shutAt(s, b, c.layer)) return refuse(s, c.p, `${STRATA[c.layer].name} is shut by a cave-in: shore it to clear it now`);
+      const { at } = crewOf(s, b);
+      if (at[c.layer] >= STRATA[c.layer].room) return refuse(s, c.p, `${STRATA[c.layer].name} has room for ${STRATA[c.layer].room} miners`);
+      const seam = seamOf(s, b);
+      // From the layer with the least left to dig, the shallowest on a tie.
+      let from: Unit | null = null;
+      let least = Infinity;
+      for (const e of s.ents) {
+        if (e.kind !== 'unit' || e.hp <= 0 || e.owner !== c.p || e.order.k !== 'shaft' || e.order.target !== b.id) continue;
+        const l = e.order.layer;
+        if (l === undefined || l === c.layer) continue;
+        const left = seam ? veinLeft(b, l, seam) : 0;
+        if (left < least) {
+          least = left;
+          from = e;
+        }
+      }
+      if (!from || from.order.k !== 'shaft') return refuse(s, c.p, 'No miner in another layer to send');
+      from.order.layer = c.layer;
       break;
     }
     case 'beacon': {

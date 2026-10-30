@@ -16,6 +16,7 @@ import { R_FISH, R_GOLD, R_STONE } from '../sim/types';
 import { isIdleCitizen } from './idle';
 import { laterTip, type Opening } from './opening';
 import { findResource } from '../sim/units';
+import { deepenProblem, seamOf, spentAt } from '../sim/shafts';
 import { seasonAt } from '../sim/seasons';
 import { tideWaitLeft } from '../sim/tides';
 import { bared } from '../sim/tides';
@@ -94,6 +95,8 @@ const TIPS: Tip[] = [
   { id: 'wayWarband', when: (s, me) => s.players[me].way === 'warband' && s.players[me].epoch <= 1, text: '<b>The Warband Way:</b> your soldiers eat by raiding. Send a few to strike a rival\'s <b>Storehouse</b>, <b>Farms</b> or <b>Hunting Camp</b>: every blow carries food home. Your bell never rings, so keep soldiers by home too.' },
   // Mine Shafts (#681): once the open stone and gold near home are gone.
   { id: 'shaft', when: (s, me) => s.players[me].epoch >= 1 && secsIn(s) > 240 && !has(s, me, 'shaft') && !buildings(s, me).some((b) => BUILDINGS[b.type].drop.length && (findResource(s, R_STONE, b.x, b.y, SHAFT.aiNear) >= 0 || findResource(s, R_GOLD, b.x, b.y, SHAFT.aiNear) >= 0)), text: 'No stone or gold left near home? A <b>Mine Shaft</b> (<kbd>B</kbd> <kbd>H</kbd>, 150 wood) digs it from the ground for good. Best over <b>old workings</b> where a deposit was worked out, then beside mountain rock, then plain ground. Right-click it with a citizen and pick the seam.' },
+  // The deep mine (#924 m1): a shaft whose vein is dug out in every layer it reaches can be sunk deeper.
+  { id: 'deepen', when: (s, me) => buildings(s, me).some((b) => b.type === 'shaft' && b.built && !deepenProblem(s, b) && (() => { const m = seamOf(s, b); return !!m && (m === 'stone' || m === 'gold') && spentAt(b, m); })()), text: 'A <b>Mine Shaft</b>\'s vein is spent: it still digs, at the plain pace. Select it and <b>sink it deeper</b> (<kbd>D</kbd>) for a richer layer and room for more miners. The cut-away in the panel shows what each layer holds.' },
   { id: 'train', when: (s) => secsIn(s) > 25, text: 'More citizens mean a faster economy. Click your <b>Town Center</b> and press <kbd>Q</kbd> to train one (you can queue several).' },
   { id: 'house', when: (s, me) => s.players[me].pop >= s.players[me].cap - 2, text: 'You are nearly out of room. Select a citizen, press <kbd>B</kbd> then <kbd>E</kbd> to build a <b>house</b> (5 more people each).' },
   { id: 'idle', when: (s, me) => secsIn(s) > 60 && s.ents.some((e) => isIdleCitizen(e, me)), text: 'Someone is standing around: press <kbd>.</kbd> to find an idle citizen, or <kbd>Shift</kbd> + <kbd>.</kbd> to select every idle citizen and put them to work.' },

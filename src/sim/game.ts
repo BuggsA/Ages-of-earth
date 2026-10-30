@@ -3,6 +3,7 @@ import { forgeStep } from './forge';
 import { faultStep } from './fault';
 import { delveStep } from './delve';
 import { hengeStep } from './henge';
+import { deepenStep, strand } from './shafts';
 import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
@@ -509,6 +510,8 @@ function removeDead(s: GameState): void {
     const c = s.byId.get(id);
     if (c) c.hp = 0;
   }
+  // A pithead that falls strands the miners below it (#924 m2).
+  for (const e of s.ents) if (e.kind === 'building' && e.hp <= 0 && e.type === 'shaft') strand(s, e);
   let any = false;
   for (const e of s.ents) {
     if (e.hp > 0) continue;
@@ -704,6 +707,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   floodStep(s);
   tideStep(s);
   hengeStep(s);
+  deepenStep(s);
   delveStep(s, ungarrison);
   underStep(s);
   forgeStep(s);

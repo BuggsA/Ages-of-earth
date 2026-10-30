@@ -713,8 +713,14 @@ const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'
  * a windlass and a hanging bucket; Gunpowder: a taller timber frame with a sheave wheel; Industrial: an iron lattice headframe,
  * a winding-engine house and its stack. A rail of ore tubs runs from the collar.
  */
-function shaft(k: Kit, e: number, st: Style, seam: number): void {
+function shaft(k: Kit, e: number, st: Style, variant: number): void {
   pad(k, 2, st.base);
+  // The variant carries the seam and, from the deep mine (#924 m1), the layer reached: `seam + 8 * depth`. The pithead
+  // grows with depth, so a rival sees a deep mine from outside: a taller headframe, a bigger spoil heap, a winding shed.
+  // Shored (#924 m2) adds 64: a stack of pit-props by the collar.
+  const seam = variant % 8;
+  const deep = Math.floor((variant % 64) / 8);
+  const shored = variant >= 64;
   const [rock, fleck] = SPOIL[Math.min(Math.max(seam, 0), SPOIL.length - 1)];
   // The collar and the hole.
   k.box(0.62, 0.03, 0.62, '#1c1712', -0.25, 0.02, -0.2);
@@ -722,7 +728,7 @@ function shaft(k: Kit, e: number, st: Style, seam: number): void {
     k.box(w, 0.12, d, e >= 3 ? STONE : WOOD, x, 0, z);
   }
   const frame = e >= 4 ? '#3a3e44' : st.post;
-  const top = e >= 3 ? 1.75 : 1.25;
+  const top = (e >= 3 ? 1.75 : 1.25) + deep * 0.3;
   // Two A-frames over the hole, joined at the top by the axle beam.
   for (const z of [-0.5, 0.1]) {
     for (const sx of [-1, 1]) {
@@ -731,7 +737,7 @@ function shaft(k: Kit, e: number, st: Style, seam: number): void {
     }
   }
   k.box(0.08, 0.08, 0.72, frame, -0.25, top - 0.06, -0.2);
-  if (e >= 3) {
+  if (e >= 3 || deep >= 1) {
     // The sheave wheel, its rope down the shaft.
     const wheel = k.cyl(0.26, 0.26, 0.05, 12, e >= 4 ? '#6a6e74' : WOOD, -0.25, top - 0.3, -0.2);
     wheel.rotation.z = Math.PI / 2;
@@ -754,9 +760,19 @@ function shaft(k: Kit, e: number, st: Style, seam: number): void {
     cable.rotation.y = 1.1;
     cable.rotation.z = 0.5;
   }
-  // The spoil heap: the seam shows in it.
-  k.sphere(0.42, rock, 0.55, 0.0, 0.42).scale.set(1, 0.55, 1);
-  k.sphere(0.24, rock, 0.25, 0.0, 0.7).scale.set(1, 0.5, 1);
+  if (deep >= 2 && e < 4) {
+    // A winding shed: a horse gin's drum under a pitched roof, the rope run out to the wheel.
+    k.box(0.5, 0.42, 0.42, st.wall, 0.62, 0, -0.58);
+    k.prism(0.54, 0.2, 0.46, st.roof, 0.62, 0.42, -0.58);
+    const rope = k.box(0.012, 0.012, 0.95, '#c9b98f', 0.18, 0.9, -0.4);
+    rope.rotation.y = 1.1;
+    rope.rotation.z = 0.55;
+  }
+  // The spoil heap: the seam shows in it, and it grows with every layer sunk.
+  const heap = 1 + deep * 0.28;
+  k.sphere(0.42 * heap, rock, 0.55, 0.0, 0.42).scale.set(1, 0.55, 1);
+  k.sphere(0.24 * heap, rock, 0.25, 0.0, 0.7).scale.set(1, 0.5, 1);
+  if (deep >= 1) k.sphere(0.2 * heap, rock, 0.85, 0.0, 0.05).scale.set(1, 0.5, 1);
   for (const [x, y, z] of [[0.45, 0.17, 0.3], [0.62, 0.15, 0.55], [0.72, 0.1, 0.25], [0.35, 0.12, 0.55], [0.22, 0.06, 0.75]] as [number, number, number][]) {
     k.octa(0.055, fleck, x, y, z);
   }
@@ -765,6 +781,15 @@ function shaft(k: Kit, e: number, st: Style, seam: number): void {
   for (const z of [0.45, 0.78]) {
     k.box(0.36, 0.2, 0.22, e >= 3 ? '#4a4a4e' : WOOD, -0.65, 0.04, z);
     k.sphere(0.1, fleck, -0.65, 0.24, z).scale.set(1.3, 0.5, 0.8);
+  }
+  if (shored) {
+    // Pit-props stacked crosswise by the collar, timber waiting to go down.
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3 - i; j++) {
+        const log = k.cyl(0.035, 0.035, 0.5, 5, i % 2 ? '#a87a44' : WOOD, 0.62 + (j - (2 - i) / 2) * 0.075, 0.035 + i * 0.065, -0.05);
+        log.rotation.x = Math.PI / 2;
+      }
+    }
   }
   // A pick and a shovel against the collar.
   const haft = k.cyl(0.018, 0.018, 0.55, 4, WOOD, 0.25, 0.0, -0.75);
