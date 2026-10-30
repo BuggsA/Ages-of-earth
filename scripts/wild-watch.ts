@@ -21,7 +21,7 @@ for (let seed = 1; seed <= seeds; seed++) {
 
     step(s);
     for (const e of s.events) {
-      if (e.k === 'animalDie' && beasts.has(e.id)) at[beasts.get(e.id) as 'mammoth' | 'wolf'].push(Math.round(s.tick / secs(1)));
+      if (e.k === 'animalDie' && beasts.has(e.id)) at[beasts.get(e.id) as 'mammoth' | 'wolf']?.push(Math.round(s.tick / secs(1)));
       if (e.k === 'wildStrike') lastBit.set(e.target, s.tick);
     }
     for (const [id, tick] of lastBit) {

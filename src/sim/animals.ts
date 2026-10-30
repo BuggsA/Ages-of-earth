@@ -1,6 +1,6 @@
 import { landOwnerAt } from './borders';
 import { drawBeast } from './blood';
-import { AMOUNT, BOAR, DEER, DT, FLOCK, MAMMOTH, RAIDER, ROT, TICK_HZ, WOLF, domainOf, secs } from './data';
+import { AMOUNT, BOAR, DEER, DT, FLOCK, MAMMOTH, RAIDER, ROT, TEEM, TICK_HZ, WOLF, domainOf, secs } from './data';
 import { clearResource, walkable } from './grid';
 import type { Spatial } from './spatial';
 import type { Animal, GameState, Order, Unit } from './types';
@@ -331,10 +331,10 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   }
   if (wolf && a.prey !== undefined) return;
   const roam = wolf ? WOLF.roam : raider ? RAIDER.roam : a.kind === 'boar' ? BOAR.roam : MAMMOTH.roam;
-  // A band's idling never touches the match's dice, so a camp on the map moves nothing else.
+  // A band's idling never touches the match's dice, so a camp on the map moves nothing else; nor does the teeming wild's (`TEEM`).
   let n = 0;
   const dice = (): number => {
-    if (!raider) return roll(s);
+    if (!raider && a.id < TEEM.idBase) return roll(s);
     const h = Math.imul(Math.imul(s.tick + 1, 0x9e3779b1) ^ (Math.imul(a.id, 0x85ebca6b) + Math.imul(++n, 0xc2b2ae35)), 0x27d4eb2d);
     return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
   };

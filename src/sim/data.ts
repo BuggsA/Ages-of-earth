@@ -3993,6 +3993,30 @@ export const WOLF = { hunt: 7, hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35
 export const RAIDER = { hp: 30, walk: 0.8, run: 2.2, bite: 4, reach: 0.4, reload: 1.1, notice: 3.8, leash: 6.5, roam: 1.3, radius: 0.24, guards: 3, home: 22, fair: 10, spacing: 18,
   idBase: 1_000_000_000, loot: { gold: 120, food: 80, wood: 60 }, camps: { small: 1, medium: 2, large: 3 } as Record<MapSize, number> };
 
+/**
+ * The teeming wild (2026-10-30, the owner: "make animals just more plentiful in general … right now they feel very limited"). On top of
+ * the wild above, laid last on dice of its own (`placeTeeming` in `mapgen.ts`, so every other part of a map is as it was), each town
+ * gets `mammoths` more mammoths on a ring `mammothAt` tiles out, `boars` more boars by berry patches `boarMin`–`boarMax` tiles out (none
+ * for now: a boar that near charges the woodcutters), and a wolf den of its own `denAt` tiles out (past `AI_WILD.clear`, so its pack
+ * waits to be cleared or tamed by choice, and seldom finds the gatherers); and the open ground between the towns gets `open` more
+ * mammoths, boars and dens for the map's size. Their ids come from `idBase` up, so they renumber nothing, and they idle on dice of their
+ * own (`beastStep`), so they move no other roll of the match.
+ */
+export const TEEM = {
+  mammoths: 1,
+  mammothAt: 28,
+  boars: 0,
+  boarMin: 12,
+  boarMax: 22,
+  denAt: 37,
+  open: {
+    mammoth: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>,
+    boar: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>,
+    den: { small: 1, medium: 2, large: 3 } as Record<MapSize, number>,
+  },
+  idBase: 1_200_000_000,
+};
+
 // ---- Tidings, the market and starting resources ---------------------------------------------------
 
 /**
