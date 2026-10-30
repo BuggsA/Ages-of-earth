@@ -42,6 +42,7 @@ import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
 import { FoundationView } from './foundationView';
+import { CoverView } from './coverView';
 import { RangeGuides, MAX_RANGE_GUIDES, bent, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
@@ -132,6 +133,8 @@ export class View {
    * and the pitheads and cores stand out, the cored patches lit in their lodes' colours.
    */
   underground = false;
+  /** Forest cover (#934): the ground under the pointer, set by the input; hovering a wood traces its cover's edge. */
+  coverHover: { x: number; y: number } | null = null;
   private wasUnder = false;
   readonly vents = new VentsView();
   /** Chasms and charging cracks (#900). */
@@ -153,6 +156,7 @@ export class View {
   private relicGlint = 0;
   private overlays = new Overlays();
   private rangeGuides = new RangeGuides();
+  private coverEdge = new CoverView();
   private borders = new BorderView();
   private foundations = new FoundationView();
   private graze = new GrazeView();
@@ -227,7 +231,7 @@ export class View {
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
     this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.cores.group, this.vents.group, this.chasms.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
-    this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
+    this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh, this.coverEdge.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
     this.applyQuality();
@@ -459,9 +463,9 @@ export class View {
     return this.fog.visibleAt(x, y) > 0.45;
   }
 
-  // A rival's unit hidden by the Mycelium's spores (#800) is not drawn, wherever the fog stands.
+  // A rival's unit hidden by the Mycelium's spores (#800), or in a wood (#934), is not drawn, wherever the fog stands.
   private visibleUnit = (u: Unit): boolean =>
-    u.owner === this.viewer || (this.sees(u.x, u.y) && (this.reveal || !u.cloak || !this.state || this.state.players[u.owner].team === this.state.players[this.viewer].team));
+    u.owner === this.viewer || (this.sees(u.x, u.y) && (this.reveal || !(u.cloak || u.cover) || !this.state || this.state.players[u.owner].team === this.state.players[this.viewer].team));
 
   /** Draw a frame. `alpha` is how far into the next tick we are (0..1). */
   frame(s: GameState, alpha: number, dt: number, sel: Selection): void {
@@ -821,6 +825,15 @@ export class View {
     this.foundations.update(s, this.viewer, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.rangeGuides.update(s, guides, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.overlays.setBars(bars, this.rig.camera);
+    // Forest cover (#934): your own soldiers hidden in a wood wear one small leaf; hovering a wood traces its cover's edge.
+    const leaves: THREE.Vector3[] = [];
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || !e.cover || e.hp <= 0 || e.owner !== this.viewer) continue;
+      const at = this.units.drawn.get(e.id);
+      if (at) leaves.push(new THREE.Vector3(at.x, at.y + (statsFor(s, e.owner, e.type).mounted ? 1.62 : 1.24), at.z));
+    }
+    this.overlays.setLeaves(leaves, this.rig.camera, this.time);
+    this.coverEdge.update(s, this.viewer, this.underground || sel.ghost ? null : this.coverHover, this.reveal);
     const p = s.players[this.viewer];
     this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color, age: ageOf(p) } : null);
     this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false, sel.wall?.type);
