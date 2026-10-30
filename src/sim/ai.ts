@@ -172,23 +172,37 @@ function leanAges(p: Player, route: RouteId): AgeId[] {
  */
 function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   mem.lean = 'none';
-  // Not in Lords of the Land (#810): that match names its own aim, every landmark, and a route chosen on a coin (the Wild's
-  // tamed beasts for a legion) could leave a town with no soldiers to take one back.
-  if (s.scenario || s.mode === 'lords' || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
+  if (!leanable(s, p) || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
   const wet = s.mapType === 'lakes' || s.mapType === 'sea';
+  // The Deep Road is leaned to where it begins, in the Megaliths (`leanDeep`), not here: drawing it here moved every other leaning's dice.
   const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && r !== 'deep' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
-  // The Deep Road (#906) is leaned to on a coin of its own, one share among the routes open, before the others are drawn: a seat that
-  // doesn't lean deep draws its route on the dice it always did. Never by a people that quarries no stone (`roadProblem`).
-  const deep = !isNomad(p) && leanAges(p, 'deep').length > 0 && coin(s, p.id, 0xde17) * (open.length + 1) < 1;
-  if (!open.length && !deep) return;
-  const route = deep ? 'deep' : open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
+  if (!open.length) return;
+  const route = open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
   mem.lean = route;
   const roads = (mem.roads ??= {});
-  // The Deep Road starts at the Stone Age's last turn (`ROADS`): a town leaning deep passes the others by, or it would never reach it.
-  if (deep) for (const r of ROADS) if (r.from === 'stone' && r.to !== 'megaliths' && isSideRoad(r)) roads[r.to] ??= false;
   // The Wild route's fork (the Bloom or Leviathans) is left to its own coin (`wants`): a people leaning wild walks one of them.
   // So is the rare Mycelium (#800), on a coin of its own where glowcaps are to be had.
   for (const a of leanAges(p, route)) if (a !== 'bloom' && a !== 'leviathans' && a !== 'mycelium') roads[a] ??= true;
+}
+
+/** Whether a computer seat may lean (#749): a clever one, in a skirmish. */
+function leanable(s: GameState, p: Player): boolean {
+  // Not in Lords of the Land (#810): that match names its own aim, every landmark, and a route chosen on a coin (the Wild's
+  // tamed beasts for a legion) could leave a town with no soldiers to take one back.
+  return !s.scenario && s.mode !== 'lords' && !!AI_LEVELS[p.ai!].clever && AI_LEVELS[p.ai!].lean !== false;
+}
+
+/**
+ * The Deep Road's leaning (#906): a seat with an open mind that turned into the Megaliths (on their own coin, `wants`) has set out on the
+ * road, and leans to it from then on, choosing every age down to the Living Earth. Settled where the road begins, so every match is the
+ * same as before until some people stands in the Megaliths; and a people walks the road whole, not on a coin an age.
+ */
+function leanDeep(s: GameState, p: Player, mem: AiMemory): void {
+  if (mem.lean !== 'none' || !leanable(s, p)) return;
+  mem.lean = 'deep';
+  const roads = (mem.roads ??= {});
+  // Every age of it, suited or not (`fit`): each asks the one before, as the coins in `wants` never asked the fit either.
+  for (const a of Object.keys(AGES) as AgeId[]) if (!TRUNK.includes(a) && AGES[a].routes?.includes('deep')) roads[a] ??= true;
 }
 
 /** The leaning a computer seat has settled on (#749), or null for a person or a seat with an open mind. */
@@ -272,11 +286,12 @@ function afford(v: View, cost: Cost): boolean {
 }
 
 /**
- * A climb paid for clears the Town Center's queue when the people is at its cap (#906): a citizen queued there never trains, and the
- * advance waits on an empty queue. In 60-minute matches at peace, a Deep Road town sat 20 minutes in the Deep Forges with the Faults paid for.
+ * A climb paid for clears the Town Center's queue when the people is at the most it may number (`POP_MAX`, #906): no house makes room
+ * there, so a citizen queued never trains, and the advance waits on an empty queue. In 60-minute matches at peace, a Deep Road town sat
+ * 20 minutes in the Deep Forges with the Faults paid for.
  */
 function unjam(v: View, issue: (c: Command) => void): void {
-  if (!v.tc || v.p.pop < v.p.cap) return;
+  if (!v.tc || v.p.pop < POP_MAX) return;
   for (let i = v.tc.queue.length - 1; i >= 0; i--) issue({ t: 'cancel', p: v.p.id, building: v.tc.id, index: i });
 }
 
@@ -415,7 +430,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   } else if (kinOnly && !advancing && !threatNear(s, v).unit) {
     // Saving for the next call: the army and the rest wait on the food it needs, unless raiders are at the door.
     spend(v, KIN.cost);
-  } else if (tc && !advancing && !v.packing && !kinOnly && !climbReady && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2) && p.pop < p.cap) {
+  } else if (tc && !advancing && !v.packing && !kinOnly && !climbReady && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2) && p.pop < POP_MAX) {
     const cost = unitStats('citizen', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: tc.id, unit: 'citizen' });
@@ -4322,6 +4337,7 @@ function megalithWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   const { p } = v;
   if (!v.tc || ageOf(p) !== 'megaliths') return;
   mem.megaliths ??= s.tick;
+  leanDeep(s, p, mem);
   // Its buildings wait on stone: once the store runs low a Mine Shaft goes down by home (timber, which it has), up to `aiShafts`, and digs
   // stone (`bestSeam` starts it there in this age) for as long as the town stands.
   if (p.res.stone < MEGALITH.aiLow && count(v, 'shaft') < MEGALITH.aiShafts && !v.buildings.some((b) => b.type === 'shaft' && !b.built) && s.tick - (mem.ordered.shaft ?? -99999) >= secs(20) && v.budget.wood >= (buildingCostFor(s, p.id, 'shaft').wood ?? 0)) {
