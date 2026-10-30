@@ -1,0 +1,18 @@
+{
+  "name": "Ages of Earth",
+  "short_name": "Ages of Earth",
+  "description": "A real-time strategy game in your browser: lead your people from the Stone Age to the age of steam, against the computer or online with friends.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1b2230",
+  "theme_color": "#1b2230",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

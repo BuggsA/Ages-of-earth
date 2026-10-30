@@ -6,6 +6,8 @@ import { MAX_CLOUD_SAVE, MAX_PROGRESS_BODY, MAX_WEB_BODY, validSlot, validVaultK
  *   POST /api/rooms           a fresh room code
  *   GET  /api/rooms/CODE/ws   the room's WebSocket (a Durable Object per room keeps its clock)
  *   /api/vault/KEY[/SLOT]     cloud saves (a Durable Object per save key: src/net/vault.ts)
+ * and the bits search engines and link previews read, made for whichever host serves the game:
+ *   /robots.txt, /sitemap.xml, and absolute addresses in the page's canonical, og: and twitter: tags.
  */
 
 export { Room } from './room';
@@ -19,9 +21,29 @@ interface Env {
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
+/** The page's preview tags say "/" and "./og-card.jpg"; link previews and crawlers want them whole. */
+async function siteMeta(req: Request, env: Env, origin: string): Promise<Response> {
+  const res = await env.ASSETS.fetch(req);
+  if (!(res.headers.get('content-type') ?? '').includes('text/html')) return res;
+  const whole = (path: string | null) => new URL(path ?? '/', `${origin}/`).toString();
+  const fix = (attr: string) => ({ element: (el: Element) => void el.setAttribute(attr, whole(el.getAttribute(attr))) });
+  return new HTMLRewriter()
+    // A canonical link can't be in index.html: Vite reads its href="/" as a file to bundle.
+    .on('head', { element: (el) => void el.append(`<link rel="canonical" href="${origin}/" />`, { html: true }) })
+    .on('meta[property="og:url"], meta[property="og:image"], meta[name="twitter:image"]', fix('content'))
+    .transform(res);
+}
+
+const text = (body: string, type: string) => new Response(body, { headers: { 'content-type': `${type}; charset=utf-8`, 'cache-control': 'public, max-age=3600' } });
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
+    if (url.pathname === '/robots.txt') return text(`User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${url.origin}/sitemap.xml\n`, 'text/plain');
+    if (url.pathname === '/sitemap.xml') {
+      return text(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${url.origin}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n</urlset>\n`, 'application/xml');
+    }
+    if (url.pathname === '/' || url.pathname === '/index.html') return siteMeta(req, env, url.origin);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     if (url.pathname === '/api/rooms' && req.method === 'POST') {
       const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH));

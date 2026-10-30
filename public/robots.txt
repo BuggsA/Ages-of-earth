@@ -1,0 +1,4 @@
+# Served by the Worker with the Sitemap line for its own host (worker/index.ts); this copy is for static hosts.
+User-agent: *
+Allow: /
+Disallow: /api/
