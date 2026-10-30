@@ -46,7 +46,7 @@ import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, freeShaft, nearestTemple, TILE_OF_RARE } from './units';
-import { seamOf, seamProblem, siteGrade } from './shafts';
+import { deepenProblem, depthOf, seamOf, seamProblem, siteGrade, spentAt } from './shafts';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findPath, findRoute } from './path';
 import { isEnemy, maxHp, townCenters } from './world';
@@ -69,7 +69,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_DEEP, AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
+import { AI_DEEP, AI_TEMPER, ROUTES, STRATA, TRUNK, type RouteId } from './data';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY, AI_MEWS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
@@ -3504,6 +3504,21 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     }
   }
 
+  // The deep mine (#924 m1): a shaft whose seam is dug out in every layer it reaches is sunk a layer deeper, with wood to spare.
+  if (p.epoch >= 1 && s.tick - (mem.deepLook ?? -99999) > secs(10)) {
+    mem.deepLook = s.tick;
+    for (const b of v.buildings) {
+      if (b.type !== 'shaft' || deepenProblem(s, b)) continue;
+      const seam = seamOf(s, b);
+      if (!seam || (seam !== 'stone' && seam !== 'gold') || !spentAt(b, seam)) continue;
+      const cost = STRATA[depthOf(b) + 1].sink;
+      if ((v.budget.wood ?? 0) < (cost.wood ?? 0) + SHAFT.aiSink || !afford(v, cost)) continue;
+      spend(v, cost);
+      issue({ t: 'deepen', p: p.id, building: b.id });
+      break;
+    }
+  }
+
   // In the Age of Lightning a coil goes up by a workshop that stands dark (#231), so its training runs fast again.
   if (ageOf(p) === 'lightning' && count(v, 'tower') < AI_LIGHTNING.most && !recently('tower', AI_LIGHTNING.gap)) {
     const dark = v.buildings.find((b) => b.built && b.type !== 'tower' && BUILDINGS[b.type].trains.length > 0 && !inField(s, b));
@@ -3778,7 +3793,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
   let tile = findResource(s, TILE_OF[res], from.x, from.y, SHAFT.aiNear);
   // No deposit near a drop (#681): a free Mine Shaft of its own, set to this stock, before the long walk to a far one.
   if (tile < 0 && v.p.epoch >= 1 && res !== 'wood') {
-    const pit = freeShaft(s, v.p.id, v.home.x, v.home.y, SHAFT.aiReach + 10);
+    const pit = freeShaft(s, v.p.id, v.home.x, v.home.y, SHAFT.aiReach + 10, undefined, res);
     if (pit && !seamProblem(s, pit, res)) {
       if (seamOf(s, pit) !== res) issue({ t: 'seam', p: v.p.id, building: pit.id, seam: res });
       issue({ t: 'work', p: v.p.id, ids: [u.id], target: pit.id });

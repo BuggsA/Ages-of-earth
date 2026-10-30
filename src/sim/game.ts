@@ -3,6 +3,7 @@ import { forgeStep } from './forge';
 import { faultStep } from './fault';
 import { delveStep } from './delve';
 import { hengeStep } from './henge';
+import { deepenStep } from './shafts';
 import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
@@ -704,6 +705,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   floodStep(s);
   tideStep(s);
   hengeStep(s);
+  deepenStep(s);
   delveStep(s, ungarrison);
   underStep(s);
   forgeStep(s);
