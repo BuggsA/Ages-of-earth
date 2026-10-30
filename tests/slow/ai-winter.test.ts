@@ -17,16 +17,24 @@ const play = (seed: number, secs: number): GameState => {
 };
 
 describe('the computer plans for winter', () => {
-  it('puts more people on food in autumn than one that does not plan, and is the same before', () => {
+  // Judged across a dozen maps (#940): on any one the count swings by several either way with what the map holds, so three
+  // seeds summed could fall either side of zero. Planning should lift the count on most maps and in sum.
+  it('puts more people on food in autumn than one that does not plan on most maps, and is the same before', () => {
     let more = 0;
-    for (const seed of [3, 7, 11]) {
+    let up = 0;
+    let down = 0;
+    for (let seed = 1; seed <= 12; seed++) {
       Object.assign(AI_WINTER, { food: 0, fields: 0, hunters: 0, pack: 0 });
-      const spring = onFood(play(seed, SEASON.len - 5));
+      const spring = seed <= 3 ? onFood(play(seed, SEASON.len - 5)) : 0;
       const a = onFood(play(seed, SEASON.len * 2 + 90));
       Object.assign(AI_WINTER, saved);
-      expect(onFood(play(seed, SEASON.len - 5))).toBe(spring);
-      more += onFood(play(seed, SEASON.len * 2 + 90)) - a;
+      if (seed <= 3) expect(onFood(play(seed, SEASON.len - 5))).toBe(spring);
+      const d = onFood(play(seed, SEASON.len * 2 + 90)) - a;
+      more += d;
+      if (d > 0) up++;
+      if (d < 0) down++;
     }
     expect(more).toBeGreaterThan(0);
-  }, 90000);
+    expect(up).toBeGreaterThan(down);
+  }, 600000);
 });
