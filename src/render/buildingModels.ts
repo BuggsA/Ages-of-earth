@@ -3018,9 +3018,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
     }
     case 'merchant':
       if (type === 'market') {
-        awning(k, -0.9, 0.78, 1.25, 1.2, 4, 0);
-        awning(k, 0.9, 0.78, 1.25, 1.2, 4, 2);
-        k.box(0.5, 0.3, 0.04, '#e2b23c', 0, 1.55, 0.2);
+        // The counting-house (`merchantMarket`) is the whole look.
       } else if (type === 'house') awning(k, 0, 0.62, 0.85, 0.7, 3, 1);
       else if (big) {
         awning(k, -0.8, 1.0, 2.1, 1.4, 4, 0);
@@ -3134,6 +3132,67 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heartstone: (k: Kit, _e: number, st: Style) => heartstone(k, st.base),
 };
 
+/**
+ * The Merchants' Market (#816): a guild counting-house, not a stall row. A narrow stepped-gable house over an arcade, a hoist
+ * beam at its peak with a bale on the rope, and out front the hiring table where the age sells swords: a team-coloured board,
+ * a balance, a coin chest and spears racked for hire (`AGES.merchant.hire`).
+ */
+function merchantMarket(k: Kit, st: Style): void {
+  pad(k, 3, st.base);
+  k.box(1.7, 1.1, 1.9, st.wall, 0, 0, -0.35);
+  k.box(1.76, 0.07, 1.95, st.trim, 0, 0.55, -0.35);
+  // Three arches along the ground floor and a lit window row above.
+  for (const x of [-0.55, 0, 0.55]) {
+    k.box(0.36, 0.46, 0.03, '#2a1f17', x, 0, 0.6);
+    k.box(0.44, 0.06, 0.05, st.trim, x, 0.46, 0.61);
+    window(k, st, x, 0.78, 0.6, 0.14, 0.2);
+    for (const dx of [-0.11, 0.11]) k.box(0.05, 0.22, 0.02, st.trim, x + dx, 0.77, 0.61);
+  }
+  // The roof ridge runs front to back; the stepped gable stands against its front end.
+  k.prism(1.84, 0.7, 1.9, st.roof, 0, 1.1, -0.35).rotation.y = Math.PI / 2;
+  const steps: [number, number][] = [[1.76, 1.1], [1.4, 1.33], [1.04, 1.56], [0.68, 1.79], [0.34, 2.02]];
+  for (const [w, y] of steps) k.box(w, 0.24, 0.12, st.wall2, 0, y, 0.64);
+  k.box(0.1, 0.08, 0.14, st.trim, 0, 2.26, 0.64);
+  k.sphere(0.04, '#e2b23c', 0, 2.38, 0.64);
+  // The hoist: a beam out over the street, a rope and a bale.
+  k.box(0.07, 0.07, 0.75, WOOD, 0, 2.02, 0.95);
+  k.cyl(0.012, 0.012, 0.4, 4, '#5b4330', 0, 1.64, 1.25);
+  k.box(0.26, 0.2, 0.22, '#d8c08a', 0, 1.44, 1.25);
+  k.box(0.28, 0.03, 0.04, '#7d5a3a', 0, 1.52, 1.25);
+  // The hiring table: counter, coin chest, gold, and the board behind it in the team's colour.
+  k.box(1.0, 0.32, 0.3, WOOD, 0, 0, 1.25);
+  k.box(1.06, 0.04, 0.36, '#9a7a52', 0, 0.32, 1.25);
+  k.box(0.24, 0.16, 0.16, '#5a3a22', -0.3, 0.36, 1.25);
+  k.box(0.26, 0.04, 0.18, '#e2b23c', -0.3, 0.52, 1.25);
+  for (let i = 0; i < 3; i++) k.cyl(0.05, 0.05, 0.05 + i * 0.05, 8, '#e2b23c', 0.1 + i * 0.14, 0.36, 1.2);
+  k.cyl(0.02, 0.02, 0.7, 4, st.post, -0.45, 0, 1.0);
+  k.cyl(0.02, 0.02, 0.7, 4, st.post, 0.45, 0, 1.0);
+  k.team(k.box(0.9, 0.34, 0.03, TEAM, 0, 0.74, 1.0));
+  k.box(0.94, 0.04, 0.05, st.trim, 0, 1.08, 1.0);
+  // A balance on a post at the left, and spears racked for hire at the right.
+  k.cyl(0.02, 0.03, 0.6, 5, WOOD, -1.05, 0, 0.95);
+  k.box(0.5, 0.03, 0.03, '#b8893a', -1.05, 0.62, 0.95);
+  for (const dx of [-0.23, 0.23]) k.cyl(0.08, 0.04, 0.03, 8, '#e2b23c', -1.05 + dx, 0.5, 0.95);
+  for (const [x, lean] of [[1.05, 0.08], [1.17, 0], [1.29, -0.08]] as const) {
+    const sp = k.group(x, 0, 0.95);
+    sp.rotation.z = lean;
+    k.cyl(0.014, 0.016, 0.95, 4, '#6b4b2f', 0, 0, 0, sp);
+    k.cone(0.035, 0.16, 4, '#9a9ca2', 0, 0.95, 0, sp);
+  }
+  // Bales and a barrel against the house.
+  k.box(0.34, 0.24, 0.26, '#d8c08a', -1.15, 0, 0.3);
+  k.box(0.3, 0.22, 0.26, '#c8b07a', -1.12, 0.24, 0.3);
+  k.cyl(0.12, 0.1, 0.28, 8, '#8a6440', 1.15, 0, 0.3);
+  // Sacks of coin and grain stacked by the arcade, and hanging lanterns at the door: a counting-house is full of small stores.
+  for (const [x, z, c] of [[-0.85, 0.42, '#d8c08a'], [-0.7, 0.5, '#c8b07a'], [0.9, 0.45, '#d8c08a'], [0.75, 0.52, '#c8b07a'], [1.0, 0.6, '#e2b23c']] as const) k.sphere(0.13, c, x, 0.12, z).scale.set(1, 0.85, 1);
+  for (const x of [-0.28, 0.28]) {
+    k.cyl(0.012, 0.012, 0.16, 4, IRON_DARK, x, 0.38, 0.66);
+    k.glow(k.sphere(0.06, '#ffd890', x, 0.34, 0.66));
+  }
+  for (const [x, z] of [[1.3, 0.1], [1.15, -0.05]]) k.cyl(0.12, 0.1, 0.28, 8, '#8a6440', x, 0, z);
+  banner(k, -1.35, 0, 1.35, 1.3);
+}
+
 /** The Aeronauts' Airfield (#816): no runway but a mooring mast, an airship riding at its nose with a winch house and fuel drums below. */
 function aeroAirfield(k: Kit, st: Style): void {
   k.box(3.9, 0.05, 3.9, '#8fa586', 0, -0.02, 0);
@@ -3168,6 +3227,7 @@ function aeroAirfield(k: Kit, st: Style): void {
 /** Buildings an age raises in a shape of its own (#816), in place of the trunk's model; its touches still follow. */
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
   iron: { house: ironHouse, towncenter: ironHillfort },
+  merchant: { market: merchantMarket },
   aeronaut: { airfield: aeroAirfield },
 };
 
