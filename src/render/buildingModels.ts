@@ -704,8 +704,8 @@ function huntcamp(k: Kit, e: number, st: Style): void {
 
 // ---- Mine Shaft (#681) ---------------------------------------------------------------------------------
 
-/** The spoil heap's colours by seam (`SEAMS` order: stone, gold, salt, saltpetre, blood-iron): the rock, and the flecks of what is dug. */
-const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'], ['#9a948a', '#eeeae0'], ['#8f8a7c', '#d9d2b0'], ['#5e5650', '#6a1f24']];
+/** The spoil heap's colours by seam (`SEAMS` order: stone, gold, salt, saltpetre, blood-iron, glowcaps, gems): the rock, and the flecks of what is dug. */
+const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'], ['#9a948a', '#eeeae0'], ['#8f8a7c', '#d9d2b0'], ['#5e5650', '#6a1f24'], ['#6a6458', '#b8f0c0'], ['#4e5a60', '#7fe0f0']];
 
 /**
  * A shaft collar of squared timbers round a dark hole, the headframe over it, and a spoil heap beside it that shows the seam:
@@ -717,10 +717,12 @@ function shaft(k: Kit, e: number, st: Style, variant: number): void {
   pad(k, 2, st.base);
   // The variant carries the seam and, from the deep mine (#924 m1), the layer reached: `seam + 8 * depth`. The pithead
   // grows with depth, so a rival sees a deep mine from outside: a taller headframe, a bigger spoil heap, a winding shed.
-  // Shored (#924 m2) adds 64: a stack of pit-props by the collar.
+  // Shored (#924 m2) adds 64: a stack of pit-props by the collar. A pump (#924 m4) adds 128 for a steam engine, 256 for a
+  // windmill pump: either works a rod down the shaft and spills the water it lifts into a trough by the collar.
   const seam = variant % 8;
   const deep = Math.floor((variant % 64) / 8);
-  const shored = variant >= 64;
+  const shored = (variant % 128) >= 64;
+  const pump = Math.floor(variant / 128);
   const [rock, fleck] = SPOIL[Math.min(Math.max(seam, 0), SPOIL.length - 1)];
   // The collar and the hole.
   k.box(0.62, 0.03, 0.62, '#1c1712', -0.25, 0.02, -0.2);
@@ -790,6 +792,39 @@ function shaft(k: Kit, e: number, st: Style, variant: number): void {
         log.rotation.x = Math.PI / 2;
       }
     }
+  }
+  if (pump) {
+    // The trough the lifted water spills into, running off the pad, and the rising main up out of the hole.
+    k.box(0.14, 0.08, 0.6, WOOD, -0.86, 0, -0.2);
+    k.box(0.1, 0.02, 0.58, '#4a90c0', -0.86, 0.07, -0.2);
+    k.box(0.3, 0.035, 0.035, '#55595e', -0.72, 0.16, -0.36);
+    k.cyl(0.03, 0.03, 0.2, 5, '#55595e', -0.86, 0.0, -0.36);
+  }
+  if (pump === 1) {
+    // A Cornish engine house: a tall narrow stone house, its beam nodding out over the shaft, the rod down to the pump, a stack.
+    k.box(0.36, 0.95, 0.34, STONE, -0.82, 0, -0.78);
+    k.prism(0.4, 0.14, 0.38, st.roof, -0.82, 0.95, -0.78);
+    k.box(0.12, 0.2, 0.02, '#2a2420', -0.82, 0.55, -0.6);
+    const bob = k.box(0.62, 0.07, 0.07, '#3a3e44', -0.55, 0.92, -0.5);
+    bob.rotation.y = -0.75;
+    bob.rotation.z = -0.12;
+    k.box(0.025, 0.85, 0.025, '#3a3e44', -0.32, 0.08, -0.3);
+    k.cyl(0.05, 0.065, 1.35, 6, '#7a3a2c', -1.0, 0, -0.95);
+  } else if (pump === 2) {
+    // A windmill pump, as on the polders (#701): an open trestle, a cap, four sails, and the rod down into the shaft.
+    for (const [x, z] of [[-0.95, -0.9], [-0.65, -0.9], [-0.95, -0.6], [-0.65, -0.6]] as [number, number][]) {
+      const leg = k.box(0.04, 1.15, 0.04, st.post, x, 0, z);
+      leg.rotation.set((z + 0.75) * -0.12, 0, (x + 0.8) * -0.12);
+    }
+    k.box(0.26, 0.16, 0.26, st.roof, -0.8, 1.12, -0.75);
+    const hub = k.cyl(0.04, 0.04, 0.12, 6, WOOD, -0.8, 1.2, -0.6);
+    hub.rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) {
+      const sail = k.box(0.09, 0.62, 0.015, '#e8e0d0', -0.8, 0.95, -0.53);
+      sail.geometry.translate(0, 0.31, 0);
+      sail.rotation.z = i * (Math.PI / 2) + 0.4;
+    }
+    k.box(0.025, 1.0, 0.025, WOOD, -0.6, 0.12, -0.42);
   }
   // A pick and a shovel against the collar.
   const haft = k.cyl(0.018, 0.018, 0.55, 4, WOOD, 0.25, 0.0, -0.75);

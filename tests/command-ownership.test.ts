@@ -73,6 +73,7 @@ describe('one player never commands another’s people', () => {
       deepen: { t: 'deepen', p: 1, building: tc.id },
       toLayer: { t: 'toLayer', p: 1, building: tc.id, layer: 0 },
       prop: { t: 'prop', p: 1, building: tc.id, layer: 1 },
+      pump: { t: 'pump', p: 1, building: tc.id },
       core: { t: 'core', p: 1, building: tc.id, x: 5, y: 5 },
       callUp: { t: 'callUp', p: 1, building: tc.id, n: 5 },
       pack: { t: 'pack', p: 1, building: tc.id },

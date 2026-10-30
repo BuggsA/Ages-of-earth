@@ -3,7 +3,7 @@ import { engineLimit, fault, faultProblem, isChasm, spanOpen } from './fault';
 import { heaveProblem, quakeProblem, raiseRidge, stoneLimit, swallow, swallowProblem, wake } from './living';
 import { hiddenFrom, inert, sink, sinkProblem, surface, surfaceProblem } from './undercity';
 import { delve, delveProblem } from './delve';
-import { AUTO_WORK, BUILDINGS, CORE, FAULT, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, STRATA, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, CORE, FAULT, HENGE, GIANTS, EPOCHS, GEMS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, STRATA, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { inBounds, placeProblem, stampBuilding, walkable } from './grid';
@@ -13,7 +13,7 @@ import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, journeyOf, keepsakeProblem, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
-import { blast, blastProblem, crewOf, deepen, deepenProblem, depthOf, prop, propProblem, resOfSeam, roomLeft, seamOf, seamProblem, shutAt, veinLeft } from './shafts';
+import { blast, blastProblem, crewOf, deepen, deepenProblem, depthOf, floodedAt, prop, propProblem, pumpCost, pumpProblem, raisePump, resOfSeam, roomLeft, seamOf, seamProblem, shutAt, veinLeft } from './shafts';
 import { coreProblem, drawCore } from './lodes';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, isCarrier, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
@@ -834,6 +834,19 @@ export function applyCommand(s: GameState, c: Command): void {
       prop(b, c.layer);
       break;
     }
+    case 'pump': {
+      // A pump at the pithead (#924 m4): the wet layers are pumped dry and kept so.
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = pumpProblem(s, b);
+      if (why) return refuse(s, c.p, why);
+      const cost = pumpCost(s, c.p);
+      const short = shortfall(p, cost);
+      if (short) return refuse(s, c.p, short);
+      pay(p, cost);
+      raisePump(s, b);
+      break;
+    }
     case 'core': {
       // A Prospector's Lodge drills a core sample (#924 m3).
       const b = myBuilding(s, c.p, c.building);
@@ -851,6 +864,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (!b || b.type !== 'shaft' || !b.built) return;
       if (c.layer < 0 || c.layer > depthOf(b)) return refuse(s, c.p, 'The shaft is not sunk that deep yet');
       if (shutAt(s, b, c.layer)) return refuse(s, c.p, `${STRATA[c.layer].name} is shut by a cave-in: shore it to clear it now`);
+      if (floodedAt(b, c.layer)) return refuse(s, c.p, `${STRATA[c.layer].name} is flooded: pump it dry`);
       const { at } = crewOf(s, b);
       if (at[c.layer] >= STRATA[c.layer].room) return refuse(s, c.p, `${STRATA[c.layer].name} has room for ${STRATA[c.layer].room} miners`);
       const seam = seamOf(s, b);
@@ -1222,6 +1236,17 @@ export function applyCommand(s: GameState, c: Command): void {
         if (c.buy || have < ORE_TRADE.lot) return refuse(s, c.p, c.buy ? `${RARE[c.res].name} cannot be bought` : `Need ${ORE_TRADE.lot} ${RARE[c.res].name.toLowerCase()} to sell`);
         p.rare![c.res] = have - ORE_TRADE.lot;
         p.res.gold += ORE_TRADE.gold[c.res];
+        break;
+      }
+      // Gems (#924 m4): sold by the lot at a price every seller shares, falling as anyone sells; never bought.
+      if (c.res === 'gems') {
+        const have = p.gems ?? 0;
+        if (c.buy || have < GEMS.lot) return refuse(s, c.p, c.buy ? 'Gems cannot be bought' : `Need ${GEMS.lot} gems to sell`);
+        const price = s.market.gems ?? GEMS.price;
+        p.gems = have - GEMS.lot;
+        p.res.gold += price;
+        s.market.gems = Math.max(GEMS.min, price - GEMS.step);
+        s.events.push({ k: 'trade', owner: c.p, res: 'gems', buy: false, gold: price });
         break;
       }
       const price = s.market[c.res];

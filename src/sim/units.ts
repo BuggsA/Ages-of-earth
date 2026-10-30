@@ -20,7 +20,7 @@ import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
 import { finishTame, songOf, tames, wildBeast } from './tame';
 import { catchIn, nextSnare } from './snares';
-import { TILE_OF_SEAM, digAt, placeFor, resOfSeam, riskLoad, roomLeft, roomOf, seamOf, seamProblem, strand } from './shafts';
+import { TILE_OF_SEAM, digAt, placeFor, resOfSeam, riskFlood, riskLoad, roomLeft, roomOf, seamOf, seamProblem, strand } from './shafts';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
@@ -177,7 +177,12 @@ export function findResource(s: GameState, kind: number, x: number, y: number, m
 function deposit(s: GameState, u: Unit, at: Building): void {
   // What the Mycelium's web takes in (#800) is the deed of its road on to the Bloom.
   if (u.carry > 0 && webTakes(s, at)) s.players[u.owner].stats.webbed = (s.players[u.owner].stats.webbed ?? 0) + u.carry;
-  if (u.carry > 0 && u.carryRes === 'stone' && u.carryRare) {
+  if (u.carry > 0 && u.carryRare === 'gems') {
+    // Gems from the wet deep (#924 m4) are kept apart, to be sold at the Market.
+    const p = s.players[u.owner];
+    p.gems = (p.gems ?? 0) + u.carry;
+    s.events.push({ k: 'deliver', owner: u.owner, res: 'gold', amount: u.carry, x: at.x, y: at.y, gems: true });
+  } else if (u.carry > 0 && u.carryRes === 'stone' && u.carryRare && u.carryRare !== 'gems') {
     const p = s.players[u.owner];
     const stock = (p.rare ??= {});
     stock[u.carryRare] = (stock[u.carryRare] ?? 0) + u.carry;
@@ -581,6 +586,8 @@ function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): vo
     if (u.carry >= carryCap(s, u)) {
       // A full basket from an unshored layer (#924 m2): the dice say whether it falls in on its miners, this one among them.
       if (riskLoad(s, b, o.layer ?? 0)) return;
+      // And where the water stands in a wet layer (#924 m4), whether it breaks in.
+      if (riskFlood(s, b, o.layer ?? 0)) return;
       u.frac = 0;
       o.phase = 'drop';
     }

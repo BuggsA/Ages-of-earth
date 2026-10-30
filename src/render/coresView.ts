@@ -11,6 +11,8 @@ import { heightAt } from './terrain';
  * tints, the top layer uppermost), flecked with what the ground holds and capped in its lode's colour; a drilling rig while it
  * is drawn. Only the viewer's own. In the underground view (U) the columns stand taller and each cored patch glows in its
  * lode's colour on the faded ground.
+ *
+ * The wet deep (#924 m4): its band carries a ring of water, thicker the wetter the ground (`LODES[].wet`), and cut gems.
  */
 const ORE_FLECK: Partial<Record<SeamId, string>> = { salt: '#f4f6f8', saltpetre: '#b8e0d0', bloodiron: '#c0303a' };
 
@@ -32,6 +34,12 @@ function coreModel(code: number): THREE.BufferGeometry {
     const golds = gold > 0 ? Math.min(4, Math.max(1, Math.round(gold / 300))) : 0;
     for (let g = 0; g < golds; g++) k.box(0.05, 0.04, 0.03, '#ffd24a', 0.12 * (g % 2 ? 1 : -0.6), y + 0.04 + (g * 0.05) % (band - 0.06), 0.06 * (g - 1.5));
     if (ore && l === LODE.oreLayer) for (let g = 0; g < 3; g++) k.box(0.05, 0.05, 0.04, ORE_FLECK[ore] ?? '#ffffff', 0.12 * (g === 1 ? -1 : 1), y + 0.05 + g * 0.05, 0.05 * (g - 1));
+    if (STRATA[l].fill > 0) {
+      // Water weeping from the band: a glassy ring round its foot, as high as the ground is wet.
+      k.cyl(0.145, 0.145, Math.min(band - 0.02, 0.05 * lode.wet), 6, '#3a8ab8', 0, y, 0);
+      const gems = Math.min(4, Math.max(1, Math.round(((STRATA[l].veins.gems ?? 0) * lode.gems) / 150)));
+      for (let g = 0; g < gems; g++) k.octa(0.035, '#7fe0f0', 0.13 * (g % 2 ? -1 : 1), y + 0.08 + (g * 0.04) % (band - 0.1), 0.05 * (g - 1.5));
+    }
   }
   // The cap, in the lode's colour, and a little marker peg.
   const top = 0.05 + n * band;
