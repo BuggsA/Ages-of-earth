@@ -9,8 +9,12 @@
  * Props, cave-ins and blasting (#924 m2): a layer below the first is shored with timber, or dug unshored, faster, with a chance
  * on the match's dice of a cave-in on every full basket. From the Gunpowder Age a layer is blasted open at once, with a chance of
  * firedamp above. A pithead that falls strands the miners below it.
+ *
+ * The ground below differs (#924 m3, `lodes.ts`): the lode under a shaft scales its layers' veins of stone and gold, their
+ * pace and the chance of a cave-in, and may hold a seam of a rare ore in one layer, dug there only while it lasts.
  */
-import { MEGALITH, SHAFT, STRATA, EPOCHS, secs } from './data';
+import { LODE, LODES, MEGALITH, SHAFT, STRATA, EPOCHS, secs } from './data';
+import { kindOf, lodeOfSite, oreOf } from './lodes';
 import { roll } from './animals';
 import { deepQuarry } from './henge';
 import { mineable } from './household';
@@ -52,12 +56,22 @@ export function groundAt(s: GameState, b: { tx: number; ty: number; size: number
   return out;
 }
 
-/** The seams a shaft here may dig for its people: held by the ground, and worked by that people (a household mines no gold, a nomad camp quarries no stone, #501). */
+/**
+ * The seams a shaft here may dig for its people: held by the ground (or by its lode, #924 m3), and worked by that people (a
+ * household mines no gold, a nomad camp quarries no stone, #501).
+ */
 export function seamsAt(s: GameState, b: { tx: number; ty: number; size: number; owner: number }): SeamId[] {
   const g = groundAt(s, b);
   const p = s.players[b.owner];
-  return SEAMS.filter((m) => g[m] && mineable(p, TILE_OF_SEAM[m]));
+  const ore = oreOf(codeOf(s, b));
+  return SEAMS.filter((m) => (g[m] || ore === m) && mineable(p, TILE_OF_SEAM[m]));
 }
+
+/** Whether a seam at this shaft is held only by its lode (#924 m3): a rare ore with no old workings, dug in its one layer while it lasts. */
+export const lodeOnly = (s: GameState, b: { tx: number; ty: number; size: number }, seam: SeamId): boolean => !groundAt(s, b)[seam] && oreOf(codeOf(s, b)) === seam;
+
+/** The lode under a shaft (stamped on it when placed; common ground in an older save), or under a site for one. */
+const codeOf = (s: GameState, b: { tx: number; ty: number; size: number; kind?: string; lode?: number }): number => (b.kind === 'building' ? (b.lode ?? 0) : lodeOfSite(s, b));
 
 const RANK: Record<Grade, number> = { old: 3, hill: 2, open: 1 };
 
@@ -69,13 +83,16 @@ export function bestSeam(s: GameState, b: { tx: number; ty: number; size: number
   // A people building in stone (#877) starts a shaft on stone on a tie: it is what the town waits on.
   const first: SeamId[] = deepQuarry(s, b.owner) ? ['stone', 'gold'] : ['gold', 'stone'];
   for (const m of [...first, ...SEAMS.filter((x) => x !== 'gold' && x !== 'stone')] as SeamId[]) {
-    if (can.includes(m) && (!best || RANK[g[m]!] > RANK[g[best]!])) best = m;
+    // A seam held only by the lode (#924 m3) is dug when chosen, never by default.
+    if (can.includes(m) && g[m] && (!best || RANK[g[m]!] > RANK[g[best]!])) best = m;
   }
   return best;
 }
 
 /** The seam a shaft digs now: its own choice while that still holds, else the best there (null: none its people may dig). */
 export function seamOf(s: GameState, b: Building): SeamId | null {
+  // A seam held only by the lode (#924 m3) is dug while its vein lasts; spent, the shaft goes back to the best of its ground.
+  if (b.seam && lodeOnly(s, b, b.seam) && veinLeft(b, LODE.oreLayer, b.seam) <= 0) return bestSeam(s, b);
   return b.seam && seamsAt(s, b).includes(b.seam) ? b.seam : bestSeam(s, b);
 }
 
@@ -91,6 +108,12 @@ export function shaftShare(s: GameState, b: { tx: number; ty: number; size: numb
 /** Why a shaft can't be set to dig this seam, or null. */
 export function seamProblem(s: GameState, b: Building, seam: SeamId): string | null {
   if (!(seam in SHAFT.seams)) return 'No such seam';
+  if (lodeOnly(s, b, seam)) {
+    if (!mineable(s.players[b.owner], TILE_OF_SEAM[seam])) return 'Your people quarries no stone';
+    if (depthOf(b) < LODE.oreLayer) return `The ${SHAFT.seams[seam].name.toLowerCase()} lies in ${STRATA[LODE.oreLayer].name.toLowerCase()}: sink the shaft that deep`;
+    if (veinLeft(b, LODE.oreLayer, seam) <= 0) return `The seam of ${SHAFT.seams[seam].name.toLowerCase()} is dug out`;
+    return null;
+  }
   if (!groundAt(s, b)[seam]) return `${SHAFT.seams[seam].name} is dug only where a vein of it was worked out`;
   if (!mineable(s.players[b.owner], TILE_OF_SEAM[seam])) return seam === 'gold' ? 'Your people mines no gold' : 'Your people quarries no stone';
   return null;
@@ -107,11 +130,27 @@ export function siteGrade(s: GameState, b: { tx: number; ty: number; size: numbe
 /** The deepest layer a shaft reaches (0: the first). A shaft from an older save stands in the first. */
 export const depthOf = (b: Building): number => Math.min(b.depth ?? 0, STRATA.length - 1);
 
+/**
+ * How much of a seam's vein a layer of this shaft held at first (#924 m3): the layer's own, scaled by the lode under it for
+ * stone and gold, and the lode's rare seam in its one layer.
+ */
+export function veinFull(b: { lode?: number }, layer: number, seam: SeamId): number {
+  const L = STRATA[layer];
+  if (!L) return 0;
+  const code = b.lode ?? 0;
+  if (oreOf(code) === seam && layer === LODE.oreLayer) return LODE.oreVein + (L.veins[seam] ?? 0);
+  const k = LODES[kindOf(code)];
+  const n = L.veins[seam] ?? 0;
+  return seam === 'stone' ? Math.round(n * k.stone) : seam === 'gold' ? Math.round(n * k.gold) : n;
+}
+
 /** How much of a seam's vein is left to dig in a layer of this shaft (0 where the layer holds none, or it is spent). */
 export function veinLeft(b: Building, layer: number, seam: SeamId): number {
-  const full = STRATA[layer]?.veins[seam] ?? 0;
-  return Math.max(0, full - (b.worked?.[layer]?.[seam] ?? 0));
+  return Math.max(0, veinFull(b, layer, seam) - (b.worked?.[layer]?.[seam] ?? 0));
 }
+
+/** The chance a full basket brings a layer of this shaft down while it is unshored: the layer's, scaled by the lode (#924 m3). */
+export const fallOf = (b: { lode?: number }, layer: number): number => (STRATA[layer]?.fall ?? 0) * LODES[kindOf(b.lode ?? 0)].fall;
 
 /** Take one load's worth from a layer's vein. */
 function takeVein(b: Building, layer: number, seam: SeamId): void {
@@ -127,10 +166,13 @@ function takeVein(b: Building, layer: number, seam: SeamId): void {
  */
 export function digShare(s: GameState, b: Building, seam: SeamId, layer: number): number {
   const floor = shaftShare(s, b, seam);
-  if (!floor) return 0;
+  const vein = veinLeft(b, layer, seam) > 0;
+  // A seam held only by the lode (#924 m3) has no plain grade: it digs where its vein lies, while it lasts.
+  if (!floor && !vein) return 0;
   const rush = safeAt(b, layer) ? 0 : STRATA[layer].rush;
-  if (veinLeft(b, layer, seam) <= 0) return floor + rush;
-  return Math.max(floor, SHAFT.grade[groundAt(s, b)[seam]!] + STRATA[layer].add) + rush;
+  if (!vein) return floor + rush;
+  const g = groundAt(s, b)[seam];
+  return Math.max(floor, (g ? SHAFT.grade[g] : LODE.oreGrade) + STRATA[layer].add + LODES[kindOf(b.lode ?? 0)].add) + rush;
 }
 
 // ---- Props, cave-ins and blasting (#924 m2) ----------------------------------------------------------------------
@@ -186,7 +228,7 @@ export function caveIn(s: GameState, b: Building, layer: number, why: 'fall' | '
 /** A full basket dug in an unshored layer: a roll of the match's dice whether the layer falls in. True if it did. */
 export function riskLoad(s: GameState, b: Building, layer: number): boolean {
   if (safeAt(b, layer)) return false;
-  if (roll(s) >= STRATA[layer].fall) return false;
+  if (roll(s) >= fallOf(b, layer)) return false;
   caveIn(s, b, layer, 'fall');
   return true;
 }
@@ -270,6 +312,8 @@ export function placeFor(s: GameState, b: Building, u: Unit, seam: SeamId, want?
   const open = (l: number) => l >= 0 && l <= depthOf(b) && at[l] < STRATA[l].room && !shutAt(s, b, l);
   if (want !== undefined && open(want) && veinLeft(b, want, seam) > 0) return want;
   for (let l = depthOf(b); l >= 0; l--) if (open(l) && veinLeft(b, l, seam) > 0) return l;
+  // A seam held only by the lode (#924 m3) is dug nowhere else: no place where its vein isn't.
+  if (lodeOnly(s, b, seam)) return -1;
   if (want !== undefined && open(want)) return want;
   for (let l = depthOf(b); l >= 0; l--) if (open(l)) return l;
   return -1;

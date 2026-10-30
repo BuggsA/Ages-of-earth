@@ -444,6 +444,8 @@ body.online .tip-box { bottom: 330px; }
 /* A short screen: the banner stays above the bottom panels. */
 @media (max-height: 560px) { .banner { top: 42%; } }
 .paused { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font: 800 clamp(32px, 5vw, 46px) 'Cinzel', serif; color: var(--gold); pointer-events: none; text-shadow: 0 3px 12px #000; }
+/* The underground view (#924 m3): one quiet line at the top while the surface is faded. */
+.underground-note { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); padding: 4px 12px; border-radius: 6px; background: rgba(28, 20, 14, 0.82); border: 1px solid #8a6a42; color: #e8d8b8; font-size: 13px; pointer-events: none; white-space: nowrap; }
 
 .dragbox { position: absolute; border: 1.5px solid #bfffb8; background: rgba(140, 255, 130, 0.1); pointer-events: none; z-index: 5; }
 .label-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
