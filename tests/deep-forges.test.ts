@@ -117,17 +117,20 @@ describe('a vent by every town (#884)', () => {
     expect(generateMap(7, 'small', 2, 'continental', true, true).vents).toEqual(generateMap(7, 'small', 2, 'continental', true, true).vents);
   });
 
-  it('takes a Vent Forge over a vent, one to a vent, nothing else on it, and a Deep Road people keeps the ground round it clear', () => {
+  it('takes a Vent Forge over a vent, one to a vent; once a people is on the Deep Road, nothing else on it or round it, for anyone', () => {
     const s = make();
     const v = s.vents![0];
     const at = forgeAt(s, v);
     expect(placeProblem(s, 'ventforge', at.tx + 3, at.ty, true, 0)).toBe('vent');
     expect(placeProblem(s, 'ventforge', at.tx + 1, at.ty + 1, true, 0)).toBeNull();
-    for (const type of ['house', 'barracks', 'wall'] as const) expect(placeProblem(s, type, v % s.w, Math.floor(v / s.w), true, 0)).toBe('hot');
-    // Beside it: open to a people off the road, kept clear by one on it.
-    expect(placeProblem(s, 'house', at.tx - 1, at.ty - 1, true, 0)).toBeNull();
-    s.players[0].walked = ['megaliths'];
-    expect(placeProblem(s, 'house', at.tx - 1, at.ty - 1, true, 0)).toBe('hot');
+    // Asleep while nobody walks the road: a house may stand on it.
+    expect(placeProblem(s, 'house', v % s.w, Math.floor(v / s.w), true, 0)).toBeNull();
+    s.players[1].walked = ['megaliths'];
+    for (const o of [0, -1]) {
+      for (const type of ['house', 'barracks', 'wall'] as const) expect(placeProblem(s, type, v % s.w, Math.floor(v / s.w), true, o)).toBe('hot');
+      expect(placeProblem(s, 'house', at.tx - 1, at.ty - 1, true, o)).toBe('hot');
+    }
+    expect(placeProblem(s, 'house', at.tx - 2, at.ty - 2, true, 0)).toBeNull();
     const f = forge(s);
     expect(ventOf(s, f)).toBe(v);
     expect(placeProblem(s, 'ventforge', at.tx, at.ty, true, 1)).toBe('blocked');

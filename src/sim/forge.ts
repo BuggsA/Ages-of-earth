@@ -6,7 +6,7 @@ import type { Building, GameState } from './types';
 
 /**
  * The Age of Deep Forges (#884, the Deep Road's fourth age). Mapgen lays a vent of the earth's heat by every town and a few out on the
- * map (`GameState.vents`); nothing is built on a vent but a Vent Forge, raised over it (`ventSpot`). While
+ * map (`GameState.vents`); a Vent Forge is raised over one, and once any people is on the Deep Road nothing else is (`ventSpot`). While
  * it stands hot (`forgeHot`) it drives every building of its people within `VENT.reach` tiles (`ventRate`, read by `workRate`); in the
  * age, a building out of every hot forge's reach works at `VENT.cold`. A forge goes cold while a rival's soldiers stand round its vent
  * and none of its people's do (`forgeStep`), and its people may let its steam out over the vent (`scald`), striking every rival round it
@@ -30,17 +30,17 @@ function ventUnder(s: GameState, tx: number, ty: number, n: number): number {
 /** The vent a Vent Forge stands over, or -1. */
 export const ventOf = (s: GameState, b: Building): number => (b.type === 'ventforge' ? ventUnder(s, b.tx, b.ty, b.size) : -1);
 
+/** Whether the vents are awake: some people has set out on the Deep Road (walked the Megaliths), so their ground is kept for forges. */
+export const ventsAwake = (s: GameState): boolean => !!s.vents && s.players.some((p) => hasWalked(p, 'megaliths'));
+
 /**
- * Why a building can't stand on this n-by-n square for the vents, or null: a Vent Forge goes over a vent (anywhere under it), and
- * nothing else goes on a vent. A people on the Deep Road (that has walked the Megaliths) keeps the eight tiles round every vent clear as
- * well, so its own town never shuts its forge out; a people that never took the road raises what it likes beside one.
+ * Why a building can't stand on this n-by-n square for the vents, or null: a Vent Forge goes over a vent (anywhere under it). Once the
+ * vents are awake, nothing else is raised on a vent or the eight tiles round it, so no town shuts a forge out; until then they lie
+ * quiet, and a building may stand on one (a forge waits for it to fall).
  */
-export function ventSpot(s: GameState, type: string, tx: number, ty: number, n: number, owner = -1): 'vent' | 'hot' | null {
+export function ventSpot(s: GameState, type: string, tx: number, ty: number, n: number): 'vent' | 'hot' | null {
   if (type === 'ventforge') return ventUnder(s, tx, ty, n) >= 0 ? null : 'vent';
-  if (!s.vents) return null;
-  if (ventUnder(s, tx, ty, n) >= 0) return 'hot';
-  const p = owner >= 0 ? s.players[owner] : undefined;
-  return p && hasWalked(p, 'megaliths') && ventUnder(s, tx - 1, ty - 1, n + 2) >= 0 ? 'hot' : null;
+  return ventsAwake(s) && ventUnder(s, tx - 1, ty - 1, n + 2) >= 0 ? 'hot' : null;
 }
 
 /** The top-left tile of a Vent Forge centred over this vent: its ground is kept open from the start. */

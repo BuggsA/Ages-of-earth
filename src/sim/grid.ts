@@ -183,8 +183,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     const o = landOwnerAt(s, tx + (n >> 1), ty + (n >> 1));
     if (o >= 0 && isEnemy(s, owner, o)) return 'foreign';
   }
-  // A vent (#884) takes a Vent Forge over it, and nothing else; a people on the Deep Road keeps the ground round it clear too.
-  const hot = ventSpot(s, type, tx, ty, n, owner);
+  // A vent (#884) takes a Vent Forge over it; once a people is on the Deep Road, nothing else goes on it or the ground round it.
+  const hot = ventSpot(s, type, tx, ty, n);
   if (hot) return hot;
   // A spring head (#701) is left open, for the channel dug from it.
   if (s.springs) for (const t of s.springs) if (t % s.w >= tx && t % s.w < tx + n && Math.floor(t / s.w) >= ty && Math.floor(t / s.w) < ty + n) return 'blocked';
