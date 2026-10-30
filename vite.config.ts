@@ -1,8 +1,25 @@
+import { readFileSync } from 'node:fs';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+import { sitePages } from './src/site/pages';
+
+/** The site's plain pages (src/site/pages.ts), written next to index.html in the build. */
+function sitePagesPlugin(): Plugin {
+  return {
+    name: 'site-pages',
+    apply: 'build',
+    generateBundle() {
+      const howto = /<div class="howto">\s*<ul>([\s\S]*?)<\/ul>/.exec(readFileSync('index.html', 'utf8'))?.[1];
+      if (!howto) this.error('site-pages: the How to play list in index.html moved');
+      for (const [fileName, source] of Object.entries(sitePages(howto))) this.emitFile({ type: 'asset', fileName, source });
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => ({
   // Relative asset paths so the build works from any static host path.
   base: './',
+  plugins: [sitePagesPlugin()],
   // Online rooms only let in browsers running the same build (the rules must match exactly).
   define: { __BUILD__: JSON.stringify(process.env.AGES_BUILD ?? Date.now().toString(36)) },
   build: {
