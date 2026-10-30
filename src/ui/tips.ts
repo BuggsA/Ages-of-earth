@@ -512,7 +512,7 @@ const TIPS: Tip[] = [
     id: 'wild',
     // The Age of the Wild (`docs/wild-road.md`): nothing tamed yet.
     when: (s, me) => ageOf(s.players[me]) === 'wild' && !s.players[me].tamed?.length,
-    text: `Your people keeps company with the wild now. Select a citizen and <b>right-click a wolf, boar or mammoth</b> to sing it calm: ${TAME.secs.wolf} seconds for a wolf, ${TAME.secs.boar} for a boar, ${TAME.secs.mammoth} for a mammoth, and it becomes yours, a beast of war. The beast stands still for its tamer, but its pack bites, so bring an escort. Once a kind is tamed, a <b>${BUILDINGS.den.name}</b> breeds more of it.`,
+    text: `Your people keeps company with the wild now. Select a citizen and <b>right-click a wolf, boar or mammoth</b> to sing it calm: ${TAME.secs.wolf} seconds for a wolf, ${TAME.secs.boar} for a boar, ${TAME.secs.mammoth} for a mammoth, and it becomes yours, a beast of war. The beast stands still for its tamer, but its pack bites, so bring an escort. Your <b>Hunting Camps call the wild in</b>: every ${TAME.callEvery} seconds a beast comes to each, the kind you have not tamed first, and a mammoth until you have one. Once a kind is tamed, a <b>${BUILDINGS.den.name}</b> breeds more of it.`,
   },
   {
     id: 'grove',
