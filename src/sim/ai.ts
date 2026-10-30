@@ -19,6 +19,8 @@ import { AI_COCKLE, DELVE, HENGE, MEGALITH, UNDER, VENT } from './data';
 import { canDelve, delveProblem, delvers } from './delve';
 import { hiddenFrom, sinkProblem, surfaceProblem } from './undercity';
 import { forgeAt, forgeHot, forgeOver, scaldProblem, ventOf } from './forge';
+import { engineIdle, faultProblem } from './fault';
+import { FAULT } from './data';
 import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
@@ -342,6 +344,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   delveWork(s, v, mem, issue);
   underWork(s, v, mem, issue);
   forgeWork(s, v, mem, issue);
+  faultWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
   leviathanWork(s, v, mem, issue);
@@ -726,6 +729,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'forges') {
     // The Deep Road's fourth age (#884): a people that lived below goes on down to the earth's heat, on a coin of its own.
     roads[to] = hasWalked(p, 'undercity') && coin(s, p.id, 0xde14) < VENT.take;
+  } else if (roads[to] === undefined && to === 'faults') {
+    // The Deep Road's fifth age (#900): a people that worked the earth's heat goes on to break the land, on a coin of its own.
+    roads[to] = hasWalked(p, 'forges') && coin(s, p.id, 0xde15) < FAULT.take;
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
@@ -915,6 +921,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'undercity' && s.tick - (mem.under?.since ?? s.tick) < secs(UNDER.stay)) return null;
   // The Deep Forges (#884) are kept a while, so its forges are raised and drive the town.
   if (walksWeb(v) && ageOf(p) === 'forges' && s.tick - (mem.forges?.since ?? s.tick) < secs(VENT.stay)) return null;
+  // The Faults (#900) are kept a while, so an engine is raised and cracks the ground at least once.
+  if (walksWeb(v) && ageOf(p) === 'faults' && s.tick - (mem.faults?.since ?? s.tick) < secs(FAULT.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
@@ -4394,6 +4402,77 @@ function forgeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     if (!construct(s, v, mem, 'ventforge', at, 3, issue)) spend(v, buildingCostFor(s, p.id, 'ventforge'));
     return;
   }
+}
+
+/**
+ * The Age of Faults (#900): a Fault Engine by the vent nearest home; then a crack across the way a rival army comes, once `FAULT.aiArmy`
+ * of its soldiers are seen within `FAULT.aiNear` tiles of home (between them and the town, square to their road), else under the rival
+ * building it sees nearest home in the engine's reach.
+ */
+function faultWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!v.tc || !ageDef(p).faults || !s.vents) return;
+  const f = (mem.faults ??= { since: s.tick, crack: -99999 });
+  const engines = v.buildings.filter((b) => b.type === 'faultengine');
+  const d2 = (x: number, y: number) => (x - v.home.x) * (x - v.home.x) + (y - v.home.y) * (y - v.home.y);
+  if (!engines.length) {
+    if (s.tick - (mem.ordered.faultengine ?? -99999) < secs(30)) return;
+    const vents = s.vents.filter((t) => d2((t % s.w) + 0.5, Math.floor(t / s.w) + 0.5) <= VENT.aiFrom * VENT.aiFrom).sort((a, b) => d2((a % s.w) + 0.5, Math.floor(a / s.w) + 0.5) - d2((b % s.w) + 0.5, Math.floor(b / s.w) + 0.5) || a - b);
+    for (const t of vents) {
+      const spot = findSpot(s, 'faultengine', (t % s.w) + 0.5, Math.floor(t / s.w) + 0.5, 3, FAULT.tap - 2);
+      if (!spot) continue;
+      if (!construct(s, v, mem, 'faultengine', spot, 3, issue)) spend(v, buildingCostFor(s, p.id, 'faultengine'));
+      return;
+    }
+    return;
+  }
+  const eng = engines.find((b) => b.built && !engineIdle(s, b));
+  if (!eng || s.tick - f.crack < secs(5) || !afford(v, FAULT.cost)) return;
+  // A line `FAULT.len` long through (`mx`, `my`), square to the way from home to there.
+  const across = (mx: number, my: number): { x0: number; y0: number; x1: number; y1: number } | null => {
+    const dx = mx - v.home.x;
+    const dy = my - v.home.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 1) return null;
+    const half = FAULT.len / 2 - 0.5;
+    const nx = (-dy / d) * half;
+    const ny = (dx / d) * half;
+    const line = { x0: Math.floor(mx + nx), y0: Math.floor(my + ny), x1: Math.floor(mx - nx), y1: Math.floor(my - ny) };
+    return faultProblem(s, p.id, eng, line.x0, line.y0, line.x1, line.y1) ? null : line;
+  };
+  let n = 0;
+  let sx = 0;
+  let sy = 0;
+  const r2 = FAULT.aiNear * FAULT.aiNear;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !MILITARY.includes(e.type) || domainOf(e.type) !== 'land' || !isEnemy(s, p.id, e.owner)) continue;
+    if (d2(e.x, e.y) > r2 || !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    n++;
+    sx += e.x;
+    sy += e.y;
+  }
+  let line: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  if (n >= FAULT.aiArmy) {
+    // Between the army and the town: a few tiles short of where it stands, toward home.
+    const ax = sx / n;
+    const ay = sy / n;
+    const d = Math.sqrt(d2(ax, ay));
+    const k = d > 8 ? (d - 3) / d : 0.6;
+    line = across(v.home.x + (ax - v.home.x) * k, v.home.y + (ay - v.home.y) * k);
+  }
+  if (!line) {
+    const reach = FAULT.reach - 2;
+    let best: Building | null = null;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || hiddenFrom(s, e, p.id)) continue;
+      if ((e.x - eng.x) * (e.x - eng.x) + (e.y - eng.y) * (e.y - eng.y) > reach * reach || !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+      if (!best || d2(e.x, e.y) < d2(best.x, best.y)) best = e;
+    }
+    if (best) line = across(best.x, best.y);
+  }
+  if (!line) return;
+  issue({ t: 'fault', p: p.id, building: eng.id, ...line });
+  f.crack = s.tick;
 }
 
 /**

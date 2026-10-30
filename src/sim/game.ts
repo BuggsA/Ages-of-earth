@@ -1,5 +1,6 @@
 import { inert, underStep } from './undercity';
 import { forgeStep } from './forge';
+import { faultStep } from './fault';
 import { delveStep } from './delve';
 import { hengeStep } from './henge';
 import { callWild } from './tame';
@@ -706,6 +707,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   delveStep(s, ungarrison);
   underStep(s);
   forgeStep(s);
+  faultStep(s);
   sluiceStep(s);
   siloStep(s);
   sortieStep(s);

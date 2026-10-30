@@ -4,6 +4,7 @@ import { AGES, BUILDINGS, CIVS, DAM, GOLDEN, LIGHTNING, LOWER_IS_BETTER, PATHS, 
 import { KEYS, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
 import { coastHeld, driven } from './water';
 import { ventRate } from './forge';
+import { overChasm } from './fault';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -37,7 +38,7 @@ const boon = (key: keyof Mods, v: number): boolean => (LOWER_IS_BETTER.includes(
 /** What an age's verbs are, beyond its numbers and its doors: carried whole into a Golden Age. */
 const VERB_KEYS = [
   'hire', 'mobile', 'packs', 'caravans', 'relicTrade', 'ironTrade', 'forge', 'coils', 'callUp', 'haul', 'blood', 'hemocraft', 'rite', 'fission', 'fusion',
-  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards', 'heel', 'henges', 'delves', 'sinks', 'vents',
+  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards', 'heel', 'henges', 'delves', 'sinks', 'vents', 'faults',
 ] as const;
 
 const woven = new Map<string, Age>();
@@ -530,6 +531,8 @@ export const suspendedBelow = (p: Player, tier: number): TechId[] => p.techs.fil
  */
 export function asleep(s: GameState, b: Building): boolean {
   const only = BUILDINGS[b.type].ages;
+  // A Bridge over a chasm (#900) is any people's who may lay one there: it never sleeps.
+  if (b.type === 'bridge' && overChasm(s, b)) return false;
   // A keepsake (#555 s11) never sleeps.
   return !!only && !b.keep && !only.some((a) => standsIn(s.players[b.owner], a)) && !ageDef(s.players[b.owner]).carries?.includes(b.type);
 }
