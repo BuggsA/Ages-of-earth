@@ -7,8 +7,9 @@
  * Props and cave-ins (#924 m2): an unshored layer that may fall in shows cracks across it; a shored one, timber props at the
  * shaft's sides with a cap beam over the face; a layer shut by a cave-in, rubble heaped over its face and a darker band.
  */
-import { STRATA, SHAFT } from '../sim/data';
-import { crewOf, deepeningLeft, depthOf, digShare, safeAt, seamOf, shutLeft, veinLeft } from '../sim/shafts';
+import { LODES, STRATA, SHAFT } from '../sim/data';
+import { kindOf, lodeName } from '../sim/lodes';
+import { SEAMS, crewOf, deepeningLeft, depthOf, digShare, fallOf, safeAt, seamOf, shutLeft, veinFull, veinLeft } from '../sim/shafts';
 import type { Building, GameState, SeamId } from '../sim/types';
 
 const W = 116;
@@ -19,8 +20,25 @@ const TOP = 26;
 const SX = 52;
 const SW = 12;
 
-/** A seam's glint colour (stone and gold for now; a later seam adds one). */
-const GLINT: Partial<Record<SeamId, string>> = { stone: '#e6e0d2', gold: '#ffd24a' };
+/** A seam's glint colour (a later seam adds one). */
+const GLINT: Partial<Record<SeamId, string>> = { stone: '#e6e0d2', gold: '#ffd24a', salt: '#f4f6f8', saltpetre: '#b8e0d0', bloodiron: '#c0303a' };
+
+/** The seams a layer of this ground holds, and how much of each at first (#924 m3: the lode scales them). */
+const veinsIn = (b: { lode?: number }, l: number): [SeamId, number][] => SEAMS.map((m) => [m, veinFull(b, l, m)] as [SeamId, number]).filter(([, n]) => n > 0);
+
+/**
+ * What a core sample reads (#924 m3): the ground below a spot, layer by layer, in the cut-away's words. The hover tip on a
+ * core's striped column.
+ */
+export function coreTip(code: number): string {
+  const k = LODES[kindOf(code)];
+  const rows = STRATA.map((L, l) => {
+    const veins = veinsIn({ lode: code }, l).map(([m, n]) => `${n} ${SHAFT.seams[m].name.toLowerCase()}`).join(', ') || 'no vein';
+    const fall = fallOf({ lode: code }, l);
+    return `<span style="color:${L.tint}">■</span> ${L.name}: ${veins}${fall > 0 ? `; ${Math.round(fall * 100)}% cave-in a basket unshored` : ''}`;
+  });
+  return `<b>Core sample · ${lodeName(code, (m) => SHAFT.seams[m].name)}</b>${k.blurb[0].toUpperCase()}${k.blurb.slice(1)}${k.add > 0 ? `, ${Math.round(k.add * 100)} points faster while a vein lasts` : ''}.<br>${rows.join('<br>')}<br>A shaft sunk on this patch digs what it shows.`;
+}
 
 /** Mix a #rrggbb colour toward another by `t` (0..1). */
 function mix(a: string, b: string, t: number): string {
@@ -41,7 +59,7 @@ function spot(l: number, k: number, y0: number, h: number): [number, number] {
 function veinsOf(b: Building, l: number): { left: number; full: number } {
   let left = 0;
   let full = 0;
-  for (const [m, n] of Object.entries(STRATA[l].veins) as [SeamId, number][]) {
+  for (const [m, n] of veinsIn(b, l)) {
     full += n;
     left += veinLeft(b, l, m);
   }
@@ -73,19 +91,20 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
     const band = `M0 ${y0 + j(0)} L${W * 0.3} ${y0 + j(1)} L${W * 0.62} ${y0 + j(2)} L${W} ${y0 + j(3)} V${y0 + h + 1} H0Z`;
     const facet = `M0 ${y0 + h * 0.55} L${W * 0.22} ${y0 + h} H0Z M${W} ${y0 + h * 0.35} L${W * 0.74} ${y0 + h} H${W}Z`;
     const glints: string[] = [];
-    for (const [m, nv] of Object.entries(L.veins) as [SeamId, number][]) {
+    for (const [m, nv] of veinsIn(b, l)) {
       const c = GLINT[m];
       if (!c || !nv) continue;
-      const shown = Math.ceil((veinLeft(b, l, m) / nv) * 4);
-      for (let k = 0; k < shown; k++) {
-        const [x, y] = spot(l, k + (m === 'gold' ? 4 : 0), y0, h);
+      // Four glints for a plain layer's vein; more on rich ground (#924 m3), fewer on poor.
+      const shown = Math.ceil((veinLeft(b, l, m) / Math.max(1, STRATA[l].veins[m] ?? nv)) * 4);
+      for (let k = 0; k < Math.min(shown, 8); k++) {
+        const [x, y] = spot(l, k + (m === 'gold' ? 8 : m === 'stone' ? 0 : 16), y0, h);
         glints.push(`<path d="M${x.toFixed(1)} ${(y - 2.2).toFixed(1)} l2 2.2 l-2 2.2 l-2 -2.2Z" fill="${c}"/>`);
       }
     }
     const room = L.room;
     // Props, cracks and rubble (#924 m2), drawn only in the layers reached.
     const shut = reached ? shutLeft(s, b, l) : 0;
-    const risky = reached && L.fall > 0 && !safeAt(b, l);
+    const risky = reached && fallOf(b, l) > 0 && !safeAt(b, l);
     const shored = reached && L.fall > 0 && safeAt(b, l);
     const marks: string[] = [];
     if (risky) {
@@ -106,8 +125,8 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
       const rock = mix(L.tint, '#2a2a2a', 0.35);
       marks.push(`<path d="M${SX - 26} ${yb} L${SX - 18} ${yb - h * 0.55} L${SX - 9} ${yb - h * 0.4} L${SX - 2} ${yb - h * 0.7} L${SX} ${yb}Z M${SX + SW} ${yb} L${SX + SW + 4} ${yb - h * 0.6} L${SX + SW + 13} ${yb - h * 0.45} L${SX + SW + 24} ${yb}Z" fill="${rock}" stroke="#1a120c" stroke-width="0.6"/>`);
     }
-    const state = shut > 0 ? ` Caved in: cleared in ${shut} seconds, or at once if shored.` : risky ? ` Unshored: ${Math.round(L.rush * 100)} points faster, a ${Math.round(L.fall * 100)}% chance of a cave-in each basket. Shore it (P).` : shored ? ' Shored with props.' : '';
-    const tip = `<b>${L.name}</b>${reached ? '' : `Sink the shaft to reach it (${Object.entries(L.sink).map(([r, v]) => `${v} ${r}`).join(', ')}, ${L.time} seconds). `}${(Object.entries(L.veins) as [SeamId, number][]).map(([m, v]) => `${SHAFT.seams[m].name}: ${veinLeft(b, l, m)} of ${v} left`).join(', ') || 'No vein'}. Room for ${room} miners${reached ? `, ${at[l]} here` : ''}.${reached && seam ? ` Digs ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}%.` : ''}${state}${reached && !shut ? ' Click to send a miner here.' : ''}`;
+    const state = shut > 0 ? ` Caved in: cleared in ${shut} seconds, or at once if shored.` : risky ? ` Unshored: ${Math.round(L.rush * 100)} points faster, a ${Math.round(fallOf(b, l) * 100)}% chance of a cave-in each basket. Shore it (P).` : shored ? ' Shored with props.' : '';
+    const tip = `<b>${L.name}</b>${reached ? '' : `Sink the shaft to reach it (${Object.entries(L.sink).map(([r, v]) => `${v} ${r}`).join(', ')}, ${L.time} seconds). `}${veinsIn(b, l).map(([m, v]) => `${SHAFT.seams[m].name}: ${veinLeft(b, l, m)} of ${v} left`).join(', ') || 'No vein'}. Room for ${room} miners${reached ? `, ${at[l]} here` : ''}.${reached && seam ? ` Digs ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}%.` : ''}${state}${reached && !shut ? ' Click to send a miner here.' : ''}`;
     const dark = shut > 0 ? `<path d="${band}" fill="#000" opacity="0.28"/>` : '';
     parts.push(`<g data-layer="${l}" data-shaft="${b.id}" data-tip="${tip.replace(/"/g, '&quot;')}" opacity="${op}" class="${reached ? 'cut-reach' : ''}"><path d="${band}" fill="${fill}"/><path d="${facet}" fill="#000" opacity="0.12"/>${glints.join('')}${dark}${marks.join('')}${worked ? `<path d="M0 ${y0 + 0.5} H${W}" stroke="#fff" stroke-opacity="0.35" stroke-width="1"/>` : ''}</g>`);
   }
@@ -134,7 +153,10 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
       parts.push(`<g><rect x="${x - 1.6}" y="${y - 6}" width="3.2" height="5" rx="1" fill="${color}"/><circle cx="${x}" cy="${y - 7.6}" r="1.6" fill="#f0d8b0"/><path d="M${x + (left ? -1 : 1)} ${y - 5} l${left ? -3 : 3} -2" stroke="#ddd" stroke-width="0.8"/></g>`);
     }
   }
+  // The lode (#924 m3): its name in a small tag on the sky, in its own colour.
+  const lode = b.lode ?? 0;
+  parts.push(`<g data-tip="${coreTip(lode).replace(/"/g, '&quot;')}"><rect x="2" y="2" width="5" height="5" rx="1" fill="${LODES[kindOf(lode)].tint}" stroke="#0008" stroke-width="0.6"/><text x="9" y="6.6" font-size="7" fill="#e8e0d0" font-family="sans-serif">${LODES[kindOf(lode)].name}</text></g>`);
   const svg = `<svg class="cutaway${open ? ' cut-open' : ''}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="The shaft, cut away">${parts.join('')}</svg>`;
-  const key = `${depth}:${sinking}:${at.join(',')}:${STRATA.map((_, l) => Math.ceil(veinsOf(b, l).left / 10)).join(',')}:${seam}:${open}:${STRATA.map((_, l) => `${safeAt(b, l) ? 1 : 0}${shutLeft(s, b, l)}`).join(',')}`;
+  const key = `${lode}:${depth}:${sinking}:${at.join(',')}:${STRATA.map((_, l) => Math.ceil(veinsOf(b, l).left / 10)).join(',')}:${seam}:${open}:${STRATA.map((_, l) => `${safeAt(b, l) ? 1 : 0}${shutLeft(s, b, l)}`).join(',')}`;
   return { svg, key };
 }

@@ -34,6 +34,8 @@ import { gateHead, gateReach, gateWorks, pondBehind, tideGateProblem } from '../
 import { TIDE_GATE } from '../sim/data';
 import { COCKLER } from '../sim/data';
 import { COCKLE } from '../sim/data';
+import { CORE, LODE, LODES } from '../sim/data';
+import { coresOf, drillingLeft, kindOf, lodeName } from '../sim/lodes';
 import { R_COCKLE } from '../sim/types';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
@@ -42,7 +44,7 @@ import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
 import { kinCount, kinProblem, vowProblem, wayBarred, wayProblem } from '../sim/ways';
 import { catchIn, snareCap, snareFull, snareRate, snareWoods } from '../sim/snares';
 import { beaconProblem, lit } from '../sim/beacon';
-import { SEAMS, blastProblem, crewOf, deepenProblem, deepeningLeft, depthOf, digShare, groundAt, propProblem, roomOf, safeAt, seamOf, seamProblem, seamsAt, shaftShare, shutLeft, toShore, veinLeft, winchHurt } from '../sim/shafts';
+import { SEAMS, blastProblem, crewOf, deepenProblem, deepeningLeft, depthOf, digShare, fallOf, lodeOnly, veinFull, groundAt, propProblem, roomOf, safeAt, seamOf, seamProblem, seamsAt, shaftShare, shutLeft, toShore, veinLeft, winchHurt } from '../sim/shafts';
 import { cutaway } from './cutaway';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
@@ -59,7 +61,7 @@ import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
 import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
-import type { AgeId, BloomSeed, KeyId, RareId, SeamId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { AgeId, BloomSeed, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { hiveLine, keepsBees } from '../sim/hive';
 import { heartBarred, heartLine, heartOf, rootProblem, wakesForest } from '../sim/wildwood';
@@ -103,6 +105,8 @@ export interface HudActions {
   launchMode(silo: number, w?: WarheadKind | 'salvo'): void;
   /** Wait for a left click on the map, for this Seed Spire to sling its Bloom Seed at (the Age of the Bloom). */
   slingMode(spire: number): void;
+  /** A Prospector's Lodge's core sample (#924 m3): the next click on the map is where it drills. */
+  coreMode(lodge: number): void;
   /** Wait for a left click on a building to shelter in (or a transport to board). */
   garrisonMode(): void;
   /** Wait for a left click on a shore to land a transport's passengers. */
@@ -570,6 +574,12 @@ export class Hud {
   }
 
   /** Press a command's hotkey. Returns whether one was found. */
+  /** Whether the command card has an open (not shut) button on this key. */
+  hasOpenKey(key: string): boolean {
+    const k = key.toUpperCase();
+    return this.cmds.some((x) => x.key === k && x.ok);
+  }
+
   hotkey(key: string): boolean {
     const k = key.toUpperCase();
     // Two buttons may share a key where one is shut (the Pontoon takes the House's E in the Age of Floating Cities, #770): the open one wins.
@@ -1288,7 +1298,13 @@ export class Hud {
     }
     else if (b.type === 'house' && b.built && isHousehold(p)) status = `<span data-tip="<b>The household tax</b>Each house pays gold in proportion to how full your town is, and more for every house on its street (a Market counts as two): a lane apart is a street.">🏮 ${streetOf(s, b)} on its street</span>`;
     else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
-    else if (b.type === 'prospector' && b.built && prospected(p)) status = prospectLine(s, p);
+    else if (b.type === 'prospector' && b.built) {
+      // Core samples (#924 m3): the one it is drilling, and how many its people has drawn.
+      const left = drillingLeft(s, b);
+      const drawn = coresOf(s, b.owner).length;
+      const cores = left > 0 ? `🪨 Drilling a core: ${left}s` : drawn ? `🪨 ${drawn} core${drawn > 1 ? 's' : ''} drawn: U to see the ground` : '';
+      status = [prospected(p) ? prospectLine(s, p) : '', cores].filter(Boolean).join(' · ') || 'Ready';
+    }
     else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * Math.round(RELIC.gold * modsOf(s, b.owner).relicGold) * keptIn(s, b))} a minute`;
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
     // A building of other ages (#555 s10): it stands idle until its people returns to them.
@@ -1999,12 +2015,18 @@ export class Hud {
           const why = slingProblem(s, viewer, b, b.x, b.y);
           cmds.push({ key: 'G', pic: '', glyph: '🌱', title: 'Sling Seed', desc: `Then click anywhere on the map: the Bloom Seed flies ${BLOOM.flight} seconds, every player seeing where it falls, and roots on the open ground nearest that point. ${BLOOM.grow} seconds later every rival building within ${BLOOM.r} tiles of its heart-root cracks, and forest grows where they stood, unless rival citizens beside the root hack it out first (${BLOOM.root} strokes, one a second for each). Guard it. The next Seed ripens ${BLOOM.ripen} seconds after, while your Heart Tree stands.`, cost: BLOOM.fuel, ok: !why, why: why ?? undefined, run: () => this.act.slingMode(b.id) });
         }
+        // A Prospector's Lodge drills a core sample (#924 m3).
+        if (b.type === 'prospector' && b.built) {
+          const left = drillingLeft(s, b);
+          const why = left > 0 ? `Drilling a core: ${left}s` : shortfall(p, CORE.cost);
+          cmds.push({ key: 'C', pic: '', glyph: '🪨', title: 'Core sample', desc: `Then click any ground your people has seen: the prospectors drill there for ${CORE.time} seconds and draw up a core, a striped column of the layers below. Hover it to read what lies under that patch of ground, layer by layer: a gold reef, good building stone, poor ground, sound rock that holds its roof, shattered ground that falls in, and now and then a seam of a rare ore in ${STRATA[LODE.oreLayer].name.toLowerCase()}. The ground round every town is common ground; the rich and the poor lie out on the map. A Mine Shaft sunk on that patch digs what the core shows. Press U to see the ground below. One core at a time; your ${CORE.most} latest are kept.`, cost: CORE.cost, ok: !why, why: why ?? undefined, run: () => this.act.coreMode(b.id) });
+        }
         // Sink a Mine Shaft a layer deeper (#924 m1).
         if (b.type === 'shaft' && b.built) {
           const next = STRATA[depthOf(b) + 1];
           if (next) {
             const why = deepenProblem(s, b) ?? shortfall(p, next.sink);
-            cmds.push({ key: 'D', pic: '', glyph: '⛏', title: `Sink to ${next.name}`, desc: `Sink the shaft a layer deeper, to ${next.name.toLowerCase()}: ${next.time} seconds, and it digs nothing meanwhile. ${(Object.entries(next.veins) as [SeamId, number][]).map(([m, v]) => `${v} ${SHAFT.seams[m].name.toLowerCase()}`).join(' and ')} to dig there, ${Math.round(next.add * 100)} points faster than the plain grade while it lasts, with room for ${next.room} more miners. The layers above stay open.${next.fall > 0 ? ` It opens unshored: shore it (P) or risk a cave-in.` : ''}`, cost: next.sink, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'deepen', p: viewer, building: b.id }), this.act.sound('queue')) });
+            cmds.push({ key: 'D', pic: '', glyph: '⛏', title: `Sink to ${next.name}`, desc: `Sink the shaft a layer deeper, to ${next.name.toLowerCase()}: ${next.time} seconds, and it digs nothing meanwhile. ${SEAMS.filter((m) => veinFull(b, depthOf(b) + 1, m) > 0).map((m) => `${veinFull(b, depthOf(b) + 1, m)} ${SHAFT.seams[m].name.toLowerCase()}`).join(' and ')} to dig there, ${Math.round((next.add + LODES[kindOf(b.lode ?? 0)].add) * 100)} points faster than the plain grade while it lasts, with room for ${next.room} more miners. The layers above stay open.${next.fall > 0 ? ` It opens unshored: shore it (P) or risk a cave-in.` : ''}`, cost: next.sink, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'deepen', p: viewer, building: b.id }), this.act.sound('queue')) });
             // Blasting (#924 m2): the layer opened at once with powder, from the Gunpowder Age; shown an age ahead, so it is looked for.
             if (p.epoch >= SHAFT.blastAge - 1) {
               const bwhy = blastProblem(s, b) ?? shortfall(p, next.blast);
@@ -2018,7 +2040,7 @@ export class Hud {
           if (l > 0) {
             const L = STRATA[l];
             const pwhy = propProblem(b, l) ?? shortfall(p, L.prop);
-            cmds.push({ key: 'P', pic: '', glyph: '🪵', title: `Shore ${L.name}`, desc: `Prop ${L.name.toLowerCase()} with timber: safe for good, at the plain pace of its vein, and a cave-in's rubble there is cleared at once. Unshored, its miners dig ${Math.round(L.rush * 100)} points faster, but each full basket has a ${Math.round(L.fall * 100)}% chance of bringing the roof down on everyone at its face; the layer is then shut ${SHAFT.shut} seconds.`, cost: L.prop, ok: !pwhy, why: pwhy ?? undefined, run: () => (this.act.issue({ t: 'prop', p: viewer, building: b.id, layer: l }), this.act.sound('queue')) });
+            cmds.push({ key: 'P', pic: '', glyph: '🪵', title: `Shore ${L.name}`, desc: `Prop ${L.name.toLowerCase()} with timber: safe for good, at the plain pace of its vein, and a cave-in's rubble there is cleared at once. Unshored, its miners dig ${Math.round(L.rush * 100)} points faster, but each full basket has a ${Math.round(fallOf(b, l) * 100)}% chance of bringing the roof down on everyone at its face; the layer is then shut ${SHAFT.shut} seconds.`, cost: L.prop, ok: !pwhy, why: pwhy ?? undefined, run: () => (this.act.issue({ t: 'prop', p: viewer, building: b.id, layer: l }), this.act.sound('queue')) });
           }
         }
         // The seam a Mine Shaft digs (#681).
@@ -2029,7 +2051,10 @@ export class Hud {
             if (!can.includes(m)) return;
             const why = seamProblem(s, b, m);
             const name = SHAFT.seams[m].name;
-            cmds.push({ key: 'QWERT'[i], pic: '', glyph: m === 'gold' ? '🪙' : m === 'stone' ? '🪨' : '💎', title: `Dig ${name.toLowerCase()}`, desc: `Set this shaft to dig ${name.toLowerCase()} at ${Math.round(shaftShare(s, b, m) * 100)}% of an open deposit's pace${m === 'gold' || m === 'stone' ? '' : ', over the old workings of that vein'}. Its miners switch at the next trip.`, ok: !why, why: why ?? undefined, on: now === m, run: () => (this.act.issue({ t: 'seam', p: viewer, building: b.id, seam: m }), this.act.sound('queue')) });
+            const seamDesc = lodeOnly(s, b, m)
+              ? `Set this shaft to dig the seam of ${name.toLowerCase()} the ground holds in ${STRATA[LODE.oreLayer].name.toLowerCase()}: ${veinLeft(b, LODE.oreLayer, m)} of it left, at ${Math.round(digShare(s, b, m, LODE.oreLayer) * 100)}% of an open deposit's pace, and only there, while it lasts. Its miners switch at the next trip.`
+              : `Set this shaft to dig ${name.toLowerCase()} at ${Math.round(shaftShare(s, b, m) * 100)}% of an open deposit's pace${m === 'gold' || m === 'stone' ? '' : ', over the old workings of that vein'}. Its miners switch at the next trip.`;
+            cmds.push({ key: 'QWERT'[i], pic: '', glyph: m === 'gold' ? '🪙' : m === 'stone' ? '🪨' : '💎', title: `Dig ${name.toLowerCase()}`, desc: seamDesc, ok: !why, why: why ?? undefined, on: now === m, run: () => (this.act.issue({ t: 'seam', p: viewer, building: b.id, seam: m }), this.act.sound('queue')) });
           });
         }
         if (b.type === 'tower') {
@@ -2158,6 +2183,24 @@ export class Hud {
     this.tipEl.classList.add('hidden');
   }
 
+  /** A tip for something on the map (a core sample, #924 m3), by the pointer; null hides it if it is one of these. */
+  worldTip(html: string | null, x: number, y: number): void {
+    if (!html) {
+      if (this.tipEl.dataset.world) {
+        delete this.tipEl.dataset.world;
+        this.hideTip();
+      }
+      return;
+    }
+    this.tipFor = null;
+    this.tipEl.dataset.world = '1';
+    if (this.tipEl.innerHTML !== html) this.tipEl.innerHTML = html;
+    this.tipEl.classList.remove('hidden');
+    const r = this.tipEl.getBoundingClientRect();
+    this.tipEl.style.left = `${Math.max(6, Math.min(x + 14, window.innerWidth - r.width - 6))}px`;
+    this.tipEl.style.top = `${Math.max(6, Math.min(y - r.height - 12 < 46 ? y + 18 : y - r.height - 12, window.innerHeight - r.height - 6))}px`;
+  }
+
   /** Forget cached panels (after a new match starts). */
   reset(): void {
     this.selSig = '';
@@ -2184,7 +2227,8 @@ function shaftLine(s: GameState, b: Building): string {
   const vein = veinLeft(b, l, seam);
   const grade = groundAt(s, b)[seam]!;
   const ground = { old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[grade];
-  const tip = `<b>${ground}</b>A shaft digs at ${Math.round(SHAFT.grade[grade] * 100)}% of an open deposit's pace on its ground (old workings, a deposit worked out nearby, are best, then rock beside it, then plain ground), and faster while a layer's vein lasts. A spent vein still digs at the plain pace. Sink it deeper (D) for richer layers. Below the first, a layer dug unshored is faster but may fall in: shore it (P).`;
+  const lode = lodeName(b.lode ?? 0, (m) => SHAFT.seams[m].name);
+  const tip = `<b>${ground} · ${lode}</b>The ground below: ${LODES[kindOf(b.lode ?? 0)].blurb}. A shaft digs at ${Math.round(SHAFT.grade[grade] * 100)}% of an open deposit's pace on its ground (old workings, a deposit worked out nearby, are best, then rock beside it, then plain ground), and faster while a layer's vein lasts. A spent vein still digs at the plain pace. Sink it deeper (D) for richer layers. Below the first, a layer dug unshored is faster but may fall in: shore it (P). What lies below differs from place to place: a Prospector's Lodge's core sample shows it before you sink.`;
   // The one hazard worth a word (#924 m2): a layer shut by a cave-in, a hurt winch, or the worked layer unshored.
   const shut = STRATA.findIndex((_, k) => shutLeft(s, b, k) > 0);
   const warn = shut >= 0 ? ` · ${STRATA[shut].name.toLowerCase()} caved in: ${shutLeft(s, b, shut)}s` : winchHurt(s, b) ? ' · winch hurt: slow haul' : !safeAt(b, l) ? ' · unshored' : '';

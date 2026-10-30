@@ -3,7 +3,7 @@ import { engineLimit, fault, faultProblem, isChasm, spanOpen } from './fault';
 import { heaveProblem, quakeProblem, raiseRidge, stoneLimit, swallow, swallowProblem, wake } from './living';
 import { hiddenFrom, inert, sink, sinkProblem, surface, surfaceProblem } from './undercity';
 import { delve, delveProblem } from './delve';
-import { AUTO_WORK, BUILDINGS, FAULT, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, STRATA, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, CORE, FAULT, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, STRATA, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { inBounds, placeProblem, stampBuilding, walkable } from './grid';
@@ -14,6 +14,7 @@ import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, jou
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
 import { blast, blastProblem, crewOf, deepen, deepenProblem, depthOf, prop, propProblem, resOfSeam, roomLeft, seamOf, seamProblem, shutAt, veinLeft } from './shafts';
+import { coreProblem, drawCore } from './lodes';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, isCarrier, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
@@ -831,6 +832,18 @@ export function applyCommand(s: GameState, c: Command): void {
       if (short) return refuse(s, c.p, short);
       pay(p, cost);
       prop(b, c.layer);
+      break;
+    }
+    case 'core': {
+      // A Prospector's Lodge drills a core sample (#924 m3).
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = coreProblem(s, c.p, b, c.x, c.y);
+      if (why) return refuse(s, c.p, why);
+      const short = shortfall(p, CORE.cost);
+      if (short) return refuse(s, c.p, short);
+      pay(p, CORE.cost);
+      drawCore(s, c.p, b, c.x, c.y);
       break;
     }
     case 'toLayer': {

@@ -79,6 +79,8 @@ export class BuildingsView {
   /** Every building the viewer knows of, kept up to date while it is in sight. */
   readonly known = new Map<number, Known>();
   private colors: string[] = [];
+  /** The underground view (#924 m3): only buildings of this type are drawn (the pitheads), or all when null. */
+  only: BuildingType | null = null;
 
   setColors(colors: string[]): void {
     this.colors = colors;
@@ -156,6 +158,7 @@ export class BuildingsView {
         v = this.make(s, k, key);
         this.views.set(id, v);
       }
+      v.group.visible = !this.only || k.type === this.only;
       // Rising out of its scaffolding.
       const p = k.built ? 1 : k.progress;
       v.body.visible = p > 0.02 || k.type === 'farm';
