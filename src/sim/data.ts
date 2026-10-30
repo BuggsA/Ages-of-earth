@@ -1011,6 +1011,135 @@ export const AGES: Record<AgeId, Age> = {
   },
 };
 
+/**
+ * Here, because (the owner, 2026-10-30: an age should give the player a reason to choose it, and "this age is useful here,
+ * because…"): the situations that favour or hurt each age, read by `fitsOf` (`src/sim/fit.ts`) from what the player knows: the
+ * land round its town, the age each rival stands in (every age change is told to all), and rival soldiers seen near home. The
+ * age-up preview shows each that holds as a ✔ or a ✘ line. A `land` fit is a ✔ where the ground is rich in it, and, if `need`,
+ * a ✘ where it is poor; a `rival` fit holds when any rival stands in one of `ages` or on one of `routes` (`con`: it hurts);
+ * `pace` says whether the age pays at once (`quick`) or is an investment (`slow`), read against rival soldiers near home.
+ * A gateway age is `slow` without saying so. An age with no fits shows none.
+ */
+export type FitLand = 'water' | 'stone' | 'wood' | 'gold' | 'game';
+export type Fit =
+  | { k: 'land'; on: FitLand; need?: boolean; why: string }
+  | { k: 'rival'; ages?: AgeId[]; routes?: RouteId[]; con?: boolean; why: string }
+  | { k: 'pace'; on: 'quick' | 'slow' };
+
+/**
+ * What the reads count (`fitsOf`): per land, tiles within `r` of the town's start that the player has seen (beasts: those it sees now),
+ * `rich` or more a ✔ and under `poor` a ✘ for an age that needs it. Rival soldiers it sees now within `near` of the start, `press` of
+ * them, make the town pressed. Tuned on small maps eight minutes in (Normal computers, seeds 1 to 3): water 0 to 4 tiles by a dry
+ * continental town, 60 to 300 by a lake or a shore; woods 80 to 380.
+ */
+export const FIT = {
+  near: 20,
+  press: 4,
+  land: {
+    water: { r: 24, rich: 60, poor: 10, name: 'water' },
+    stone: { r: 20, rich: 8, poor: 3, name: 'stone' },
+    wood: { r: 20, rich: 250, poor: 100, name: 'woods' },
+    gold: { r: 20, rich: 10, poor: 4, name: 'gold' },
+    game: { r: 26, rich: 4, poor: 0, name: 'beasts' },
+  } as Record<FitLand, { r: number; rich: number; poor: number; name: string }>,
+};
+
+/** Rival ages that shelter behind walls, living or stone, or behind water: what a wall-breaker or a flier is for. */
+const WALLED: AgeId[] = ['megaliths', 'grove', 'hive', 'waterline', 'locks'];
+/** Rival ages whose people moves its town. */
+const ROVING: AgeId[] = ['steppe', 'horde', 'silk', 'hunt', 'floating', 'leviathans'];
+/** Rival ages that fire warheads. */
+const STRIKING: AgeId[] = ['atomic', 'fission', 'fusion'];
+/** Rival ages that ride: heavy riders and beasts. */
+const RIDING: AgeId[] = ['steppe', 'horde', 'chariots', 'hunt', 'wild'];
+
+export const FITS: Partial<Record<AgeId, Fit[]>> = {
+  gunpowder: [{ k: 'rival', ages: ['megaliths', 'grove', 'undercity'], why: 'cannon break the stone or the living wall they hide behind' }],
+  atomic: [{ k: 'pace', on: 'slow' }, { k: 'rival', ages: STRIKING, why: 'a silo held in Reserve can shoot down their warheads' }],
+  aeronaut: [
+    { k: 'land', on: 'water', why: 'the route grew from the sea, and your fleet already guards it' },
+    { k: 'rival', ages: WALLED, why: 'a bomber flies over any wall, moat or flood' },
+  ],
+  reclaimer: [{ k: 'pace', on: 'slow' }, { k: 'rival', routes: ['army'], why: 'what their raids knock down you raise again for less' }],
+  merchant: [
+    { k: 'pace', on: 'quick' },
+    { k: 'land', on: 'gold', why: 'the gold you mine hires swords at once' },
+    { k: 'rival', routes: ['army'], why: 'hired swords stand up the moment their army comes' },
+  ],
+  iron: [{ k: 'pace', on: 'quick' }, { k: 'rival', ages: ['chariots'], why: 'hard foot soldiers are what a charioteer fears' }],
+  pilgrim: [{ k: 'pace', on: 'slow' }, { k: 'rival', ages: ['megaliths', 'grove'], why: 'priests win over the towers and gates they built to hold' }],
+  fair: [{ k: 'pace', on: 'slow' }, { k: 'rival', routes: ['army'], con: true, why: 'a town grown open round its fairground stands weaker to their raids' }],
+  sail: [
+    { k: 'land', on: 'water', need: true, why: 'convoys and prize money need sea' },
+    { k: 'rival', routes: ['navy', 'water'], why: 'their sunk cogs pay you prize money' },
+    { k: 'rival', ages: ['beggars'], con: true, why: 'the Sea Beggars board and take a beaten ship' },
+  ],
+  lightning: [{ k: 'pace', on: 'slow' }, { k: 'rival', ages: ['aeronaut'], con: true, why: 'no aircraft of your own to meet theirs' }],
+  warband: [{ k: 'pace', on: 'quick' }, { k: 'rival', routes: ['economy', 'faith'], why: 'a rich town with few soldiers pays the best plunder' }],
+  ironblood: [{ k: 'pace', on: 'quick' }, { k: 'rival', ages: ROVING, why: 'their town moves: train where your army stands, not back home' }],
+  totalwar: [{ k: 'pace', on: 'quick' }],
+  hemocraft: [{ k: 'pace', on: 'quick' }, { k: 'rival', ages: ['industrial', 'lightning', 'locks', 'forges'], con: true, why: 'an army of machines bleeds nothing for your rigs' }],
+  bloodrite: [{ k: 'pace', on: 'quick' }, { k: 'rival', routes: ['army'], why: 'every battle fought at your altars mends your own' }],
+  fission: [{ k: 'pace', on: 'quick' }, { k: 'rival', ages: STRIKING, why: 'a short clock leaves their people less time to read the flight and run' }],
+  fusion: [{ k: 'pace', on: 'slow' }],
+  steppe: [{ k: 'pace', on: 'quick' }, { k: 'land', on: 'game', why: 'the wagons go where the herds are' }],
+  horde: [
+    { k: 'rival', routes: ['economy', 'faith'], why: 'a rich treasury for your riders to drain' },
+    { k: 'rival', routes: ['army'], con: true, why: 'a town with no walls and an army at its door' },
+  ],
+  silk: [{ k: 'rival', routes: ['economy', 'faith'], why: 'their traders crossing your land pay your toll' }],
+  alchemy: [{ k: 'rival', ages: ['megaliths', 'grove', 'forges'], why: 'the Sappers behind it blow open a town that hides behind stone' }],
+  sapper: [{ k: 'pace', on: 'quick' }, { k: 'rival', ages: ['megaliths', 'grove', 'forges'], why: 'a keg at the wall opens the town they built to hold' }],
+  searaider: [
+    { k: 'land', on: 'water', need: true, why: 'the war-host comes and goes by ship' },
+    { k: 'rival', routes: ['economy', 'faith'], why: 'a rich shore with few soldiers pays the best plunder' },
+  ],
+  chariots: [{ k: 'pace', on: 'quick' }, { k: 'rival', ages: ['iron'], con: true, why: 'their hard foot soldiers are what a charioteer fears' }],
+  hunt: [{ k: 'pace', on: 'quick' }, { k: 'land', on: 'game', why: 'the wolves and the hunt feed on the herds round you' }],
+  wild: [{ k: 'land', on: 'game', why: 'your army is tamed from the beasts round you' }],
+  grove: [
+    { k: 'land', on: 'game', why: 'food grows dense where beasts are' },
+    { k: 'land', on: 'water', why: 'food grows dense where water is' },
+    { k: 'rival', routes: ['army', 'horse'], why: 'a wall that heals outlasts their raids' },
+  ],
+  hive: [{ k: 'land', on: 'wood', why: 'woods a rival cannot walk through' }, { k: 'rival', ages: RIDING, why: 'venom cuts down heavy riders and beasts' }],
+  wildwood: [{ k: 'land', on: 'wood', need: true, why: 'the forest is your army and your wall' }],
+  bloom: [{ k: 'pace', on: 'slow' }, { k: 'land', on: 'wood', why: 'the greening starts from the woods you keep' }],
+  leviathans: [{ k: 'rival', ages: WALLED, why: 'soldiers dropped behind their walls' }],
+  mycelium: [{ k: 'rival', routes: ['army', 'horse'], why: 'a town that cannot be starved or cut off' }],
+  missions: [{ k: 'pace', on: 'slow' }, { k: 'land', on: 'water', why: 'a foothold on any shore' }],
+  rivers: [{ k: 'land', on: 'water', why: 'channels dug from water near home reach farther' }],
+  dykes: [{ k: 'land', on: 'water', need: true, why: 'new land is won from the sea' }],
+  waterline: [
+    { k: 'land', on: 'water', why: 'more water to let over low ground' },
+    { k: 'rival', routes: ['army', 'horse'], why: 'you flood the fields under a marching army' },
+    { k: 'rival', routes: ['navy'], con: true, why: 'a flood stops what walks, not what sails' },
+  ],
+  locks: [
+    { k: 'pace', on: 'slow' },
+    { k: 'land', on: 'water', why: 'your canals join water near home, so your fleet reaches inland' },
+    { k: 'rival', routes: ['army', 'horse'], why: 'a canal is a moat a marching army must bridge' },
+    { k: 'rival', ages: ['delvings', 'undercity'], con: true, why: 'a canal stops nothing that comes up from below' },
+  ],
+  tides: [{ k: 'land', on: 'water', need: true, why: 'the tide works only where the sea comes in' }],
+  floating: [
+    { k: 'land', on: 'water', need: true, why: 'a town on pontoons needs water to moor on' },
+    { k: 'rival', ages: STRIKING, why: 'tow your districts out of a warhead\'s reach' },
+  ],
+  beggars: [
+    { k: 'land', on: 'water', need: true, why: 'the fleet grows by what it takes at sea' },
+    { k: 'rival', routes: ['navy', 'water'], why: 'their cogs, barges and polder become yours' },
+  ],
+  megaliths: [{ k: 'land', on: 'stone', need: true, why: 'every timber is paid in stone' }, { k: 'rival', routes: ['army', 'horse'], why: 'rings no tower or camp of theirs may be raised in' }],
+  delvings: [{ k: 'pace', on: 'quick' }, { k: 'rival', ages: WALLED, why: 'a Barrow comes up inside their walls and moats' }],
+  undercity: [
+    { k: 'pace', on: 'slow' },
+    { k: 'rival', routes: ['army', 'horse'], why: 'a raid finds bare ground' },
+    { k: 'rival', ages: ['aeronaut'], why: 'a bomber finds no town to strike' },
+  ],
+  forges: [{ k: 'pace', on: 'quick' }],
+};
+
 // ---- What the side ages give ----------------------------------------------------------------------
 
 /**

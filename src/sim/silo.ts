@@ -710,7 +710,10 @@ function fire(s: GameState, l: Launch): void {
     if (by) by.reload = s.tick + secs(INTERCEPT.reload);
     else {
       by = reserveFor(s, l, i);
-      if (!by) continue;
+      if (!by) {
+        unguarded(s, l, i);
+        continue;
+      }
       silo = true;
       const p = s.players[by.owner];
       spend(s, p);
@@ -720,6 +723,40 @@ function fire(s: GameState, l: Launch): void {
     const hit = roll(s) < INTERCEPT.chance;
     (l.icpt ??= []).push({ shot: i, battery: by.id, owner: by.owner, x: by.x, y: by.y, hit, ...(silo ? { silo } : {}) });
     s.events.push({ k: 'intercept', owner: by.owner, by: l.owner, id: l.id, shot: i, what: 'fired', x: by.x, y: by.y, ...(silo ? { silo } : {}) });
+  }
+}
+
+/**
+ * Why nothing rose for a launch's warhead `shot` (the `unguarded` event): for each rival of the launcher that stands guard, a finished
+ * battery or a silo held in Reserve, what kept its own guard down. A battery in reach of the ring its team is shown was reloading; if
+ * none was in reach, how far the nearest stood. A Reserve silo was arming, or its people had no warhead or no fuel. A people with no
+ * guard at all is told nothing: it knew.
+ */
+function unguarded(s: GameState, l: Launch, shot: number): void {
+  for (const o of s.players) {
+    if (o.defeated || !isEnemy(s, l.owner, o.id)) continue;
+    const g = ringOf(l, o.team, shot);
+    let near = Infinity, wait = Infinity, silo: Building | undefined;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.owner !== o.id || !e.built || e.hp <= 0) continue;
+      if (held(e)) silo ??= e;
+      if (e.type !== 'battery') continue;
+      const d2 = (g.x - e.x) * (g.x - e.x) + (g.y - e.y) * (g.y - e.y);
+      if (d2 <= INTERCEPT.reach * INTERCEPT.reach) wait = Math.min(wait, Math.max(1, Math.ceil(((e.reload ?? 0) - s.tick) / TICK_HZ)));
+      else near = Math.min(near, d2);
+    }
+    const bat = wait < Infinity ? { why: 'reload' as const, wait } : near < Infinity ? { why: 'reach' as const, d: Math.round(Math.sqrt(near)), reach: INTERCEPT.reach } : undefined;
+    const res = !silo
+      ? undefined
+      : !armed(s, silo)
+        ? { why: 'arming' as const, wait: Math.max(1, armingOf(s, silo)) }
+        : stockOf(o) <= 0
+          ? { why: 'store' as const }
+          : !canAfford(o, fuelOf(rulesOf(o).w))
+            ? { why: 'fuel' as const }
+            : undefined;
+    if (!bat && !res) continue;
+    s.events.push({ k: 'unguarded', owner: o.id, by: l.owner, id: l.id, shot, x: g.x, y: g.y, ...(bat ? { bat } : {}), ...(res ? { res } : {}) });
   }
 }
 

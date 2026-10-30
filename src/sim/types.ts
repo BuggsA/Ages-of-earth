@@ -1162,6 +1162,13 @@ export type GameEvent =
    * the warhead (`hit`: it is gone; `missed`: it flies on) where the missile is, `z` tiles up.
    */
   | { k: 'intercept'; owner: number; by: number; id: number; shot: number; what: 'fired' | 'hit' | 'missed'; x: number; y: number; z?: number; silo?: true }
+  /**
+   * No interceptor rose for a warhead (#759, the owner 2026-10-30: players should know why a defence did or didn't work): told to each
+   * rival of the launcher that stands guard, with why its own guard stayed down. `bat`: its batteries stood too far from the ring it was
+   * shown (`d` tiles from the nearest, against `reach`), or every one in reach was reloading (`wait` seconds to the first). `res`: its
+   * silo held in Reserve was still arming (`wait`), had no warhead in store, or could not pay the launch fuel.
+   */
+  | { k: 'unguarded'; owner: number; by: number; id: number; shot: number; x: number; y: number; bat?: { why: 'reach'; d: number; reach: number } | { why: 'reload'; wait: number }; res?: { why: 'arming'; wait: number } | { why: 'store' } | { why: 'fuel' } }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
