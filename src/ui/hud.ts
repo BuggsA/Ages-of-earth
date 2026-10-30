@@ -1,4 +1,5 @@
 import { delvers, isBelow, isMouth } from '../sim/delve';
+import { sinkCost, sinkProblem, surfaceProblem } from '../sim/undercity';
 import { gathered, solstice } from '../sim/henge';
 import { crestSvg } from './crests';
 import { seasonAt, seasonOf } from '../sim/seasons';
@@ -11,7 +12,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { DELVE, HENGE, SEASON, FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
+import { UNDER, DELVE, HENGE, SEASON, FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -1361,6 +1362,13 @@ export class Hud {
       const share = millShares(s).get(b.id) ?? 0;
       status += ` · <span data-tip="<b>Tide Mill</b>Its pond fills on the flood and runs out through the wheel on the ebb: at every turn of the tide it grinds ${TIDE.mill.gold} gold with ${TIDE.mill.most} tiles of tidal ground within ${TIDE.mill.reach} tiles of it, less with fewer. A tile feeds only the first mill raised by it. Causeways count as tidal ground. Flats a causeway line shuts off from the sea are a barrage's pond: ground twice, on the flood and on the ebb.">${still ? `⚠ ${still}` : `🌊 ${Math.round(share)} gold a turn of the tide (${Math.min(TIDE.mill.most, tidalNear(s, b).length)} tiles of tidal ground${tidalNear(s, b).some((t) => isPond(s, t)) ? `, ${tidalNear(s, b).filter((t) => isPond(s, t)).length} of them a barrage's pond, ground twice` : ''})${tideClock(s) ? '' : ': the tide wakes the moment it is raised'}`}</span>`;
     }
+    // The Undercity (#883): sunk, going down or coming up; and to its owner, which rivals have found it.
+    if (b.sunk || b.sinking !== undefined || b.rising !== undefined) {
+      const left = (t: number) => Math.max(0, Math.ceil((t - s.tick) / TICK_HZ));
+      const finders = mine && b.found?.length ? ` · found by ${b.found.map((id) => s.players[id]?.name ?? '?').join(', ')}` : '';
+      const tip = `<b>Below the ground</b>A sunk building is bare earth to a rival who hasn't found it, and no arrow, gun, ship, aeroplane or siege engine reaches it. It still houses, stores and shelters, but trains, researches and shoots nothing. A rival's foot soldiers who stand on it ${UNDER.find} seconds find it; then their blades can reach it, and a keg caves it in at ${UNDER.keg} times the blast.`;
+      status += ` · <span data-tip="${tip}">🕳 ${b.sunk ? `Sunk${finders}` : b.sinking !== undefined ? `Going down: ${left(b.sinking)}s` : `Coming up: ${left(b.rising!)}s`}</span>`;
+    }
     // A mouth of the tunnel (#881): who is below on the way here, and when the first comes up.
     if (mine && b.built && isMouth(s, b)) {
       const below = b.garrison.map((id) => s.byId.get(id)).filter((u): u is Unit => !!u && u.kind === 'unit' && isBelow(s, u));
@@ -1983,6 +1991,15 @@ export class Hud {
         if (k && k.building === b.type) {
           const why = keepsakeProblem(p, b);
           cmds.push({ key: 'J', pic: '', glyph: '🏺', title: 'Keep this one', desc: `Make this ${def.name} the ${ageDef(p).name}'s keepsake: when your people leaves the age, it keeps ${k.does}, on any road. Only one is kept; unchosen, the oldest is. Raze it and the keepsake is gone.`, ok: !why && b.keep !== ageOf(p), on: b.keep === ageOf(p), why: why ?? 'Already your keepsake', run: () => this.act.issue({ t: 'keepsake', p: viewer, building: b.id }) });
+        }
+        // The Undercity (#883): sink it, or bring it back up.
+        if (UNDER.kinds.includes(b.type) && (b.sunk || ageDef(p).sinks || b.keep === 'undercity')) {
+          const up = !!b.sunk;
+          const why = up ? surfaceProblem(s, viewer, b) : sinkProblem(s, viewer, b);
+          const desc = up
+            ? `Bring it back up: it stands on the ground again at once, where rivals can see and strike it, and is at work in ${UNDER.rise} seconds. Sunk again, a rival must find it again.`
+            : `Take it below the ground (${UNDER.sink} seconds, doing nothing meanwhile): rivals who haven't found it see bare earth, and no arrow, gun, ship, aeroplane or siege engine reaches it. It still houses, stores and shelters, but trains, researches and shoots nothing until it surfaces. Rival foot soldiers standing on it ${UNDER.find} seconds find it.`;
+          cmds.push({ key: 'N', pic: '', glyph: up ? '⏫' : '🕳', title: up ? 'Surface' : 'Sink', desc, cost: up ? undefined : sinkCost(b), ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'sink', p: viewer, building: b.id, up }), this.act.sound('queue')) });
         }
         // The tunnel (#881): those sheltering in a mouth go below to another.
         if (isMouth(s, b)) {

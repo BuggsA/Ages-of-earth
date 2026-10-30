@@ -73,3 +73,37 @@ export function barrow(k: Kit, base: string): void {
   k.team(k.box(0.26, 0.16, 0.02, TEAM, -0.47, 0.92, 0.6));
   k.team(k.box(1.98, 0.08, 1.98, TEAM, 0, -0.06, 0));
 }
+
+const TUFF = '#d2b890';
+const TUFF_DARK = '#a88c66';
+const TUFF_FLOOR = '#bfa27a';
+const SOOT = '#2a2420';
+
+/**
+ * A sunk building (the Age of the Undercity, #883), as its owner and a rival who found it see it: a low mound of tuff over the
+ * footprint, a rock-cut stair going down at the front with a lamp below and the millstone door rolled back beside it, vent holes ringed
+ * with soot, and the owner's mark on a stone by the stair. Larger halls show more vents.
+ */
+export function sunken(k: Kit, size: number): void {
+  k.box(size * 0.96, 0.04, size * 0.96, TUFF_FLOOR, 0, -0.02, 0);
+  const m = k.dome(size * 0.47, TUFF, 0, 0, -size * 0.04);
+  m.scale.set(1.04, 0.26, 1);
+  for (let i = 0; i < 5 + size; i++) {
+    const a = (i / (5 + size)) * Math.PI * 2 + 0.4;
+    k.rock(0.06 + rnd(i, 3, 7) * 0.04, i % 2 ? TUFF_DARK : TUFF, Math.cos(a) * size * 0.46, 0, Math.sin(a) * size * 0.44);
+  }
+  const fz = size * 0.5 - 0.12;
+  k.box(0.46, 0.14, 0.34, TUFF_DARK, 0, 0, fz - 0.06);
+  k.box(0.32, 0.13, 0.3, SOOT, 0, 0.02, fz - 0.04);
+  k.glow(k.box(0.06, 0.05, 0.05, '#ffb24a', 0, 0.06, fz - 0.12));
+  const mill = k.cyl(0.17, 0.17, 0.07, 10, TUFF_DARK, 0.36, 0.17, fz);
+  mill.rotation.x = Math.PI / 2;
+  k.cyl(0.035, 0.035, 0.075, 6, SOOT, 0.36, 0.17, fz).rotation.x = Math.PI / 2;
+  const vents: [number, number][] = size >= 3 ? [[-0.5, -0.35], [0.45, -0.5], [-0.05, -0.85]] : [[-0.32, -0.2], [0.3, -0.4]];
+  for (const [x, z] of vents) {
+    k.cyl(0.07, 0.09, 0.1, 6, TUFF_DARK, x, size * 0.07, z);
+    k.cyl(0.05, 0.05, 0.02, 6, SOOT, x, size * 0.07 + 0.1, z);
+  }
+  k.box(0.14, 0.2, 0.1, TUFF_DARK, -0.36, 0, fz);
+  k.team(k.box(0.12, 0.08, 0.02, TEAM, -0.36, 0.12, fz + 0.06));
+}

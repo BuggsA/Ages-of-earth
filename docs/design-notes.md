@@ -1655,3 +1655,9 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Built:** Barrows joined underground to each other and to the Town Centers: an army goes in at home and comes up at a forward mouth, unseen on the way. The door is the horse: no riders go below, so the age fights on foot.
 **Why I love it:** it turns the map's distances into a choice of where to dig, and gives the defender something to read: a rival's Barrow near your town is a promise, and the earth thrown up at its mouth is the warning. Pulling it down mid-delve strands a whole wave.
 **Next:** the Undercity's sunk buildings (a sunk Barrow as a hidden mouth), a drawn glyph for the Delve button, the computer reading a rival's Barrow and guarding it.
+
+## Designers' notes: the Age of the Undercity (#876 s3, #883, 2026-10-29), Claude Code
+
+**Built:** a town that goes below: Houses, Storehouses, halls and Barrows sink (15 s, stone) and surface (25 s). Sunk, it is bare earth to a rival, out of reach of every shot and siege engine, still housing, storing and sheltering, but training nothing. The door is the wall: no walls, gates or towers, so a sunk town's guard is that it can't be found. The answer is feet: foot soldiers standing on it find it, and blades and kegs then reach it.
+**Why I love it:** it turns a raid from "march at the town" into a search, and turns the defender's choice into a rhythm: everything down when the army comes, the Barracks up when it's time to answer, and the moment it surfaces it can be struck. A forward Barrow sunk near a rival is a door nobody can see.
+**Next:** a millstone door on a sunk Barrow that a rival's sappers must blow before they can follow the tunnel; vent smoke as a slow tell a sharp eye can read; the deep vaults of s6 that ride out a warhead.

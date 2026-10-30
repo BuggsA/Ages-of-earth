@@ -38,6 +38,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
   wild: pal('#d2c09e', '#b49f7a', '#3e2416', '#321c10', '#ede3cc', '#8f7a5c'), // hide walls, bracken roofs, bone
   rivers: pal('#dccaa0', '#c4af84', '#d5c58e', '#c2b07a', '#cdb88a', '#b5a37e'), // sun-dried mud, reed roofs
   delvings: pal('#9c8064', '#7e6650', '#3b2a1c', '#2e2116', '#a08a5a', '#4e4236'), // timber-shored earth, peat roofs, lamp brass
+  undercity: pal('#d8c4a4', '#c9ab80', '#d8a884', '#cca080', '#5e4232', '#b39470'), // cream tuff walls, rose-tuff caps, soot-dark door frames
   megaliths: pal('#a3a7a8', '#878c8f', '#26221e', '#1d1a17', '#b4aa8c', '#6a6e70'), // dressed granite, peat-turf roofs, chalk and lichen
   hunt: pal('#4a3626', '#3a2a1e', '#d8ccb0', '#c6b99c', '#a89068', '#7a6a52'), // stained leather under pale felt
   steppe: pal('#ece4cf', '#d4c8ac', '#c9b48a', '#b8a27a', '#5a3a30', '#a59878'), // white felt
@@ -84,7 +85,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
 /** The ages whose touches live in this file. */
 export const NEW_LOOK_AGES: AgeId[] = [
   'atomic', 'fission', 'fusion', 'alchemy', 'sapper', 'searaider', 'chariots', 'wild', 'grove', 'hive', 'wildwood', 'bloom', 'leviathans',
-  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium', 'megaliths', 'delvings',
+  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium', 'megaliths', 'delvings', 'undercity',
 ];
 
 /** Buildings that take touches: the town's own halls and houses. Water works, walls, fields and one-tile pieces keep their shape. */
@@ -119,6 +120,9 @@ const GRANITE = '#9a9a92';
 const GRANITE_DARK = '#76766f';
 const LICHEN_STONE = '#b3a874';
 const CHALK_CUT = '#e2ddcc';
+const TUFF = '#d9c09a';
+const TUFF_DARK = '#b89c76';
+const TUFF_ROSE = '#8a5a44';
 
 /** A barrel on its end: a keg, a water butt or a tar barrel. */
 function keg(k: Kit, x: number, z: number, r = 0.11, color = '#6a4a2e'): void {
@@ -411,6 +415,25 @@ export function ageLookTouches(k: Kit, type: BuildingType, age: AgeId): boolean 
       }
       break;
     }
+    case 'undercity': {
+      // Derinkuyu and the Cappadocian valleys: a rock-cut arched door in the tuff, a millstone door rolled back beside it, a vent shaft
+      // with a lip of soot on the roof, and a fairy chimney (a cone of soft tuff under its cap of hard rock) behind the great halls.
+      k.box(0.34, 0.5, 0.06, TUFF_DARK, l + 0.25, 0, f + 0.02);
+      k.box(0.24, 0.4, 0.02, DARK, l + 0.25, 0, f + 0.06);
+      k.dome(0.12, DARK, l + 0.25, 0.38, f + 0.06).scale.set(1, 0.7, 0.2);
+      const mill = k.cyl(0.2, 0.2, 0.07, 10, TUFF_DARK, l + 0.6, 0.2, f + 0.08);
+      mill.rotation.x = Math.PI / 2;
+      k.cyl(0.04, 0.04, 0.075, 6, DARK, l + 0.6, 0.2, f + 0.08).rotation.x = Math.PI / 2;
+      k.cyl(0.07, 0.09, 0.22, 6, TUFF_DARK, h * 0.45, e, -h * 0.3);
+      k.cyl(0.05, 0.05, 0.02, 6, DARK, h * 0.45, e + 0.22, -h * 0.3);
+      if (great || big) {
+        k.cone(0.34, 1.3, 7, TUFF, -h * 0.5, 0, -h - 0.3);
+        const top = k.dome(0.28, TUFF_ROSE, -h * 0.5, 1.15, -h - 0.3);
+        top.scale.set(1, 0.55, 1);
+        k.box(0.08, 0.12, 0.02, DARK, -h * 0.5, 0.55, -h - 0.04);
+      }
+      break;
+    }
     case 'megaliths': {
       // Carnac and Newgrange: a standing stone by the door, a kerb of boulders along the front, a spiral cut in the lintel stone,
       // and a dolmen (two uprights and a capstone) behind the great halls.
@@ -579,6 +602,8 @@ const HATS: Partial<Record<AgeId, (k: Kit) => void>> = {
   rivers: (k) => { k.cone(0.14, 0.07, 10, REED, 0, 0.55, 0); band(k, 0.54, 0.07); },
   // A miner's leather skullcap with a little brass lamp at the brow, as the flint diggers wore below.
   delvings: (k) => { cap(k, '#5a4030', 0.075); k.glow(k.box(0.03, 0.025, 0.02, AMBER, 0, 0.57, 0.07)); band(k, 0.53, 0.071); },
+  // A Cappadocian felt cap, cream, wound round with a madder-red scarf against the dust of the stair.
+  undercity: (k) => { cap(k, '#e6dac0', 0.076); k.cyl(0.079, 0.079, 0.03, 10, '#9a3a2a', 0, 0.535, 0); band(k, 0.57, 0.06); },
   // An undyed wool hood with a chalk bead on its point, as a quarrier wears against the grit.
   megaliths: (k) => { cap(k, '#7d766a', 0.077); k.cone(0.03, 0.07, 5, '#6a6458', 0, 0.6, -0.04).rotation.x = -0.5; k.sphere(0.018, CHALK_CUT, 0, 0.63, -0.07); band(k, 0.535, 0.072); },
   hunt: (k) => { crown(k, 0.074, 0.05, '#6a5038'); k.cone(0.01, 0.12, 4, '#8a7a62', 0.05, 0.56, -0.04).rotation.z = -0.6; band(k, 0.55, 0.075); },

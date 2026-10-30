@@ -1,3 +1,4 @@
+import { hiddenFrom } from './undercity';
 import { BUILDINGS, CONSECRATE, DT, secs } from './data';
 import { peace } from './combat';
 import { stampBuilding } from './grid';
@@ -19,7 +20,9 @@ export const consecrates = (s: GameState, owner: number): boolean => modsOf(s, o
 /** Why `owner`'s priests can't chant this building over, or null if they can. */
 export function consecrateProblem(s: GameState, owner: number, b: Building): string | null {
   if (!consecrates(s, owner)) return 'Only a pilgrim people\'s priests can win over buildings';
-  if (b.hp <= 0 || !isEnemy(s, owner, b.owner)) return 'Only a rival\'s buildings can be won over';
+  if (b.hp <= 0 || !isEnemy(s, owner, b.owner) || hiddenFrom(s, b, owner)) return 'Only a rival\'s buildings can be won over';
+  // The chant doesn't carry below the ground (#883).
+  if (b.sunk) return 'A sunk building can\'t hear the chant: wait for it to surface';
   if (CONSECRATE.never.includes(b.type)) return `A ${BUILDINGS[b.type].name} never turns`;
   if (peace(s)) return 'Not while the peace treaty holds';
   return null;

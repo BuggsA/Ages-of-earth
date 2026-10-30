@@ -1,4 +1,5 @@
-import { COCKLE, COCKLER, DELVE, HENGE, SEASON, TICK_HZ } from '../sim/data';
+import { COCKLE, COCKLER, DELVE, HENGE, SEASON, TICK_HZ, UNDER } from '../sim/data';
+import { hiddenFrom } from '../sim/undercity';
 import { TIDE_GATE } from '../sim/data';
 import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
@@ -536,9 +537,21 @@ const TIPS: Tip[] = [
     text: `Your people goes below now. Raise <b>${BUILDINGS.barrow.name}s</b> (<kbd>${BUILDINGS.barrow.key}</kbd>): every Barrow and Town Center of yours is a mouth of one tunnel. Shelter soldiers in one (<kbd>G</kbd>), select it and <b>Delve</b> (<kbd>D</kbd>), then click another mouth: they go below, unseen and out of reach, at ${DELVE.pace} tiles a second, and come up there. A Barrow raised near a rival is a door into its land. No riders go below, and no Stable is raised.`,
   },
   {
+    id: 'undercity',
+    // The Age of the Undercity (#883): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'undercity',
+    text: `Your town can go below now. Select a House, Storehouse, hall or Barrow and <b>Sink</b> it (<kbd>N</kbd>, ${UNDER.cost} stone a tile): in ${UNDER.sink} seconds rivals see bare earth, and no arrow, gun, ship or siege engine can reach it. It still houses, stores and shelters, but trains and researches nothing: <b>Surface</b> it (<kbd>N</kbd>) to work it. No walls or towers guard you now: a rival's foot soldiers who stand on a sunk building ${UNDER.find} seconds find it, so watch the bare ground.`,
+  },
+  {
+    id: 'rivalUndercity',
+    // A rival in the Age of the Undercity (#883): its town may be under the viewer's feet.
+    when: (s, me) => s.players.some((q) => q.id !== me && isEnemy(s, me, q.id) && ageOf(q) === 'undercity'),
+    text: `A rival has gone into the <b>Undercity</b>: its houses, stores and halls can sink below the ground, where you see bare earth and no arrow, gun or siege engine reaches them. Walk foot soldiers over its land: standing ${UNDER.find} seconds on a sunk building finds it for good, and then swords and powder kegs can bring it down. It must surface to train, and then it can be struck.`,
+  },
+  {
     id: 'rivalBarrow',
     // A rival's Barrow (#881) the viewer can see: an army can come up out of it.
-    when: (s, me) => s.ents.some((e) => e.kind === 'building' && e.type === 'barrow' && e.built && isEnemy(s, me, e.owner) && s.players[me].vis[Math.floor(e.y) * s.w + Math.floor(e.x)]),
+    when: (s, me) => s.ents.some((e) => e.kind === 'building' && e.type === 'barrow' && e.built && isEnemy(s, me, e.owner) && !hiddenFrom(s, e, me) && s.players[me].vis[Math.floor(e.y) * s.w + Math.floor(e.x)]),
     text: 'A rival has dug a <b>Barrow</b>. Its people can send an army below from any of their Barrows or Town Centers and bring it up here, unseen on the way: watch for the earth thrown up at its mouth. Pull it down, and anyone bound for it comes up where it stood, alone.',
   },
   {

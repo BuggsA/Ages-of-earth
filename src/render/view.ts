@@ -1583,6 +1583,26 @@ export class View {
           this.cue('surface', ev.x, ev.y, 0.5);
           break;
         }
+        case 'sink': {
+          // The Undercity (#883): tuff dust as a building goes down or heaves up, seen by anyone who sees it happen; the settling of a
+          // sunk one, only by its people; a cellar found or caved in, by its people and by whoever found it.
+          const mine = ev.owner === this.viewer;
+          if (ev.what === 'sunk') {
+            if (!mine) break;
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.15), { count: 5, speed: 0.3, up: 0.6, life: 1.4, size: 0.06, gravity: 0.3, drag: 0.7, colors: ['#8a8278', '#bfa27a'] });
+            break;
+          }
+          if (ev.what === 'found' || ev.what === 'caved') {
+            if (!mine && ev.by !== this.viewer) break;
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 10, speed: 0.8, up: 0.9, life: 1.0, size: 0.06, gravity: 2, drag: 0.4, colors: ['#d2b890', '#a88c66', '#2a2420'] });
+            this.cue('unearthed', ev.x, ev.y, 0.55);
+            break;
+          }
+          if (!mine && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.3), { count: 14, speed: 0.7, up: 0.8, life: 1.6, size: 0.08, gravity: 0.9, drag: 0.5, colors: ['#d2b890', '#bfa27a', '#e8dcc4'] });
+          this.cue(ev.what === 'sinking' ? 'sinkDown' : 'sinkUp', ev.x, ev.y, 0.5);
+          break;
+        }
         case 'gathering': {
           // The year's gathering at a Henge (#877): chalk dust off the bank and sparks from the fire at its altar; its people hear the
           // drum and the ringing stones, the solstice louder.

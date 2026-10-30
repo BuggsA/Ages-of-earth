@@ -1,3 +1,4 @@
+import { inert, underStep } from './undercity';
 import { delveStep } from './delve';
 import { hengeStep } from './henge';
 import { callWild } from './tame';
@@ -374,7 +375,8 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     return;
   }
   const item = b.queue[0];
-  if (!item) return;
+  // A building sunk, or going down or coming up (#883), trains and researches nothing: its queue waits.
+  if (!item || inert(b)) return;
   // In the Age of Lightning a coil's field speeds the work and the dark slows it (#231); elsewhere one step a tick.
   const steps = workSteps(s, b);
   if (item.rise) {
@@ -699,6 +701,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   tideStep(s);
   hengeStep(s);
   delveStep(s, ungarrison);
+  underStep(s);
   sluiceStep(s);
   siloStep(s);
   sortieStep(s);

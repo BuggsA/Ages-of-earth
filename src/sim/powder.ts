@@ -1,3 +1,4 @@
+import { caveIn, hiddenFrom } from './undercity';
 import { BREACH, GALLERY, KEG, TICK_HZ, domainOf, secs } from './data';
 import { ageDef } from './ages';
 import { hurt, peace } from './combat';
@@ -74,7 +75,8 @@ export function kegProblem(s: GameState, owner: number, target: Ent | undefined)
   if (!sappers(p)) return 'Only a people of the Age of Sappers lays powder kegs';
   if (kegsOf(p) < 1) return 'No kegs in store: they are ground at the mills in the Age of Alchemy';
   if (peace(s)) return 'Not while the peace holds';
-  if (!target || target.kind !== 'building' || target.hp <= 0 || !isEnemy(s, owner, target.owner)) return 'Pick a rival building';
+  // A sunk building no one of its team has found (#883) is not there to be picked.
+  if (!target || target.kind !== 'building' || target.hp <= 0 || !isEnemy(s, owner, target.owner) || hiddenFrom(s, target, owner)) return 'Pick a rival building';
   return null;
 }
 
@@ -128,7 +130,8 @@ function blow(s: GameState, k: Keg): void {
     }
   }
   // A dyke (#701 s3) is earth: powder at its foot tears it open, and the sea does the rest.
-  for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building * (e.type === 'dyke' || e.type === 'sluice' || e.type === 'dam' ? BREACH.keg : 1) : KEG.unit, k.owner, null);
+  // A sunk building (#883) caves in under powder blown on it: `UNDER.keg` times as hard, and its cellar shows to the keg's people.
+  for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building * (e.type === 'dyke' || e.type === 'sluice' || e.type === 'dam' ? BREACH.keg : 1) * caveIn(s, e, k.owner) : KEG.unit, k.owner, null);
   // A rival's causeway or barrage (#748) is packed stone on the sand: the blast breaches it.
   breachAt(s, k.x, k.y, KEG.reach, k.owner);
   const p = s.players[k.owner];

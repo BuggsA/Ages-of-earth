@@ -1,5 +1,5 @@
 import { kinBonus } from './landmarks';
-import { BEACON, BUILDINGS, LANDMARKS, TELEGRAPH } from './data';
+import { BEACON, BUILDINGS, LANDMARKS, TELEGRAPH, UNDER } from './data';
 import { inField } from './ages';
 import { modsOf } from './stats';
 import type { GameState } from './types';
@@ -60,6 +60,8 @@ export function updateVision(s: GameState): void {
     const p = s.players[e.owner];
     let r: number;
     if (e.kind === 'unit') r = statsOf(s, e).sight;
+    // A sunk building (#883) looks out from its vents and doors only.
+    else if (e.sunk) r = UNDER.sight + e.size / 2;
     else r = e.built ? BUILDINGS[e.type].sight + e.size / 2 + (e.beacon !== undefined && s.tick < e.beacon ? BEACON.sight : 0) : 2 + e.size / 2;
     // Wireless Telegraphy: ships and finished Docks inside a Tower's field see farther over the water.
     if ((e.kind === 'unit' ? statsOf(s, e).cls === 'ship' : e.type === 'dock' && e.built) && modsOf(s, e.owner).telegraph && inField(s, e)) r += TELEGRAPH.sight;

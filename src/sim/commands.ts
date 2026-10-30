@@ -1,3 +1,4 @@
+import { hiddenFrom, inert, sink, sinkProblem, surface, surfaceProblem } from './undercity';
 import { delve, delveProblem } from './delve';
 import { AUTO_WORK, BUILDINGS, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
@@ -106,6 +107,9 @@ function myUnits(s: GameState, p: number, ids: number[]): Unit[] {
   }
   return out;
 }
+
+/** Why a building sunk, or on its way down or up (#883), takes no work. */
+const belowWhy = (b: Building): string => (b.sunk ? 'It is sunk: surface it (N) to train or research here' : b.sinking !== undefined ? 'It is going down' : 'It is still coming up');
 
 function myBuilding(s: GameState, p: number, id: number): Building | null {
   const e = s.byId.get(id);
@@ -301,7 +305,8 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'attack': {
       const t = s.byId.get(c.target);
-      if (!t || t.hp <= 0 || (t.kind === 'unit' && t.inside)) return;
+      // A rival's sunk building its team hasn't found (#883) is not there: the command is dropped as for any id it can't see.
+      if (!t || t.hp <= 0 || (t.kind === 'unit' && t.inside) || hiddenFrom(s, t, c.p)) return;
       const units = myUnits(s, c.p, c.ids);
       if (!isEnemy(s, c.p, t.owner)) {
         // Not a foe: just walk over there.
@@ -378,7 +383,7 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'convert': {
       const t = s.byId.get(c.target);
-      if (!t || !isEnemy(s, c.p, t.owner)) return;
+      if (!t || !isEnemy(s, c.p, t.owner) || hiddenFrom(s, t, c.p)) return;
       if (peace(s)) return refuse(s, c.p, 'Not while the peace treaty holds');
       if (c.rite) {
         // The Blood-rite's two rites (#355 s4), worked on the living that bleed.
@@ -687,6 +692,15 @@ export function applyCommand(s: GameState, c: Command): void {
       delve(s, from!, to!);
       break;
     }
+    case 'sink': {
+      // The Age of the Undercity (#883): a building goes below the ground, or comes back up.
+      const b = myBuilding(s, c.p, c.building);
+      const why = c.up ? surfaceProblem(s, c.p, b) : sinkProblem(s, c.p, b);
+      if (why) return refuse(s, c.p, why);
+      if (c.up) surface(s, b!);
+      else sink(s, b!);
+      break;
+    }
     case 'bell': {
       if (c.ring && p.way && WAYS[p.way].noBell) return refuse(s, c.p, `${WAYS[p.way].name} does not hide: the bell does not ring`);
       if (c.ring) {
@@ -979,6 +993,7 @@ export function applyCommand(s: GameState, c: Command): void {
       const b = myBuilding(s, c.p, c.building);
       if (!b || !b.built) return;
       if (!trainsAt(p, b.type).includes(c.unit) || !UNITS[c.unit]) return;
+      if (inert(b)) return refuse(s, c.p, belowWhy(b));
       const struck = buildBarred(p, b.type);
       if (struck) return refuse(s, c.p, struck);
       if (unitEpoch(c.unit) > p.epoch) return refuse(s, c.p, `Needs the ${EPOCHS[unitEpoch(c.unit)].name}`);
@@ -1003,6 +1018,7 @@ export function applyCommand(s: GameState, c: Command): void {
       const b = myBuilding(s, c.p, c.building);
       const t = TECHS[c.tech];
       if (!b || !b.built || !t || t.at !== b.type) return;
+      if (inert(b)) return refuse(s, c.p, belowWhy(b));
       const problem = techProblem(s, c.p, c.tech);
       if (problem) return refuse(s, c.p, problem);
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');

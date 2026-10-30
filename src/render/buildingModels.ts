@@ -1,4 +1,4 @@
-import { barrow, henge } from './deepModels';
+import { barrow, henge, sunken } from './deepModels';
 import * as THREE from 'three';
 import { AGE_PALETTES, NEW_LOOK_AGES, ageLookTouches } from './ageLooks';
 import type { AgeId, BuildingType } from '../sim/types';
@@ -3342,3 +3342,18 @@ export function rubbleGeometry(size: number, epoch: number): THREE.BufferGeometr
   return g;
 }
 
+
+const sunkCache = new Map<string, THREE.BufferGeometry>();
+
+/** A sunk building's mound (the Age of the Undercity, #883): one shape for every kind, by its size and its people's colour. */
+export function sunkGeometry(size: number, color: string): THREE.BufferGeometry {
+  const key = `${size}:${color}`;
+  let g = sunkCache.get(key);
+  if (!g) {
+    const k = new Kit();
+    sunken(k, size);
+    g = bake(k.root, color);
+    sunkCache.set(key, g);
+  }
+  return g;
+}
