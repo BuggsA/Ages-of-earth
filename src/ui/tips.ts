@@ -1,4 +1,4 @@
-import { COCKLE, COCKLER, DELVE, HENGE, SEASON, TICK_HZ, UNDER, VENT } from '../sim/data';
+import { COCKLE, COCKLER, DELVE, FAULT, HENGE, SEASON, TICK_HZ, UNDER, VENT } from '../sim/data';
 import { hiddenFrom } from '../sim/undercity';
 import { TIDE_GATE } from '../sim/data';
 import { AI_GATE_ANSWER } from '../sim/data';
@@ -547,6 +547,18 @@ const TIPS: Tip[] = [
     // The Age of Deep Forges (#884): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'forges',
     text: `Your people works on the earth's heat now. Raise a <b>${BUILDINGS.ventforge.name}</b> (<kbd>${BUILDINGS.ventforge.key}</kbd>) right over a vent (the cracked, steaming ground by your town; a few more lie out on the map): every building of yours within ${VENT.reach} tiles trains and researches ${VENT.drive - 100}% faster. Out of every forge's reach, a building works ${100 - VENT.cold}% slower, so raise your halls round the vents. A rival's soldiers standing by a vent turn its forge cold: select the forge and <b>Scald</b> (<kbd>X</kbd>) to let its steam out over them.`,
+  },
+  {
+    id: 'faults',
+    // The Age of Faults (#900): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'faults',
+    text: `Your people can break the land now. Raise a <b>${BUILDINGS.faultengine.name}</b> (<kbd>${BUILDINGS.faultengine.key}</kbd>) within ${FAULT.tap} tiles of a vent, select it and <b>Crack</b> (<kbd>F</kbd>): click where the crack begins and where it ends, up to ${FAULT.len} tiles. After ${FAULT.charge} seconds the ground opens into a chasm no one crosses on foot: shut a pass, cut an army off, or open it under a rival's forward buildings. Every people sees the charge coming, and a rival holding your engine's vent stops the clock.`,
+  },
+  {
+    id: 'rivalFaults',
+    // A rival in the Age of Faults (#900): the ground may split under you.
+    when: (s, me) => s.players.some((q) => q.id !== me && isEnemy(s, me, q.id) && ageOf(q) === 'faults'),
+    text: `A rival breaks the land in the <b>Age of Faults</b>: its Fault Engines crack the ground into chasms no one crosses on foot. You'll see the line glow and feel the tremor ${FAULT.charge} seconds before it opens: move off it, raze the engine, or stand soldiers by its vent to stop the clock. A chasm is for good, but from the Middle Ages on you may lay a <b>Bridge</b> over it.`,
   },
   {
     id: 'rivalForges',

@@ -32,6 +32,7 @@ import { FindsView } from './findsView';
 import { TidesView } from './tidesView';
 import { SpringsView } from './springsView';
 import { VentsView } from './ventsView';
+import { ChasmView } from './chasmView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
 import { KegView } from './kegView';
@@ -124,6 +125,8 @@ export class View {
   readonly finds = new FindsView();
   readonly springs = new SpringsView();
   readonly vents = new VentsView();
+  /** Chasms and charging cracks (#900). */
+  readonly chasms = new ChasmView();
   /** Causeways under the tide (#739). */
   readonly tides = new TidesView();
   readonly rubble = new RubbleView();
@@ -214,7 +217,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.vents.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.vents.group, this.chasms.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -284,6 +287,7 @@ export class View {
     this.finds.clear();
     this.springs.clear();
     this.vents.clear();
+    this.chasms.clear();
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
@@ -573,6 +577,7 @@ export class View {
     this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.springs.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.vents.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
+    this.chasms.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, performance.now() / 1000);
     this.tides.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
@@ -1585,6 +1590,15 @@ export class View {
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 8 + Math.min(ev.n, 12), speed: 0.9, up: 1.1, life: 1.1, size: 0.06, gravity: 2.2, drag: 0.4, colors: ['#5e4e3e', '#7e6650', '#a08a5a'] });
           this.cue('surface', ev.x, ev.y, 0.5);
+          break;
+        }
+        case 'fault': {
+          // A Fault Engine (#900): the ground opening in a heave of rock-dust and a spray of teal shards where it is seen; the charge
+          // and its loss are told by the HUD and the sound for everyone.
+          if (ev.what !== 'crack' || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.3), { count: 40, speed: 2.2, up: 1.6, life: 1.8, size: 0.2, gravity: -0.2, drag: 0.6, colors: ['#8a8682', '#6e6a66', '#a8a29a'] });
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 14, speed: 1.4, up: 1.8, life: 1.0, size: 0.06, gravity: 1.4, drag: 0.3, colors: ['#3ad6c8', '#9af2e8'] });
+          this.cue('quake', ev.x, ev.y, 0.9);
           break;
         }
         case 'vent': {

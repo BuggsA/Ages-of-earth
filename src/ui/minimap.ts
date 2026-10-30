@@ -11,6 +11,8 @@ const POLDER_RGB = [86, 128, 62];
 const FLATS_RGB = [143, 134, 112];
 const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
+/** A chasm (#900) on the minimap: near black, a cold teal cast. */
+const CHASM_RGB = [18, 30, 32];
 const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), (s.flooded ?? 0) + (s.inundated ?? 0) + (s.tideTurns ?? 0));
 import { R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 import { R_COCKLE } from '../sim/types';
@@ -54,6 +56,8 @@ export class Minimap {
   /** The ground as painted, and the tiles pumped out by then (#701): land won from the water is repainted as it comes. */
   private terr: Uint8Array = new Uint8Array(0);
   private drainedSeen = 0;
+  /** Tiles cracked open when the chasms were last painted (#900). */
+  private crackedSeen = -1;
   private img: ImageData | null = null;
   private pings: Ping[] = [];
   private dragging = false;
@@ -120,6 +124,7 @@ export class Minimap {
     }
     this.terr = Uint8Array.from(s.terrain);
     this.drainedSeen = drained(s);
+    this.crackedSeen = -1;
     this.pings = [];
     this.waymarks.reset();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -158,6 +163,15 @@ export class Minimap {
         this.land.set(wet ? WATER_RGB : s.terrain[i] === T_SAND ? FLATS_RGB : POLDER_RGB, i * 3);
         this.depth[i] = wet ? Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]) : 0;
         this.green[i] = wet || s.terrain[i] === T_SAND ? 0 : 1;
+      }
+    }
+    // Chasms (#900): ground split open shows as a black seam, teal at its lips.
+    if ((s.cracked ?? 0) !== this.crackedSeen && s.chasm) {
+      this.crackedSeen = s.cracked ?? 0;
+      for (let i = 0; i < s.w * s.h; i++) {
+        if (!s.chasm[i]) continue;
+        this.land.set(CHASM_RGB, i * 3);
+        this.green[i] = 0;
       }
     }
     if (!reveal) this.waymarks.update(s, viewer);

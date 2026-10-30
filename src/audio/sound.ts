@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed' | 'scald' | 'forgeCold' | 'forgeWarm'
+  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed' | 'scald' | 'forgeCold' | 'forgeWarm' | 'tremor' | 'quake'
   | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise' | 'krakenGrip' | 'krakenRise' | 'webRot' | 'webBurn' | 'webGrown' | 'hawkCry';
 
 export interface SoundSettings {
@@ -816,6 +816,22 @@ export class Sound {
         this.noise(out, t + 0.04, { dur: 1.5, filter: 'highpass', f: 1800, to: 3200, q: 0.7, peak: 0.08, attack: 0.05 });
         this.noise(out, t + 0.04, { dur: 1.1, filter: 'bandpass', f: 700, to: 400, q: 0.8, peak: 0.05, attack: 0.03 });
         this.tone(out, t, { f: 46, to: 38, type: 'triangle', dur: 1.3, peak: 0.05, attack: 0.08, lp: 180 });
+        break;
+      case 'tremor':
+        // A Fault Engine begins to charge (#900), felt by every people: a long sub-bass swell that wavers, the creak of rock under strain,
+        // and a scatter of grit trickling down.
+        this.tone(out, t, { f: 34, to: 42, type: 'sine', dur: 2.4, peak: 0.07, attack: 0.9, lp: 120 });
+        this.tone(out, t + 0.2, { f: 52, to: 46, type: 'triangle', dur: 2.0, peak: 0.035, attack: 0.7, lp: 160 });
+        this.noise(out, t + 0.4, { dur: 1.6, filter: 'lowpass', f: 180, to: 90, q: 0.8, peak: 0.05, attack: 0.5 });
+        for (let i = 0; i < 4; i++) this.noise(out, t + 0.9 + i * 0.27, { dur: 0.08, filter: 'bandpass', f: 2600 - i * 300, q: 1.5, peak: 0.012, attack: 0.005 });
+        break;
+      case 'quake':
+        // The ground opens (#900): a crack like a split trunk, the roar of rock giving way, and the long rumble of it settling.
+        this.noise(out, t, { dur: 0.12, filter: 'highpass', f: 1400, to: 900, q: 0.7, peak: 0.12, attack: 0.002 });
+        this.tone(out, t, { f: 90, to: 28, type: 'square', dur: 0.5, peak: 0.06, attack: 0.004, lp: 500 });
+        this.noise(out, t + 0.05, { dur: 1.8, filter: 'lowpass', f: 700, to: 80, q: 0.7, peak: 0.1, attack: 0.03 });
+        this.tone(out, t + 0.1, { f: 40, to: 26, type: 'sine', dur: 2.6, peak: 0.09, attack: 0.1, lp: 140 });
+        for (let i = 0; i < 6; i++) this.noise(out, t + 0.5 + i * 0.19, { dur: 0.1, filter: 'bandpass', f: 500 + i * 140, q: 1.2, peak: 0.025, attack: 0.004 });
         break;
       case 'forgeCold':
         // A forge goes cold (#884): the roar of the vent sinking away, and the tick of cooling iron.

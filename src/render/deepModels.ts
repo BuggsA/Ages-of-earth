@@ -186,3 +186,68 @@ export function vent(k: Kit): void {
   for (const [x, z] of [[0.22, 0.32], [-0.2, -0.36], [0.36, -0.1]]) k.blob(0.07, SULPHUR, x, 0.03, z).scale.set(1.4, 0.35, 1.2);
   for (const [dx, y, r] of [[0, 0.3, 0.12], [0.06, 0.55, 0.16], [0.14, 0.85, 0.2]] as const) k.blob(r, STEAM, dx, y, -dx);
 }
+
+const RIFT = '#6e6a66';
+const RIFT_EDGE = '#8a8682';
+const RIFT_DARK = '#2a2c2e';
+const PIT = '#0c0e10';
+const CRYSTAL = '#3ad6c8';
+const CRYSTAL_PALE = '#9af2e8';
+
+/**
+ * A Fault Engine (the Age of Faults, #900): a crag split in two on a floor of riven slabs, its halves leaning apart, and between them a
+ * great wedge of dark stone driven down into the cleft, veined with teal crystal that glows with the strain. A crack runs out from the
+ * cleft's foot to the front, crystal glinting in it; a beam braced across the halves holds the wedge, and the owner's banner flies from
+ * the taller half.
+ */
+export function faultengine(k: Kit, base: string): void {
+  k.box(2.9, 0.05, 2.9, base, 0, -0.02, 0);
+  // Riven floor slabs, tilted a little each.
+  for (let i = 0; i < 6; i++) {
+    const x = ((i % 3) - 1) * 0.86;
+    const z = (i < 3 ? -0.5 : 0.5) + 0.1;
+    k.box(0.8, 0.06, 0.9, i % 2 ? RIFT : RIFT_EDGE, x, 0.01, z).rotation.y = (rnd(i, 3, 7) - 0.5) * 0.2;
+  }
+  // The two halves of the crag, leaning apart.
+  for (const [d, h, tilt] of [[-1, 1.9, -0.2], [1, 1.6, 0.18]] as const) {
+    const half = k.box(0.8, h, 1.3, d < 0 ? RIFT : RIFT_EDGE, d * 0.62, 0, -0.35);
+    half.rotation.z = tilt;
+    k.rock(0.3, RIFT_DARK, d * 1.05, 0.1, 0.45);
+  }
+  // The wedge, point down in the cleft, and its crystal veins.
+  const w = k.pyramid(0.7, 1.4, 0.9, RIFT_DARK, 0, 0.5, -0.35);
+  w.rotation.x = Math.PI;
+  for (const [x, y] of [[-0.12, 1.2], [0.1, 1.45], [0, 0.9]] as const) k.glow(k.box(0.05, 0.36, 0.04, CRYSTAL, x, y, 0.1));
+  // The beam braced across the crag, holding the wedge.
+  k.box(1.9, 0.14, 0.18, '#4a3a2c', 0, 1.62, -0.35);
+  for (const d of [-1, 1]) k.box(0.1, 0.26, 0.22, '#2a2624', d * 0.88, 1.55, -0.35);
+  // The crack out of the cleft's foot to the front, glowing, with crystal grown at its lips.
+  k.box(0.18, 0.02, 1.4, PIT, 0, 0.04, 0.6);
+  k.glow(k.box(0.08, 0.025, 1.3, CRYSTAL, 0, 0.045, 0.6));
+  for (const [x, z, s] of [[0.14, 0.3, 1], [-0.13, 0.75, 0.8], [0.12, 1.1, 0.7], [-0.1, 0.1, 0.9]] as const) k.glow(k.octa(0.09 * s, CRYSTAL_PALE, x, 0.08, z)).scale.set(0.7, 1.8, 0.7);
+  // The banner on the taller half.
+  k.cyl(0.02, 0.02, 0.7, 4, RIFT_DARK, -0.85, 1.75, -0.6);
+  k.team(k.box(0.3, 0.18, 0.02, TEAM, -0.7, 2.2, -0.6));
+  k.team(k.box(2.98, 0.08, 2.98, TEAM, 0, -0.06, 0));
+}
+
+/**
+ * A tile of chasm (#900): the ground split open, black in its depths, the broken lips of grey rock round it and a glint of teal crystal
+ * down the walls. Drawn over the ground, one to a tile, so a line of them reads as one crack.
+ */
+export function chasm(k: Kit): void {
+  k.box(1.02, 0.03, 1.02, RIFT_DARK, 0, 0, 0);
+  k.box(0.78, 0.035, 0.78, PIT, 0, 0.002, 0);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.4;
+    k.rock(0.09 + rnd(i, 3, 5) * 0.05, i % 2 ? RIFT : RIFT_EDGE, Math.cos(a) * 0.44, 0.02, Math.sin(a) * 0.44);
+  }
+  for (const [x, z] of [[0.22, -0.18], [-0.24, 0.2]] as const) k.glow(k.octa(0.05, CRYSTAL, x, 0.03, z)).scale.set(0.8, 1.6, 0.8);
+}
+
+/** A tile of a charging crack (#900): a thin glowing seam of teal in the ground, seen by every people before it opens. */
+export function seam(k: Kit): void {
+  k.box(0.9, 0.02, 0.12, RIFT_DARK, 0, 0, 0);
+  k.glow(k.box(0.86, 0.025, 0.06, CRYSTAL, 0, 0.005, 0));
+  k.glow(k.box(0.12, 0.025, 0.4, CRYSTAL, 0.22, 0.005, 0.1)).rotation.y = 0.7;
+}

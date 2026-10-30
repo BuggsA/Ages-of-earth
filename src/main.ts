@@ -1,5 +1,6 @@
 import { sink, sinkProblem } from './sim/undercity';
 import { forgeAt } from './sim/forge';
+import { faultProblem } from './sim/fault';
 import { delveProblem } from './sim/delve';
 import './ui/style.css';
 import { Music } from './audio/music';
@@ -9,7 +10,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, FAULT, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
@@ -131,7 +132,10 @@ let slingSpire = 0;
 let launchWarhead: WarheadKind | undefined;
 /** A salvo being aimed (#765): the points clicked so far, until there are `SALVO.trio`; null for a single launch. */
 let salvoAims: { x: number; y: number }[] | null = null;
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'delve' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'delve' | 'fault' | null = null;
+/** The Fault Engine whose crack is being aimed (#900), and the tile it begins on once the first click is made. */
+let faultEngine = 0;
+let faultFrom: { x: number; y: number } | null = null;
 /** The mouth a delve (#881) goes below from, while `targetMode` is 'delve'. */
 let delveFrom = 0;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
@@ -231,6 +235,13 @@ const hud = new Hud({
   unloadMode: () => {
     targetMode = 'unload';
     placing = null;
+  },
+  faultMode: (engine) => {
+    faultEngine = engine;
+    faultFrom = null;
+    targetMode = 'fault';
+    placing = null;
+    hud.toast(`Crack: click where the crack begins, then where it ends (up to ${FAULT.len} tiles)`, 'info');
   },
   delveMode: (from) => {
     delveFrom = from;
@@ -1818,7 +1829,7 @@ function placeHere(shift: boolean): void {
   if (!placeAt.ok) {
     // Ground the tide comes back to (#739) is said as such: it looks like land at low water.
     const why = placeProblem(s, placing, placeAt.tx, placeAt.ty, true, viewer);
-    hud.toast(why === 'tidal' ? "Can't build on the tidal flats: the sea comes back over them" : why === 'vent' ? "A Vent Forge is raised right over a vent of the earth's heat" : why === 'hot' ? "A vent's hot ground: only a Vent Forge is raised over a vent, and a people of the Deep Road keeps the ground round one clear" : "Can't build there", 'bad');
+    hud.toast(why === 'tidal' ? "Can't build on the tidal flats: the sea comes back over them" : why === 'vent' ? "A Vent Forge is raised right over a vent of the earth's heat" : why === 'hot' ? "A vent's hot ground: only a Vent Forge is raised over a vent, and a people of the Deep Road keeps the ground round one clear" : why === 'tap' ? `A Fault Engine is raised within ${FAULT.tap} tiles of a vent of the earth's heat` : why === 'chasm' ? 'The ground has split there: only a Bridge is laid over a chasm' : "Can't build there", 'bad');
     play('error');
     return;
   }
@@ -1922,6 +1933,30 @@ canvas.addEventListener('pointerdown', (e) => {
       hud.toast(why, 'bad');
       play('error');
     } else issue({ t: 'delve', p: viewer, from: delveFrom, to: to!.id });
+    targetMode = null;
+    return;
+  }
+  if (targetMode === 'fault') {
+    // The Faults (#900): two clicks, the crack's two ends.
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (!g || !s) return;
+    const at = { x: Math.floor(g.x), y: Math.floor(g.y) };
+    if (!faultFrom) {
+      faultFrom = at;
+      view.marker(s, at.x + 0.5, at.y + 0.5, true);
+      hud.toast('Crack: now click where it ends', 'info');
+      return;
+    }
+    const why = faultProblem(s, viewer, s.byId.get(faultEngine) as Building | undefined, faultFrom.x, faultFrom.y, at.x, at.y);
+    if (why) {
+      hud.toast(why, 'bad');
+      play('error');
+    } else {
+      issue({ t: 'fault', p: viewer, building: faultEngine, x0: faultFrom.x, y0: faultFrom.y, x1: at.x, y1: at.y });
+      view.marker(s, at.x + 0.5, at.y + 0.5, true);
+    }
+    faultFrom = null;
     targetMode = null;
     return;
   }
@@ -2937,6 +2972,24 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'fault': {
+        // The Faults (#900): a charge is felt by every people; the crack, its stall and its loss told to all.
+        const who = s.players[ev.owner]?.name ?? 'A rival';
+        const mine = ev.owner === viewer;
+        if (ev.what === 'charge') {
+          play('tremor');
+          if (mine) hud.toast(`〰 Your Fault Engine charges: the ground splits in ${FAULT.charge} seconds`, 'info');
+          else {
+            hud.toast(`⚠ The ground trembles: ${who}'s Fault Engine charges, and in ${FAULT.charge} seconds the glowing line splits open. Raze the engine or hold its vent`, 'alert');
+            lastAlert = { x: ev.x, y: ev.y };
+          }
+        } else if (ev.what === 'stall' && mine) {
+          hud.toast(`⏸ ${s.players[ev.by!]?.name ?? 'A rival'}'s soldiers hold your Fault Engine's vent: its charge has stopped. Drive them off`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        } else if (ev.what === 'lost') hud.toast(mine ? '✖ Your Fault Engine fell: its charge is lost' : `✔ ${who}'s Fault Engine fell: its charge is lost`, mine ? 'bad' : 'good');
+        else if (ev.what === 'crack') hud.toast(mine ? `⚡ The ground opened: ${ev.n} tiles of chasm` : `⚡ ${who} split the ground: a chasm of ${ev.n} tiles. Go round it, or lay a Bridge over it`, mine ? 'good' : 'alert');
+        break;
+      }
       case 'vent': {
         // The Deep Forges (#884): a forge of the viewer's gone cold under a rival's soldiers, or its steam let out.
         if (ev.owner !== viewer) break;
@@ -3442,6 +3495,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload' || targetMode === 'delve') return 'cur-garrison';
+  if (targetMode === 'fault') return 'cur-attack';
   if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch' || targetMode === 'sling') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
@@ -3825,6 +3879,30 @@ function frame(now: number): void {
     const at = forgeAt(s, vent);
     if (placeProblem(s, 'ventforge', at.tx, at.ty, true, owner)) return 0;
     const b = placeBuilding(s, owner, 'ventforge', at.tx, at.ty, true);
+    view.rig.focus(b.x, b.y);
+    return b.id;
+  },
+  /**
+   * The Age of Faults (testing, #900): turn a player to the age (having walked the road to it), give it stone and gold, and raise a
+   * finished Fault Engine by its home vent. Returns the engine's id, or 0 when there is no room by the vent.
+   */
+  faults(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.faults.tier;
+      p.age = 'faults';
+    });
+    p.walked = [...new Set([...(p.walked ?? []), 'megaliths', 'delvings', 'undercity', 'forges'] as AgeId[])];
+    p.res.stone += 2000;
+    p.res.gold += 1000;
+    s.peaceUntil = 0;
+    const vent = s.vents?.[owner];
+    if (vent === undefined) return 0;
+    const spot = findSpot(s, 'faultengine', (vent % s.w) + 0.5, Math.floor(vent / s.w) + 0.5, 3, FAULT.tap - 2, 1, (tx, ty) => !placeProblem(s, 'faultengine', tx, ty, true, owner));
+    if (!spot) return 0;
+    const b = placeBuilding(s, owner, 'faultengine', spot.tx, spot.ty, true);
     view.rig.focus(b.x, b.y);
     return b.id;
   },

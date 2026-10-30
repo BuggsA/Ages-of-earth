@@ -8,7 +8,7 @@ import { findSpot } from '../src/sim/ai';
 import { forgeAt } from '../src/sim/forge';
 import { crackTiles, crackable, engineVent, faultProblem, isChasm } from '../src/sim/fault';
 import { RES } from '../src/sim/types';
-import type { AgeId, Building, BuildingType, GameEvent, GameState, MapType } from '../src/sim/types';
+import type { AgeId, Building, GameEvent, GameState, MapType } from '../src/sim/types';
 import { maxHp, placeBuilding, restat, spawnUnit } from '../src/sim/world';
 
 /** The Deep Road's fifth age (#876 s5, #900): the Age of Faults, engines by the vents that crack the ground into chasms. */
@@ -30,10 +30,6 @@ const engine = (s: GameState, o = 0): Building => {
   const spot = findSpot(s, 'faultengine', (v % s.w) + 0.5, Math.floor(v / s.w) + 0.5, 3, FAULT.tap - 2, 1, (tx, ty) => !placeProblem(s, 'faultengine', tx, ty, true, o))!;
   expect(spot).toBeTruthy();
   return placeBuilding(s, o, 'faultengine', spot.tx, spot.ty, true);
-};
-const raise = (s: GameState, type: BuildingType, x: number, y: number, o = 0) => {
-  const spot = findSpot(s, type, x, y, 0, 30, 1, (tx, ty) => !placeProblem(s, type, tx, ty, true, o))!;
-  return placeBuilding(s, o, type, spot.tx, spot.ty, true);
 };
 const run = (s: GameState, sec: number) => {
   for (let i = 0; i < secs(sec); i++) step(s);
