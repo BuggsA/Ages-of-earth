@@ -1,5 +1,6 @@
 import { kinBonus } from './landmarks';
-import { BEACON, BUILDINGS, LANDMARKS, TELEGRAPH, UNDER } from './data';
+import { BEACON, BUILDINGS, LANDMARKS, TELEGRAPH, UNDER, domainOf } from './data';
+import { heightSight } from './terrain';
 import { inField } from './ages';
 import { modsOf } from './stats';
 import type { GameState } from './types';
@@ -10,11 +11,15 @@ import { pollenMul } from './bloom';
 
 const discs = new Map<number, Int16Array>();
 
-/** Tile offsets within a radius, as [dx, dy, dx, dy, ...]. */
-function disc(r: number): Int16Array {
-  const key = Math.round(r * 2);
+/**
+ * Tile offsets within a radius, as [dx, dy, dx, dy, ...]. The radius is taken to the nearest half tile, and the disc drawn from that,
+ * so the cache never depends on which radius asked first (sight from high ground, #925, is not a whole number of half tiles).
+ */
+function disc(r0: number): Int16Array {
+  const key = Math.round(r0 * 2);
   let d = discs.get(key);
   if (d) return d;
+  const r = key / 2;
   const out: number[] = [];
   const R = Math.ceil(r);
   for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= r * r + 0.5) out.push(dx, dy);
@@ -59,7 +64,8 @@ export function updateVision(s: GameState): void {
     if (e.hp <= 0) continue;
     const p = s.players[e.owner];
     let r: number;
-    if (e.kind === 'unit') r = statsOf(s, e).sight;
+    // A soldier on a rise sees further (#925); an aircraft is above it all.
+    if (e.kind === 'unit') r = statsOf(s, e).sight + (domainOf(e.type) === 'air' ? 0 : heightSight(s, e.x, e.y));
     // A sunk building (#883) looks out from its vents and doors only.
     else if (e.sunk) r = UNDER.sight + e.size / 2;
     else r = e.built ? BUILDINGS[e.type].sight + e.size / 2 + (e.beacon !== undefined && s.tick < e.beacon ? BEACON.sight : 0) : 2 + e.size / 2;

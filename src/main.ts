@@ -19,6 +19,7 @@ import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
+import { prominence, standAt } from './sim/terrain';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { carriesTorch, torchProblem } from './sim/fire';
 import { apartProblem, launchProblem, ringsFor, salvoProblem, salvoSilos, type WarheadKind } from './sim/silo';
@@ -44,7 +45,7 @@ import { journeyHtml } from './ui/journeyReport';
 import { phoneWelcome } from './ui/phoneWelcome';
 import { shareMatch } from './ui/shareCard';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
-import { KEYS, R_FISH, R_NONE, RES, T_WATER } from './sim/types';
+import { KEYS, R_FISH, R_NONE, RES, T_ROCK, T_WATER } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { salvages } from './sim/salvage';
@@ -4263,6 +4264,41 @@ function frame(now: number): void {
     setSelection([gate.id]);
     view.rig.focus(gate.x, gate.y);
     return gate.id;
+  },
+  /**
+   * High ground (testing, #925): five of the player's bowmen on the highest rise within 22 tiles of their start, selected, and a rival
+   * line of six spearmen on the lowest ground 9 tiles from them. Returns how far the rise stands above the land round it.
+   */
+  highGround(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    let best: { x: number; y: number; h: number } | null = null;
+    for (let ty = Math.floor(p.startY) - 22; ty <= p.startY + 22; ty++) {
+      for (let tx = Math.floor(p.startX) - 22; tx <= p.startX + 22; tx++) {
+        if ((tx - p.startX) ** 2 + (ty - p.startY) ** 2 < 64 || !walkable(s, tx, ty)) continue;
+        // A grassy rise, not the foot of a crag.
+        let open = true;
+        for (let dy = -2; dy <= 2 && open; dy++) for (let dx = -2; dx <= 2 && open; dx++) open = s.terrain[(ty + dy) * s.w + tx + dx] !== T_ROCK && s.terrain[(ty + dy) * s.w + tx + dx] !== T_WATER;
+        if (!open) continue;
+        const h = prominence(s, tx + 0.5, ty + 0.5);
+        if (!best || h > best.h) best = { x: tx + 0.5, y: ty + 0.5, h };
+      }
+    }
+    if (!best) return 0;
+    const ids: number[] = [];
+    for (let i = 0; i < 5; i++) ids.push(spawnUnit(s, owner, 'ranged', best.x - 0.8 + (i % 3) * 0.8, best.y - 0.4 + Math.floor(i / 3) * 0.8).id);
+    let low: { x: number; y: number } | null = null;
+    for (let k = 0; k < 16; k++) {
+      const x = best.x + Math.cos((k * Math.PI) / 8) * 9;
+      const y = best.y + Math.sin((k * Math.PI) / 8) * 9;
+      if (walkable(s, Math.floor(x), Math.floor(y)) && (!low || standAt(s, x, y) < standAt(s, low.x, low.y))) low = { x, y };
+    }
+    const rival = s.players.find((q) => q.id !== owner && isEnemy(s, owner, q.id));
+    if (rival && low) for (let i = 0; i < 6; i++) spawnUnit(s, rival.id, 'infantry', low.x - 1.2 + (i % 3) * 0.8, low.y + Math.floor(i / 3) * 0.8);
+    setSelection(ids);
+    view.rig.focus(best.x, best.y);
+    return best.h;
   },
   cocklerHut(owner: number) {
     if (!game) return 0;

@@ -71,6 +71,8 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_DEEP, AI_TEMPER, CORE, LODE, LODES, ROUTES, STRATA, TRUNK, type RouteId } from './data';
+import { AI_RIDGE } from './data';
+import { ridgeNear } from './terrain';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY, AI_MEWS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
@@ -7044,6 +7046,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const dy = enemy.y - v.home.y;
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;
   mem.muster = { x: v.home.x + (dx / dl) * 8, y: v.home.y + (dy / dl) * 8 };
+  // Between waves the army holds the high ground near home (#925): its archers shoot further down at whoever comes.
+  mem.muster = ridgeNear(s, mem.muster.x, mem.muster.y, AI_RIDGE.reach, AI_RIDGE.gain) ?? mem.muster;
   const ford = L.clever ? stagingFord(s, p.id, v.home, enemy) : null;
   if (ford) mem.muster = { x: ford.x, y: ford.y };
   // The Blood-rite (#355 s5) gathers its army by its forward altar, where the hurt are mended and the fallen foe pays blood.

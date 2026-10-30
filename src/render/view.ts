@@ -42,7 +42,7 @@ import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
 import { FoundationView } from './foundationView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, bent, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { airOf } from './ageAir';
@@ -699,6 +699,26 @@ export class View {
         for (const g of sortieRings(s, this.viewer, a)) if (guides.length < MAX_RANGE_GUIDES) guides.push(g);
         break;
       }
+    }
+    // High ground (#925): without Alt, one ring for the selection, its bowman nearest the middle, when the land bends its reach.
+    if (!sel.allBars && guides.length < MAX_RANGE_GUIDES) {
+      let cx = 0, cy = 0, n = 0;
+      for (const id of sel.ids) {
+        const at = this.units.drawn.get(id);
+        if (at) { cx += at.x; cy += at.z; n++; }
+      }
+      let pick: RangeGuide | null = null;
+      let pd = Infinity;
+      for (const id of sel.ids) {
+        const e = s.byId.get(id);
+        const at = this.units.drawn.get(id);
+        if (!e || e.kind !== 'unit' || !at) continue;
+        const g = selectedRange(s, this.viewer, e);
+        if (!g?.high) continue;
+        const d = (at.x - cx / n) ** 2 + (at.z - cy / n) ** 2;
+        if (d < pd) { pd = d; pick = { ...g, x: at.x, y: at.z }; }
+      }
+      if (pick && bent(s, pick)) guides.push(pick);
     }
     for (const id of sel.ids) {
       const e = s.byId.get(id);
