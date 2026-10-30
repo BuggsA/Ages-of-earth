@@ -3020,7 +3020,9 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       if (type === 'market') {
         // The counting-house (`merchantMarket`) is the whole look.
       } else if (type === 'house') awning(k, 0, 0.62, 0.85, 0.7, 3, 1);
-      else if (big) {
+      else if (type === 'towncenter') {
+        // The guildhall (`merchantTownCenter`) is the whole look.
+      } else if (big) {
         awning(k, -0.8, 1.0, 2.1, 1.4, 4, 0);
         awning(k, 0.8, 1.0, 2.1, 1.4, 4, 2);
       } else if (type === 'storehouse') awning(k, 0, 0.7, 1.0, 1.0, 4, 3);
@@ -3313,6 +3315,53 @@ function aeroForge(k: Kit, st: Style): void {
   }
 }
 
+/** The Merchants' Town Center (#816): a two-storey guildhall with a clock gable and a loading hoist, a canopied stall at each flank and a scale-and-bell post out front. */
+function merchantTownCenter(k: Kit, st: Style): void {
+  pad(k, 4, st.base);
+  // The hall: plinth, two floors parted by a band course, and a hipped roof under a clock gable.
+  k.box(2.6, 0.2, 1.9, st.wall2, 0, 0, -0.5);
+  k.box(2.4, 1.0, 1.7, st.wall, 0, 0.2, -0.5);
+  k.box(2.5, 0.07, 1.8, st.trim, 0, 1.2, -0.5);
+  k.box(2.3, 0.8, 1.6, st.wall, 0, 1.27, -0.5);
+  k.prism(2.5, 0.8, 1.8, st.roof, 0, 2.07, -0.5);
+  // Ground-floor arcade of three doors with lit windows over them.
+  for (const x of [-0.75, 0, 0.75]) {
+    k.box(0.42, 0.62, 0.03, '#2a1f17', x, 0.2, 0.36);
+    k.box(0.52, 0.07, 0.05, st.trim, x, 0.82, 0.37);
+    window(k, st, x, 1.5, 0.31, 0.16, 0.26);
+  }
+  // The clock gable and a gilded finial.
+  k.box(0.9, 0.5, 0.2, st.wall2, 0, 2.07, 0.3);
+  k.prism(1.0, 0.4, 0.22, st.roof, 0, 2.57, 0.3);
+  k.cyl(0.15, 0.15, 0.03, 10, '#efe3c0', 0, 2.17, 0.42).rotation.x = Math.PI / 2;
+  k.box(0.02, 0.12, 0.02, IRON_DARK, 0, 2.18, 0.45);
+  k.sphere(0.05, '#e2b23c', 0, 3.0, 0.3);
+  // The hoist over the side street, with rope and bale.
+  k.box(0.07, 0.07, 0.8, WOOD, 1.0, 2.0, 0.65);
+  k.cyl(0.012, 0.012, 0.45, 4, '#5b4330', 1.0, 1.52, 1.0);
+  k.box(0.26, 0.2, 0.22, '#d8c08a', 1.0, 1.32, 1.0);
+  // A canopied stall at each flank, striped cloth over a counter and goods.
+  for (const [sx, a] of [[-1.55, 0], [1.55, 2]] as [number, number][]) {
+    k.box(0.7, 0.32, 0.4, WOOD, sx, 0, 0.95);
+    for (const dx of [-0.32, 0.32]) k.cyl(0.018, 0.02, 0.85, 5, WOOD, sx + dx, 0, 1.2);
+    awning(k, sx, 0.88, 1.0, 0.8, 4, a);
+    k.sphere(0.07, '#c8553a', sx - 0.15, 0.32, 0.95);
+    k.box(0.16, 0.1, 0.14, '#d8c08a', sx + 0.15, 0.32, 0.95);
+  }
+  // The scale-and-bell post at the door, a team-coloured pennant beneath the bell.
+  k.cyl(0.04, 0.05, 1.5, 6, st.post, -0.45, 0, 1.45);
+  k.box(0.5, 0.04, 0.04, IRON_DARK, -0.45, 1.5, 1.45);
+  for (const dx of [-0.23, 0.23]) k.cyl(0.1, 0.1, 0.02, 8, '#e2b23c', -0.45 + dx, 1.28, 1.45);
+  k.cone(0.09, 0.14, 6, '#e2b23c', -0.45, 1.5, 1.45).position.y = 1.64;
+  k.team(k.box(0.2, 0.3, 0.02, TEAM, -0.45, 0.8, 1.5));
+  // Lanterns at the door, and the banners.
+  for (const x of [-0.4, 0.4]) {
+    k.cyl(0.012, 0.012, 0.14, 4, IRON_DARK, x, 0.96, 0.4);
+    k.glow(k.sphere(0.05, '#ffd890', x, 0.92, 0.4));
+  }
+  banner(k, 1.2, 0, -1.2, 1.4, 1.2);
+}
+
 /** The Aeronauts' Airfield (#816): no runway but a mooring mast, an airship riding at its nose with a winch house and fuel drums below. */
 function aeroAirfield(k: Kit, st: Style): void {
   k.box(3.9, 0.05, 3.9, '#8fa586', 0, -0.02, 0);
@@ -3408,7 +3457,7 @@ function aeroTerminal(k: Kit, st: Style): void {
 /** Buildings an age raises in a shape of its own (#816), in place of the trunk's model; its touches still follow. */
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
   iron: { house: ironHouse, towncenter: ironHillfort },
-  merchant: { market: merchantMarket, barracks: merchantBarracks },
+  merchant: { market: merchantMarket, barracks: merchantBarracks, towncenter: merchantTownCenter },
   aeronaut: { house: aeroHouse, forge: aeroForge, airfield: aeroAirfield, towncenter: aeroTerminal },
 };
 
