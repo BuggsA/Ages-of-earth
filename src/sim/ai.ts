@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, AI_BEGGARS, AI_HUNT, HUNT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, GEMS, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, AI_BEGGARS, AI_HUNT, HUNT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
@@ -46,7 +46,8 @@ import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, freeShaft, nearestTemple, TILE_OF_RARE } from './units';
-import { seamOf, seamProblem, siteGrade } from './shafts';
+import { blastProblem, deepenProblem, depthOf, floodedAt, propProblem, pumpCost, pumpProblem, pumping, seamOf, seamProblem, siteGrade, spentAt, wetLayer } from './shafts';
+import { coreProblem, coresOf, drillingLeft, kindOf, lodeOfSite, patchOf } from './lodes';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findPath, findRoute } from './path';
 import { isEnemy, maxHp, townCenters } from './world';
@@ -69,7 +70,9 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_DEEP, AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
+import { AI_DEEP, AI_TEMPER, CORE, LODE, LODES, ROUTES, STRATA, TRUNK, type RouteId } from './data';
+import { AI_RIDGE } from './data';
+import { ridgeNear } from './terrain';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY, AI_MEWS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
@@ -605,6 +608,11 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;
     }
+  }
+  // Gems (#924 m4) are sold while a lot fetches `SHAFT.aiGems`: below it, they wait for the price to climb back.
+  if ((p.gems ?? 0) >= GEMS.lot && (s.market.gems ?? GEMS.price) >= SHAFT.aiGems) {
+    issue({ t: 'trade', p: p.id, res: 'gems', buy: false });
+    return;
   }
   // On the Deep Road (#906) the next climb is paid in stone: gold beyond its own buys the stone, and food or wood piled past it is sold for gold.
   const deep = deepNext(p);
@@ -3498,9 +3506,105 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const drops = v.buildings.filter((b) => b.built && BUILDINGS[b.type].drop.length);
     const dry = (['gold', 'stone'] as const).filter((r) => want[r] >= 1 && mineable(p, TILE_OF[r]) && !drops.some((b) => findResource(s, TILE_OF[r], b.x, b.y, SHAFT.aiNear) >= 0));
     if (dry.length && !v.buildings.some((b) => b.type === 'shaft' && !b.built) && !freeShaft(s, p.id, home.x, home.y, s.w + s.h)) {
-      const at = (g: 'old' | 'hill' | null) => findSpot(s, 'shaft', home.x, home.y, 4, SHAFT.aiReach, 1, g ? (tx, ty) => siteGrade(s, { tx, ty, size: 2 }) === g : undefined);
+      // The ground below (#924 m3): the best ground its cores show for what it lacks, within reach of home, comes first.
+      const near2 = (dx: number, dy: number) => dx * dx + dy * dy;
+      const worth = (code: number) => dry.reduce((a, r) => a + LODES[kindOf(code)][r], 0) / dry.length;
+      const cores = coresOf(s, p.id);
+      const rich = cores.filter((c) => worth(c.lode) > 1 && near2(c.tile % s.w - home.x, Math.floor(c.tile / s.w) - home.y) <= CORE.aiReach * CORE.aiReach).sort((a, b) => worth(b.lode) - worth(a.lode) || a.tile - b.tile)[0];
+      const there = rich ? findSpot(s, 'shaft', (rich.tile % s.w) + 0.5, Math.floor(rich.tile / s.w) + 0.5, 0, 5, 1, (tx, ty) => lodeOfSite(s, { tx, ty, size: 2 }) === rich.lode) : null;
+      if (there && construct(s, v, mem, 'shaft', there, 1, issue)) return;
+      // Else home, over old workings, by rock or on open ground: never on ground a core showed poor.
+      const poor = cores.filter((c) => worth(c.lode) < 1).map((c) => patchOf(c.tile % s.w, Math.floor(c.tile / s.w)));
+      const fair = (tx: number, ty: number) => !poor.some((q) => tx + 1 >= q.x0 && tx + 1 < q.x0 + q.side && ty + 1 >= q.y0 && ty + 1 < q.y0 + q.side);
+      const at = (g: 'old' | 'hill' | null) => findSpot(s, 'shaft', home.x, home.y, 4, SHAFT.aiReach, 1, (tx, ty) => fair(tx, ty) && (!g || siteGrade(s, { tx, ty, size: 2 }) === g));
       const spot = at('old') ?? at('hill') ?? at(null);
       if (spot && construct(s, v, mem, 'shaft', spot, 1, issue)) return;
+    }
+    // Core samples (#924 m3): with a Lodge standing idle, it drills a few round home, a compass point at a time.
+    const lodge = v.buildings.find((b) => b.type === 'prospector' && b.built && b.queue.length === 0 && drillingLeft(s, b) === 0);
+    const drawn = p.cores?.length ?? 0;
+    if (lodge && drawn < CORE.aiCores && afford(v, CORE.cost)) {
+      // The four quarters first, then the points between; nearer in where the far point is unseen or off the map.
+      let done = false;
+      for (let k = 0; k < COMPASS.length && !done; k++) {
+        const [dx, dy] = COMPASS[(drawn * 4 + k * 5) % COMPASS.length];
+        for (let r = CORE.aiRing; r >= LODE.home && !done; r -= 4) {
+          const x = Math.floor(home.x + dx * r) + 0.5;
+          const y = Math.floor(home.y + dy * r) + 0.5;
+          if (coreProblem(s, p.id, lodge, x, y)) continue;
+          spend(v, CORE.cost);
+          issue({ t: 'core', p: p.id, building: lodge.id, x, y });
+          done = true;
+        }
+      }
+    }
+  }
+
+  // The deep mine (#924 m1): a shaft whose seam is dug out in every layer it reaches is sunk a layer deeper, with wood to spare.
+  // From the Gunpowder Age (#924 m2) it is blasted open at once when the gold is there. Before either, an unshored layer below
+  // the first is shored, with wood to spare: the computer takes no chances with its miners.
+  if (p.epoch >= 1 && s.tick - (mem.deepLook ?? -99999) > secs(10)) {
+    mem.deepLook = s.tick;
+    let done = false;
+    for (const b of v.buildings) {
+      if (b.type !== 'shaft' || !b.built) continue;
+      for (let l = 1; l <= depthOf(b) && !done; l++) {
+        if (propProblem(b, l)) continue;
+        const cost = STRATA[l].prop;
+        if ((v.budget.wood ?? 0) < (cost.wood ?? 0) + SHAFT.aiProp || !afford(v, cost)) continue;
+        spend(v, cost);
+        issue({ t: 'prop', p: p.id, building: b.id, layer: l });
+        done = true;
+      }
+      if (done) break;
+    }
+    // The wet deep (#924 m4): a pump goes up at a shaft that has broken into the water, or is about to, with wood and gold to
+    // spare; and a shaft never breaks into it without one, nor before it can raise one.
+    const wet = wetLayer();
+    for (const b of done || wet < 0 ? [] : v.buildings) {
+      if (b.type !== 'shaft' || pumpProblem(s, b)) continue;
+      const seam = seamOf(s, b);
+      if (depthOf(b) < wet && !(seam && spentAt(b, seam) && !deepenProblem(s, b))) continue;
+      const cost = pumpCost(s, p.id);
+      if (!RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + SHAFT.aiPump)) continue;
+      spend(v, cost);
+      issue({ t: 'pump', p: p.id, building: b.id });
+      done = true;
+      break;
+    }
+    // Gems: a clever computer with a Market sets a pumped shaft in the wet deep to them while a lot fetches enough, and back to
+    // gold when the price falls.
+    const gems = s.market.gems ?? GEMS.price;
+    for (const b of done || wet < 0 || !AI_LEVELS[p.ai!].clever || !v.buildings.some((m) => m.type === 'market' && m.built) ? [] : v.buildings) {
+      if (b.type !== 'shaft' || !b.built || depthOf(b) < wet || !pumping(s, b) || floodedAt(b, wet)) continue;
+      const now = seamOf(s, b);
+      if (now !== 'gems' && gems >= SHAFT.aiGems && !seamProblem(s, b, 'gems')) {
+        issue({ t: 'seam', p: p.id, building: b.id, seam: 'gems' });
+        done = true;
+        break;
+      }
+      if (now === 'gems' && gems < SHAFT.aiGems && !seamProblem(s, b, 'gold')) {
+        issue({ t: 'seam', p: p.id, building: b.id, seam: 'gold' });
+        done = true;
+        break;
+      }
+    }
+    for (const b of done ? [] : v.buildings) {
+      if (b.type !== 'shaft' || deepenProblem(s, b)) continue;
+      const seam = seamOf(s, b);
+      if (!seam || (seam !== 'stone' && seam !== 'gold') || !spentAt(b, seam)) continue;
+      const next = STRATA[depthOf(b) + 1];
+      if (next.fill > 0 && !b.pump) continue;
+      if (!blastProblem(s, b) && (v.budget.gold ?? 0) >= (next.blast.gold ?? 0) + SHAFT.aiBlast && afford(v, next.blast)) {
+        spend(v, next.blast);
+        issue({ t: 'deepen', p: p.id, building: b.id, blast: true });
+        break;
+      }
+      const cost = next.sink;
+      if ((v.budget.wood ?? 0) < (cost.wood ?? 0) + SHAFT.aiSink || !afford(v, cost)) continue;
+      spend(v, cost);
+      issue({ t: 'deepen', p: p.id, building: b.id });
+      break;
     }
   }
 
@@ -3778,7 +3882,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
   let tile = findResource(s, TILE_OF[res], from.x, from.y, SHAFT.aiNear);
   // No deposit near a drop (#681): a free Mine Shaft of its own, set to this stock, before the long walk to a far one.
   if (tile < 0 && v.p.epoch >= 1 && res !== 'wood') {
-    const pit = freeShaft(s, v.p.id, v.home.x, v.home.y, SHAFT.aiReach + 10);
+    const pit = freeShaft(s, v.p.id, v.home.x, v.home.y, SHAFT.aiReach + 10, undefined, res);
     if (pit && !seamProblem(s, pit, res)) {
       if (seamOf(s, pit) !== res) issue({ t: 'seam', p: v.p.id, building: pit.id, seam: res });
       issue({ t: 'work', p: v.p.id, ids: [u.id], target: pit.id });
@@ -5853,7 +5957,9 @@ export function enemyTarget(s: GameState, p: Player): Building | null {
     const blood = !hemo ? 0 : e.type === 'transfusion' ? AI_HEMO.bomb : e.type === 'bloodtower' ? AI_HEMO.bomb / 2 : 0;
     // On a feast day a rival's fairground Market is where the gold is (#379): raid it while the purse is full.
     const feast = e.type === 'market' && e.built && ageDef(s.players[e.owner]).fairs && feastOpen(s) && fairground(s, e.owner, e) ? AI_FAIR.raid : 0;
-    const d = dx * dx + dy * dy - blood - feast + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
+    // A rival's deep pithead (#924 m2): bring it down and the miners below go with it.
+    const pit = e.type === 'shaft' && e.built ? SHAFT.aiRaid * depthOf(e) : 0;
+    const d = dx * dx + dy * dy - blood - feast - pit + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
     if (d < bestD) {
       bestD = d;
       best = e;
@@ -6495,6 +6601,21 @@ function pitchStation(s: GameState, v: View, mem: AiMemory, wave: Unit[], issue:
   mem.ordered.transfusion = s.tick;
 }
 
+/** The nearest rival pithead sunk below its first layer (#924 m2) the computer has seen within `SHAFT.aiRaidNear` tiles of home, or null. */
+export function rivalPithead(s: GameState, p: Player, home: { x: number; y: number }): Building | null {
+  let best: Building | null = null;
+  let bestD = SHAFT.aiRaidNear * SHAFT.aiRaidNear;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'shaft' || !e.built || e.hp <= 0 || depthOf(e) < 1 || !isEnemy(s, p.id, e.owner)) continue;
+    if (!p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
+    if (d >= bestD) continue;
+    bestD = d;
+    best = e;
+  }
+  return best;
+}
+
 /** The nearest rival War Camp the computer has seen within `AI_BLOOD.answer` tiles of home, or null. */
 export function rivalWarCamp(s: GameState, p: Player, home: { x: number; y: number }): Building | null {
   let best: Building | null = null;
@@ -6969,6 +7090,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const dy = enemy.y - v.home.y;
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;
   mem.muster = { x: v.home.x + (dx / dl) * 8, y: v.home.y + (dy / dl) * 8 };
+  // Between waves the army holds the high ground near home (#925): its archers shoot further down at whoever comes.
+  mem.muster = ridgeNear(s, mem.muster.x, mem.muster.y, AI_RIDGE.reach, AI_RIDGE.gain) ?? mem.muster;
   const ford = L.clever ? stagingFord(s, p.id, v.home, enemy) : null;
   if (ford) mem.muster = { x: ford.x, y: ford.y };
   // The Blood-rite (#355 s5) gathers its army by its forward altar, where the hurt are mended and the fallen foe pays blood.
@@ -7136,6 +7259,17 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     const band = camp ? ready.filter(prowler) : [];
     if (camp && band.length >= AI_BLOOD.strike) {
       issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: camp.x, y: camp.y, amove: true });
+      return;
+    }
+  }
+  // A rival's deep pithead in reach (#924 m2): bring it down and the miners below go with it. Now and then, between waves, and
+  // not in a campaign chapter, whose play stays as its proof found it.
+  if (L.clever && !s.scenario && !mem.attacking && !plan.hold && s.tick >= s.peaceUntil && s.tick - (mem.pitRaid ?? -99999) > secs(SHAFT.aiRaidEvery)) {
+    const pit = rivalPithead(s, p, v.home);
+    const band = pit ? ready.filter(prowler) : [];
+    if (pit && band.length >= SHAFT.aiRaidBand) {
+      mem.pitRaid = s.tick;
+      issue({ t: 'attack', p: p.id, ids: band.slice(0, SHAFT.aiRaidBand * 2).map((u) => u.id), target: pit.id });
       return;
     }
   }

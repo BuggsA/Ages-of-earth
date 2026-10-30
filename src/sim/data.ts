@@ -2991,12 +2991,111 @@ export const SHAFT = {
     saltpetre: { name: 'Saltpetre', old: true },
     bloodiron: { name: 'Blood-iron', old: true },
     glowcap: { name: 'Glowcaps', old: true },
-  } as Record<'stone' | 'gold' | RareId, { name: string; old: boolean }>,
+    // Gems (#924 m4) lie in the wet deep only: no ground holds them nearer the grass, and they are dug only while their vein lasts.
+    gems: { name: 'Gems', old: true, deep: true },
+  } as Record<'stone' | 'gold' | RareId | 'gems', { name: string; old: boolean; deep?: boolean }>,
   aiNear: 26,
   aiReach: 18,
   aiWood: 250,
   aiMax: 3,
+  aiSink: 100,
+  // The deep mine m2 (#924, #929): props, cave-ins, blasting and the pithead as a target (`STRATA` holds each layer's own).
+  shut: 45,
+  blastAge: 3,
+  firedamp: 0.35,
+  firedampShored: 0.1,
+  strandHurt: 0.5,
+  winchDepth: 2,
+  winchHurt: 0.5,
+  winchSlow: 0.5,
+  aiProp: 60,
+  aiBlast: 150,
+  aiRaid: 600,
+  aiRaidNear: 40,
+  aiRaidBand: 4,
+  aiRaidEvery: 180,
+  // The wet deep (#924 m4): floods, the pump and gems (`STRATA[].fill`, `LODES[].wet` and `.gems`, `GEMS`).
+  inrush: 0.25,
+  drown: 0.5,
+  pumpAge: 4,
+  pump: { wood: 300, gold: 200 } as Cost,
+  mill: { wood: 220 } as Cost,
+  drain: 40,
+  gemGrade: 0.35,
+  aiPump: 80,
+  aiGems: 60,
 };
+
+/**
+ * The deep mine (#924 m1, `docs/deep-mine.md`): the layers a Mine Shaft is sunk through, top first. A new shaft stands in the
+ * first; sinking it one layer deeper costs that layer's `sink` and takes `time` seconds, from age `epoch`, and the shaft digs
+ * nothing while it sinks. Each layer holds finite `veins` (per seam: how much there is to dig, for every shaft), dug at the
+ * ground's grade (`SHAFT.grade`) plus `add`, by up to `room` miners at a time. A spent vein, or a seam the layer doesn't hold,
+ * is still dug at the plain grade, so a shaft is never worse than it was (rule 1). `tint` is the band's colour in the cut-away.
+ * A later layer, or a later seam in one, is one more entry here.
+ *
+ * The computer sinks a shaft a layer deeper once the vein it digs is spent in every layer it has reached, with `SHAFT.aiSink`
+ * more wood in hand than the sinking costs.
+ *
+ * Props and cave-ins (#924 m2): a layer with a `fall` is shored for `prop` (wood, once). Unshored, its miners dig `rush` faster
+ * (the share of an open deposit's pace, over the vein's), but each full basket risks a cave-in, `fall` the chance, on the
+ * match's dice: the miners at its face die and the layer is shut `SHAFT.shut` seconds, or until it is shored. From age
+ * `SHAFT.blastAge` a layer is blasted open at once for `blast` instead of sunk, with a chance of firedamp in the layer above
+ * (`SHAFT.firedamp`, or `SHAFT.firedampShored` where that layer is shored): a cave-in there. A pithead that falls strands its
+ * miners: those below the first layer die; those in it climb out with `SHAFT.strandHurt` of their health. A shaft
+ * `SHAFT.winchDepth` layers down hauls by winch: below `SHAFT.winchHurt` of its health, its lower layers dig at
+ * `SHAFT.winchSlow` of their pace. The computer shores a layer once it has `SHAFT.aiProp` wood over the props, blasts with
+ * `SHAFT.aiBlast` gold over the charge; its bombers are drawn to a rival's deep pithead (`SHAFT.aiRaid` a layer), and between
+ * waves, at most every `SHAFT.aiRaidEvery` seconds, a band of `SHAFT.aiRaidBand` falls on one seen within `SHAFT.aiRaidNear` tiles.
+ */
+export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | RareId | 'gems', number>>; add: number; room: number; sink: Cost; time: number; epoch: number; tint: string; prop: Cost; rush: number; fall: number; blast: Cost; fill: number }[] = [
+  { name: 'Clay and gravel', veins: { stone: 250 }, add: 0.2, room: 2, sink: {}, time: 0, epoch: 1, tint: '#b48a5c', prop: {}, rush: 0, fall: 0, blast: {}, fill: 0 },
+  { name: 'Bedrock', veins: { stone: 450, gold: 400 }, add: 0.4, room: 3, sink: { wood: 200 }, time: 40, epoch: 1, tint: '#857868', prop: { wood: 120 }, rush: 0.15, fall: 0.04, blast: { gold: 150 }, fill: 0 },
+  { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662', prop: { wood: 200 }, rush: 0.2, fall: 0.06, blast: { gold: 250 }, fill: 0 },
+  { name: 'The wet deep', veins: { stone: 200, gold: 500, gems: 360 }, add: 0.7, room: 4, sink: { wood: 450, stone: 150 }, time: 75, epoch: 3, tint: '#3e5a66', prop: { wood: 260 }, rush: 0.2, fall: 0.05, blast: { gold: 300 }, fill: 120 },
+];
+/**
+ * The wet deep (#924 m4, `docs/deep-mine.md`): a layer with a `fill` takes on water from the moment the shaft reaches it,
+ * filling in `fill` seconds (sooner on wet ground: `LODES[].wet` scales the rise) unless a pump stands at the pithead. While the
+ * water stands in it, every full basket there risks an inrush on the match's dice, `SHAFT.inrush` times the water's height:
+ * the layer fills at once and each miner at its face drowns with chance `SHAFT.drown`, else is driven up with
+ * `SHAFT.strandHurt` of their health. Water that rises to the roof drives the miners up unhurt; a flooded layer takes no one
+ * until it is pumped. The pump: a steam engine from age `SHAFT.pumpAge` for `SHAFT.pump`, or, for a people that walked the
+ * Age of Dykes, a windmill pump in any age for `SHAFT.mill`. It pumps a full layer dry in `SHAFT.drain` seconds and keeps it
+ * dry while the pithead stands above `SHAFT.winchHurt` of its health; a hurt pithead's pump stalls and the water rises again.
+ * Gems are dug in the wet deep only, at `SHAFT.gemGrade` of an open deposit of gold's pace, while their vein lasts (scaled by
+ * `LODES[].gems`), and sold at the Market (`GEMS`). The computer pumps with `SHAFT.aiPump` to spare over the pump's price, and
+ * sends its gold hands to the gems while a lot fetches `SHAFT.aiGems` or more.
+ */
+
+
+/**
+ * The ground below differs (#924 m3, `docs/deep-mine.md`): the match's seed lays the map out in lodes, patches of `LODE.cell`
+ * tiles, each one of the kinds of `LODES`, drawn by `weight` round `LODE.patch` tiles apart so the kinds lie in broad tracts.
+ * Every patch within `LODE.home` tiles of a town's start is common ground, so every town digs the same at home (rule 1) and
+ * the rich ground, and the poor, lie out on the map. A kind scales the layers' `veins` of stone and of gold, adds `add` to their
+ * pace while they last, and scales the chance of a cave-in by `fall`; every kind holds some stone and gold (rule 1). A tract out
+ * on the map holds, with chance `LODE.ore`, a seam of a rare ore this world holds (glowcaps aside: they wait on the hot deep) in
+ * layer `LODE.oreLayer`: `LODE.oreVein` of it, dug at `LODE.oreGrade` of an open deposit's pace while it lasts, and only there.
+ * `tint` is the patch's colour in the underground view and on a core's cap. The wet deep (#924 m4): `wet` scales how fast its
+ * water rises, `gems` its vein of gems; a core shows both.
+ */
+export const LODE = { cell: 8, patch: 22, home: 14, ore: 0.35, oreLayer: 2, oreVein: 300, oreGrade: 0.5 };
+export const LODES: { name: string; stone: number; gold: number; add: number; fall: number; weight: number; tint: string; blurb: string; wet: number; gems: number }[] = [
+  { name: 'Common ground', stone: 1, gold: 1, add: 0, fall: 1, weight: 4, tint: '#a08c6c', blurb: 'the plain run of the earth, as under every town', wet: 1, gems: 1 },
+  { name: 'A gold reef', stone: 0.7, gold: 2.2, add: 0.1, fall: 1, weight: 2, tint: '#e6bc3e', blurb: 'gold threaded thick through the deep rock', wet: 1, gems: 1.3 },
+  { name: 'Building stone', stone: 2.2, gold: 0.6, add: 0.05, fall: 0.8, weight: 2, tint: '#ddd5c0', blurb: 'sound, even beds of good stone', wet: 0.6, gems: 0.6 },
+  { name: 'Poor ground', stone: 0.4, gold: 0.35, add: 0, fall: 1, weight: 3, tint: '#6b6762', blurb: 'thin, worked-out rock: little to dig', wet: 1.4, gems: 0.5 },
+  { name: 'Sound rock', stone: 1.2, gold: 1, add: 0, fall: 0.3, weight: 2, tint: '#7d8ea6', blurb: 'hard rock that holds its roof', wet: 0.4, gems: 0.8 },
+  { name: 'Shattered ground', stone: 1.4, gold: 1.6, add: 0.1, fall: 2.5, weight: 2, tint: '#b0604c', blurb: 'faulted rock, rich and loose: it falls in', wet: 1.8, gems: 1.6 },
+];
+/**
+ * Core samples (#924 m3): a finished Prospector's Lodge drills a core at any tile its people has seen, for `cost`, one at a
+ * time, ready `time` seconds later: a striped column at the spot shows the ground below, layer by layer, and its patch shows
+ * in the underground view (U). A people keeps its `most` latest. The computer with a Lodge drills `aiCores`, `aiRing` tiles out
+ * from home round the compass, and sites its shafts on the best cored ground within `aiReach` of home for the stock it lacks.
+ */
+export const CORE = { cost: { food: 40, wood: 40 } as Cost, time: 15, most: 12, near: 2, aiCores: 4, aiRing: 24, aiReach: 34 };
 
 /** The interceptor's numbers (`INTERCEPT`), named here so the battery's words can say them. */
 const INTERCEPT_REACH = 12;
@@ -3053,8 +3152,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed, its warhead lost. Warheads come from the people\'s store, not the silo: one at first, one more every 240 seconds, up to 3 counting those in the air, fired from any silo. At most 2 silos (3 with Launch Control, researched here, which opens the salvo (B): three silos firing at once), and every player sees a finished one on the map.' },
-  // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
-  shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
+  // Mine Shafts (#681): miners dig stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`), sunk through layers (`STRATA`, #924).
+  shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: `A timber headframe over a hole in the ground. Citizens dig stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft. Each layer holds a vein that digs faster until it runs out, and room for a few miners: sink the shaft deeper (wood, and time it digs nothing) to reach richer layers, down to ${STRATA[STRATA.length - 1].name.toLowerCase()}.` },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
   // The Age of Deep Forges (#884, the Deep Road): raised over a vent, it drives the buildings round it (`VENT`, `forge.ts`).
@@ -4047,6 +4146,12 @@ export const TIDINGS = { at: [140, 290], jitter: 50, fade: 30,
 export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100,
   /** Every `every` seconds each price moves this far back toward where it started, so a glut or a shortage fades. */
   recover: 1, every: 10 };
+/**
+ * Gems at the Market (#924 m4): a lot of `lot` gems sells for `price` gold to start. Each lot sold, by anyone, takes `step` off
+ * the price, down to `min`; every `MARKET.every` seconds it climbs `recover` back toward `price`. Gems cannot be bought. A
+ * glut is everyone's: a rival dumping gems cheapens yours, and a patient seller gets the most.
+ */
+export const GEMS = { lot: 20, price: 120, step: 8, min: 30, recover: 2 };
 
 export const START_RES = { food: 300, wood: 250, stone: 150, gold: 100 };
 /** Extra to start with when starting in a later epoch. */
@@ -4747,3 +4852,25 @@ export const BATTLE = { recent: 3, near: 8, join: 9, reach: 10, crushing: 0.8, w
  * once nothing armed and hostile is within `clear` tiles of the building and `hold` seconds have passed.
  */
 export const FLEE = { shelter: 14, run: 8, pad: 3, clear: 10, hold: 6 };
+
+/**
+ * The lay of the land t1: high ground (#925, `docs/lay-of-the-land.md`). Heights are the map's corner heights (`groundAt`),
+ * water counted at `sea`.
+ * - Reach: a ranged unit (not an aircraft, nor at one) shooting at a target lower than it by more than `rise` reaches
+ *   `reachPer` tiles further for each unit of height past `rise`, at most `reachUp`; shooting up at one higher by more than
+ *   `rise`, it falls short by the same, at most `reachDown`.
+ * - Sight: a unit standing higher than the mean of `ring` (eight) points `around` tiles out by more than `sightFrom` sees `sightPer`
+ *   tiles further for each unit of height past it, at most `sightMax`.
+ * - Climbing: a soldier of the line (`climbers`) walking up a slope steeper than `climbFrom` (height a tile) goes slower, its pace
+ *   divided by 1 + `climb` for each unit of slope past it, never under `climbMin` of its pace. The slope is read `look` tiles ahead.
+ *   Workers know their own tracks, and beasts are sure-footed.
+ */
+export const TERRAIN = {
+  sea: 0, rise: 0.3, reachPer: 2.5, reachUp: 2, reachDown: 1,
+  ring: 8, around: 6, sightFrom: 0.15, sightPer: 6, sightMax: 3,
+  climbFrom: 0.1, climb: 1.5, climbMin: 0.6, look: 0.5,
+  climbers: ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'blowpipe'] as UnitType[],
+};
+
+/** The computer holds the high ground (#925): its army waits on the highest open ground within `reach` tiles of its muster, if that stands `gain` higher. */
+export const AI_RIDGE = { reach: 5, gain: 0.3 };

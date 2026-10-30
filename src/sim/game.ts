@@ -3,6 +3,7 @@ import { forgeStep } from './forge';
 import { faultStep } from './fault';
 import { delveStep } from './delve';
 import { hengeStep } from './henge';
+import { deepenStep, seepStep, strand } from './shafts';
 import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
@@ -28,9 +29,10 @@ import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { fleeStep } from './flee';
 import { applyCommand } from './commands';
-import { AGES, AURA, AUTO_WORK, TICK_HZ, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, AUTO_WORK, TICK_HZ, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, GEMS, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
 import { AIR, BARGE, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
+import { layLodes } from './lodes';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { elmoStep } from './elmo';
@@ -232,6 +234,8 @@ export function createGame(setup: GameSetup): GameState {
   for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
   markHomeHerds(s);
   if (map.caves.length) s.caves = map.caves.map((c) => ({ ...c }));
+  // The ground below (#924 m3): laid from the seed, on maps drawn for a match (campaigns keep common ground).
+  if (!setup.scenario) s.lodes = layLodes(setup.seed, map.w, map.h, map.starts, map.rares);
   if (map.landmarks.length) s.landmarks = map.landmarks.map((m) => ({ id: s.nextId++, x: m.x, y: m.y, kind: m.kind, owner: -1, claim: 0, by: -1 }));
   for (const c of map.caves) if (c.den) for (const p of denWolves(c.tile, map.w)) spawnAnimal(s, p.x, p.y, 'wolf');
   // Each raider camp's band keeps its fire as home (what ties them together).
@@ -515,6 +519,8 @@ function removeDead(s: GameState): void {
     const c = s.byId.get(id);
     if (c) c.hp = 0;
   }
+  // A pithead that falls strands the miners below it (#924 m2).
+  for (const e of s.ents) if (e.kind === 'building' && e.hp <= 0 && e.type === 'shaft') strand(s, e);
   let any = false;
   for (const e of s.ents) {
     if (e.hp > 0) continue;
@@ -659,6 +665,11 @@ function driftMarket(s: GameState): void {
     const d = home - s.market[r];
     s.market[r] += d > 0 ? Math.min(d, MARKET.recover) : -Math.min(-d, MARKET.recover);
   }
+  // Gems (#924 m4) climb back toward their price; absent until the first lot is sold.
+  if (s.market.gems !== undefined) {
+    s.market.gems = Math.min(GEMS.price, s.market.gems + GEMS.recover);
+    if (s.market.gems >= GEMS.price) delete s.market.gems;
+  }
 }
 
 export function step(s: GameState, cmds: readonly Command[] = []): void {
@@ -710,6 +721,8 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   floodStep(s);
   tideStep(s);
   hengeStep(s);
+  deepenStep(s);
+  seepStep(s);
   delveStep(s, ungarrison);
   underStep(s);
   forgeStep(s);

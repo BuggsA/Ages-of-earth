@@ -1,11 +1,29 @@
 /**
  * Mine Shafts (#681): stone and gold dug from the ground once the open deposits are gone. What the ground round a shaft holds
  * (old workings, mountain rock or plain earth) sets which seams it may dig and how fast; the numbers are `SHAFT` in `data.ts`.
+ *
+ * The deep mine (#924 m1, `docs/deep-mine.md`): a shaft is sunk down through the layers of `STRATA`. Each layer holds finite
+ * veins, richer the deeper, and room for a few miners; a spent vein is still dug at the ground's plain grade, so a shaft is
+ * never worse than it was before it had layers.
+ *
+ * Props, cave-ins and blasting (#924 m2): a layer below the first is shored with timber, or dug unshored, faster, with a chance
+ * on the match's dice of a cave-in on every full basket. From the Gunpowder Age a layer is blasted open at once, with a chance of
+ * firedamp above. A pithead that falls strands the miners below it.
+ *
+ * The ground below differs (#924 m3, `lodes.ts`): the lode under a shaft scales its layers' veins of stone and gold, their
+ * pace and the chance of a cave-in, and may hold a seam of a rare ore in one layer, dug there only while it lasts.
+ *
+ * The wet deep (#924 m4): a layer with a `fill` takes on water from the day it is reached, and floods unless a pump stands at
+ * the pithead. Every full basket while the water stands risks an inrush on the match's dice; gems lie there and nowhere else.
  */
-import { MEGALITH, SHAFT } from './data';
+import { LODE, LODES, MEGALITH, SHAFT, STRATA, EPOCHS, secs } from './data';
+import { hasWalked } from './ages';
+import { kindOf, lodeOfSite, oreOf } from './lodes';
+import { roll } from './animals';
 import { deepQuarry } from './henge';
 import { mineable } from './household';
-import type { Building, GameState, Res, SeamId } from './types';
+import { maxHp } from './world';
+import type { Building, GameState, Order, Res, SeamId, Unit } from './types';
 import { R_BLOODIRON, R_GLOWCAP, R_GOLD, R_SALT, R_SALTPETRE, R_STONE, T_ROCK } from './types';
 
 export type Grade = keyof typeof SHAFT.grade;
@@ -14,10 +32,10 @@ export type Grade = keyof typeof SHAFT.grade;
 export const SEAMS = Object.keys(SHAFT.seams) as SeamId[];
 
 /** The tile kind a seam is dug as (its pace and its mining technologies are that deposit's). */
-export const TILE_OF_SEAM: Record<SeamId, number> = { stone: R_STONE, gold: R_GOLD, salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON, glowcap: R_GLOWCAP };
+export const TILE_OF_SEAM: Record<SeamId, number> = { stone: R_STONE, gold: R_GOLD, salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON, glowcap: R_GLOWCAP, gems: R_GOLD };
 
-/** The stock a seam pays into: a rare ore is carried as stone and kept apart at the drop, as from its vein. */
-export const resOfSeam = (seam: SeamId): Res => (seam === 'gold' ? 'gold' : 'stone');
+/** The stock a seam pays into: a rare ore is carried as stone and kept apart at the drop, as from its vein; gems (#924 m4) ride as gold and are kept apart too. */
+export const resOfSeam = (seam: SeamId): Res => (seam === 'gold' || seam === 'gems' ? 'gold' : 'stone');
 
 /** The tiles round a shaft's footprint (it too) that its ground is read from, `SHAFT.near` out. */
 function around(s: GameState, b: { tx: number; ty: number; size: number }, see: (i: number) => void): void {
@@ -37,17 +55,40 @@ export function groundAt(s: GameState, b: { tx: number; ty: number; size: number
   });
   const out = {} as Record<SeamId, Grade | null>;
   for (const seam of SEAMS) {
-    out[seam] = old.has(TILE_OF_SEAM[seam]) ? 'old' : SHAFT.seams[seam].old ? null : rock ? 'hill' : 'open';
+    // A seam of the deep (#924 m4: gems) has no plain grade: no ground nearer the grass holds it.
+    out[seam] = SHAFT.seams[seam].deep ? null : old.has(TILE_OF_SEAM[seam]) ? 'old' : SHAFT.seams[seam].old ? null : rock ? 'hill' : 'open';
   }
   return out;
 }
 
-/** The seams a shaft here may dig for its people: held by the ground, and worked by that people (a household mines no gold, a nomad camp quarries no stone, #501). */
+/**
+ * The seams a shaft here may dig for its people: held by the ground (or by its lode, #924 m3), and worked by that people (a
+ * household mines no gold, a nomad camp quarries no stone, #501).
+ */
 export function seamsAt(s: GameState, b: { tx: number; ty: number; size: number; owner: number }): SeamId[] {
   const g = groundAt(s, b);
   const p = s.players[b.owner];
-  return SEAMS.filter((m) => g[m] && mineable(p, TILE_OF_SEAM[m]));
+  const ore = oreOf(codeOf(s, b));
+  // A seam of the deep (#924 m4: gems) is a shaft's to dig once it is sunk to the layer that holds it.
+  const deep = (m: SeamId) => !!SHAFT.seams[m].deep && 'kind' in b && b.kind === 'building' && depthOf(b as Building) >= STRATA.findIndex((L) => (L.veins[m] ?? 0) > 0);
+  return SEAMS.filter((m) => (g[m] || ore === m || deep(m)) && mineable(p, TILE_OF_SEAM[m]));
 }
+
+/** Whether a seam at this shaft is held only by its lode (#924 m3): a rare ore with no old workings, dug in its one layer while it lasts. */
+export const lodeOnly = (s: GameState, b: { tx: number; ty: number; size: number }, seam: SeamId): boolean => !groundAt(s, b)[seam] && oreOf(codeOf(s, b)) === seam;
+
+/**
+ * The one layer a seam with no plain grade lies in at this shaft, or -1 for a seam its ground holds: a lode's rare seam in
+ * `LODE.oreLayer` (#924 m3), gems in the wet deep (#924 m4). Such a seam is dug only there, while its vein lasts.
+ */
+export function boundLayer(s: GameState, b: { tx: number; ty: number; size: number }, seam: SeamId): number {
+  if (groundAt(s, b)[seam]) return -1;
+  if (oreOf(codeOf(s, b)) === seam) return LODE.oreLayer;
+  return SHAFT.seams[seam]?.deep ? STRATA.findIndex((L) => (L.veins[seam] ?? 0) > 0) : -1;
+}
+
+/** The lode under a shaft (stamped on it when placed; common ground in an older save), or under a site for one. */
+const codeOf = (s: GameState, b: { tx: number; ty: number; size: number; kind?: string; lode?: number }): number => (b.kind === 'building' ? (b.lode ?? 0) : lodeOfSite(s, b));
 
 const RANK: Record<Grade, number> = { old: 3, hill: 2, open: 1 };
 
@@ -59,13 +100,18 @@ export function bestSeam(s: GameState, b: { tx: number; ty: number; size: number
   // A people building in stone (#877) starts a shaft on stone on a tie: it is what the town waits on.
   const first: SeamId[] = deepQuarry(s, b.owner) ? ['stone', 'gold'] : ['gold', 'stone'];
   for (const m of [...first, ...SEAMS.filter((x) => x !== 'gold' && x !== 'stone')] as SeamId[]) {
-    if (can.includes(m) && (!best || RANK[g[m]!] > RANK[g[best]!])) best = m;
+    // A seam held only by the lode (#924 m3) is dug when chosen, never by default.
+    if (can.includes(m) && g[m] && (!best || RANK[g[m]!] > RANK[g[best]!])) best = m;
   }
   return best;
 }
 
 /** The seam a shaft digs now: its own choice while that still holds, else the best there (null: none its people may dig). */
 export function seamOf(s: GameState, b: Building): SeamId | null {
+  // A seam held only below (#924 m3, m4) is dug while its vein lasts and its layer is not under water; else the shaft goes
+  // back to the best of its ground, and to the seam again once its layer is pumped dry.
+  const at = b.seam ? boundLayer(s, b, b.seam) : -1;
+  if (at >= 0 && (depthOf(b) < at || veinLeft(b, at, b.seam!) <= 0 || floodedAt(b, at))) return bestSeam(s, b);
   return b.seam && seamsAt(s, b).includes(b.seam) ? b.seam : bestSeam(s, b);
 }
 
@@ -81,6 +127,15 @@ export function shaftShare(s: GameState, b: { tx: number; ty: number; size: numb
 /** Why a shaft can't be set to dig this seam, or null. */
 export function seamProblem(s: GameState, b: Building, seam: SeamId): string | null {
   if (!(seam in SHAFT.seams)) return 'No such seam';
+  const at = boundLayer(s, b, seam);
+  if (at >= 0) {
+    const name = SHAFT.seams[seam].name.toLowerCase();
+    if (!mineable(s.players[b.owner], TILE_OF_SEAM[seam])) return seam === 'gems' ? 'Your people mines no gold, nor gems' : 'Your people quarries no stone';
+    if (depthOf(b) < at) return `The ${name} ${seam === 'gems' ? 'lie' : 'lies'} in ${STRATA[at].name.toLowerCase()}: sink the shaft that deep`;
+    if (veinLeft(b, at, seam) <= 0) return seam === 'gems' ? 'The gems are dug out' : `The seam of ${name} is dug out`;
+    if (floodedAt(b, at)) return `${STRATA[at].name} is flooded: pump it dry`;
+    return null;
+  }
   if (!groundAt(s, b)[seam]) return `${SHAFT.seams[seam].name} is dug only where a vein of it was worked out`;
   if (!mineable(s.players[b.owner], TILE_OF_SEAM[seam])) return seam === 'gold' ? 'Your people mines no gold' : 'Your people quarries no stone';
   return null;
@@ -90,4 +145,347 @@ export function seamProblem(s: GameState, b: Building, seam: SeamId): string | n
 export function siteGrade(s: GameState, b: { tx: number; ty: number; size: number }): Grade {
   const g = groundAt(s, b);
   return g.stone === 'old' || g.gold === 'old' ? 'old' : g.stone!;
+}
+
+// ---- The deep mine (#924 m1) --------------------------------------------------------------------------------------
+
+/** The deepest layer a shaft reaches (0: the first). A shaft from an older save stands in the first. */
+export const depthOf = (b: Building): number => Math.min(b.depth ?? 0, STRATA.length - 1);
+
+/**
+ * How much of a seam's vein a layer of this shaft held at first (#924 m3): the layer's own, scaled by the lode under it for
+ * stone and gold, and the lode's rare seam in its one layer.
+ */
+export function veinFull(b: { lode?: number }, layer: number, seam: SeamId): number {
+  const L = STRATA[layer];
+  if (!L) return 0;
+  const code = b.lode ?? 0;
+  if (oreOf(code) === seam && layer === LODE.oreLayer) return LODE.oreVein + (L.veins[seam] ?? 0);
+  const k = LODES[kindOf(code)];
+  const n = L.veins[seam] ?? 0;
+  return seam === 'stone' ? Math.round(n * k.stone) : seam === 'gold' ? Math.round(n * k.gold) : seam === 'gems' ? Math.round(n * k.gems) : n;
+}
+
+/** How much of a seam's vein is left to dig in a layer of this shaft (0 where the layer holds none, or it is spent). */
+export function veinLeft(b: Building, layer: number, seam: SeamId): number {
+  return Math.max(0, veinFull(b, layer, seam) - (b.worked?.[layer]?.[seam] ?? 0));
+}
+
+/** The chance a full basket brings a layer of this shaft down while it is unshored: the layer's, scaled by the lode (#924 m3). */
+export const fallOf = (b: { lode?: number }, layer: number): number => (STRATA[layer]?.fall ?? 0) * LODES[kindOf(b.lode ?? 0)].fall;
+
+/** Take one load's worth from a layer's vein. */
+function takeVein(b: Building, layer: number, seam: SeamId): void {
+  b.worked ??= [];
+  while (b.worked.length <= layer) b.worked.push({});
+  const row = (b.worked[layer] ??= {});
+  row[seam] = (row[seam] ?? 0) + 1;
+}
+
+/**
+ * The share of an open deposit's pace a miner in this layer digs a seam at: the plain grade, more while the layer's vein lasts,
+ * and more again where the layer is dug unshored (#924 m2). Never less than the plain grade (rule 1).
+ */
+export function digShare(s: GameState, b: Building, seam: SeamId, layer: number): number {
+  const floor = shaftShare(s, b, seam);
+  const vein = veinLeft(b, layer, seam) > 0;
+  // A seam held only by the lode (#924 m3) has no plain grade: it digs where its vein lies, while it lasts.
+  if (!floor && !vein) return 0;
+  const rush = safeAt(b, layer) ? 0 : STRATA[layer].rush;
+  if (!vein) return floor + rush;
+  // Gems (#924 m4) are slow to cut from the wet rock: their own pace, not the layer's.
+  if (seam === 'gems') return SHAFT.gemGrade + LODES[kindOf(b.lode ?? 0)].add + rush;
+  const g = groundAt(s, b)[seam];
+  return Math.max(floor, (g ? SHAFT.grade[g] : LODE.oreGrade) + STRATA[layer].add + LODES[kindOf(b.lode ?? 0)].add) + rush;
+}
+
+// ---- Props, cave-ins and blasting (#924 m2) ----------------------------------------------------------------------
+
+/** Whether a layer is safe to dig: it never falls in (the first), or it is shored with props. */
+export const safeAt = (b: Building, layer: number): boolean => !(STRATA[layer]?.fall > 0) || !!b.propped?.[layer];
+
+/** Whether a layer is shut by a cave-in's rubble now. */
+export const shutAt = (s: GameState, b: Building, layer: number): boolean => (b.shut?.[layer] ?? 0) > s.tick;
+
+/** Seconds until a caved-in layer is cleared, or 0. */
+export const shutLeft = (s: GameState, b: Building, layer: number): number => (shutAt(s, b, layer) ? Math.ceil((b.shut![layer] - s.tick) / secs(1)) : 0);
+
+/** Why a layer of a shaft can't be shored now, or null. Its cost is checked where it is paid. */
+export function propProblem(b: Building, layer: number): string | null {
+  if (b.type !== 'shaft') return 'Only a Mine Shaft is shored';
+  if (!b.built) return 'Finish the shaft first';
+  if (!STRATA[layer] || layer > depthOf(b)) return 'The shaft is not sunk that deep yet';
+  if (!(STRATA[layer].fall > 0)) return `${STRATA[layer].name} stands without props`;
+  if (b.propped?.[layer]) return `${STRATA[layer].name} is shored already`;
+  return null;
+}
+
+/** The layer a shaft's Shore button props: the deepest it reaches that still wants props, or -1. */
+export function toShore(b: Building): number {
+  for (let l = depthOf(b); l > 0; l--) if (!safeAt(b, l)) return l;
+  return -1;
+}
+
+/** Shore a layer with props (paid by the caller): safe from now on, and a cave-in's rubble there is cleared at once. */
+export function prop(b: Building, layer: number): void {
+  b.propped ??= [];
+  while (b.propped.length <= layer) b.propped.push(false);
+  b.propped[layer] = true;
+  if (b.shut?.[layer]) b.shut[layer] = 0;
+}
+
+/** A layer falls in: the miners at its face die, in id order, and it is shut `SHAFT.shut` seconds. Returns how many died. */
+export function caveIn(s: GameState, b: Building, layer: number, why: 'fall' | 'firedamp'): number {
+  let dead = 0;
+  for (const e of s.ents) {
+    if (!crewman(e, b) || e.order.layer !== layer || e.order.phase !== 'work') continue;
+    e.hp = 0;
+    dead++;
+  }
+  b.shut ??= [];
+  while (b.shut.length <= layer) b.shut.push(0);
+  b.shut[layer] = s.tick + secs(SHAFT.shut);
+  s.events.push({ k: 'caveIn', owner: b.owner, id: b.id, x: b.x, y: b.y, layer, dead, why });
+  return dead;
+}
+
+/** A full basket dug in an unshored layer: a roll of the match's dice whether the layer falls in. True if it did. */
+export function riskLoad(s: GameState, b: Building, layer: number): boolean {
+  if (safeAt(b, layer)) return false;
+  if (roll(s) >= fallOf(b, layer)) return false;
+  caveIn(s, b, layer, 'fall');
+  return true;
+}
+
+/** Why a shaft can't be blasted a layer deeper now, or null. Its charge is checked where it is paid. */
+export function blastProblem(s: GameState, b: Building): string | null {
+  const why = deepenProblem(s, b);
+  if (why) return why;
+  if (s.players[b.owner].epoch < SHAFT.blastAge) return `Blasting comes with the ${EPOCHS[SHAFT.blastAge].name}`;
+  return null;
+}
+
+/** Blast a shaft a layer deeper at once (paid by the caller), with a roll for firedamp in the layer above. */
+export function blast(s: GameState, b: Building): void {
+  const above = depthOf(b);
+  b.depth = above + 1;
+  s.events.push({ k: 'blast', owner: b.owner, id: b.id, x: b.x, y: b.y, layer: b.depth });
+  const chance = safeAt(b, above) && STRATA[above].fall > 0 ? SHAFT.firedampShored : SHAFT.firedamp;
+  if (roll(s) < chance) caveIn(s, b, above, 'firedamp');
+}
+
+/** A shaft's winch is hurt: one sunk `SHAFT.winchDepth` layers down, under `SHAFT.winchHurt` of its health. */
+export const winchHurt = (s: GameState, b: Building): boolean => depthOf(b) >= SHAFT.winchDepth && b.hp < maxHp(s, b) * SHAFT.winchHurt;
+
+/**
+ * A pithead has fallen (#924 m2): the miners at its faces are stranded. Those below the first layer die with the winch; those in
+ * the first climb out hurt, off the face, so a second call passes them by. Their next step finds the shaft gone and sends them on.
+ * Called by the first of its miners to find it fallen, and as it is cleared away, whichever comes first.
+ */
+export function strand(s: GameState, b: Building): void {
+  let dead = 0;
+  for (const e of s.ents) {
+    if (!crewman(e, b) || e.order.phase !== 'work') continue;
+    if ((e.order.layer ?? 0) > 0) {
+      e.hp = 0;
+      dead++;
+    } else {
+      e.hp = Math.max(1, Math.floor(e.hp * SHAFT.strandHurt));
+      e.order.phase = 'go';
+    }
+  }
+  if (dead) s.events.push({ k: 'caveIn', owner: b.owner, id: b.id, x: b.x, y: b.y, layer: depthOf(b), dead, why: 'stranded' });
+}
+
+/** Whether a unit works this shaft (on its way to it, at it, or hauling from it). */
+const crewman = (e: GameState['ents'][number], b: Building): e is Unit & { order: Extract<Order, { k: 'shaft' }> } =>
+  e.kind === 'unit' && e.hp > 0 && e.owner === b.owner && e.order.k === 'shaft' && e.order.target === b.id;
+
+/** A shaft's crew: how many hold a place in each layer it reaches, and how many are on their way without one. */
+export function crewOf(s: GameState, b: Building, skip?: Unit): { at: number[]; coming: number } {
+  const at = STRATA.map(() => 0);
+  let coming = 0;
+  for (const e of s.ents) {
+    if (e === skip || !crewman(e, b)) continue;
+    const l = e.order.layer;
+    if (l === undefined || l > depthOf(b)) coming++;
+    else at[l]++;
+  }
+  return { at, coming };
+}
+
+/** How many miners a shaft has room for, in all the layers it reaches. */
+export function roomOf(b: Building): number {
+  let n = 0;
+  for (let l = 0; l <= depthOf(b); l++) n += STRATA[l].room;
+  return n;
+}
+
+/** How many more miners a shaft takes: its room less its crew, those on their way too. */
+export function roomLeft(s: GameState, b: Building): number {
+  const c = crewOf(s, b);
+  return roomOf(b) - c.coming - c.at.reduce((a, n) => a + n, 0);
+}
+
+/**
+ * The layer a miner arriving at a shaft takes: its own while that still has a vein of the seam, else the deepest with room
+ * and a vein, else its own, else the deepest with room (dug at the plain grade). -1: no room at all.
+ */
+export function placeFor(s: GameState, b: Building, u: Unit, seam: SeamId, want?: number): number {
+  const { at } = crewOf(s, b, u);
+  // A flooded layer (#924 m4) takes no one until it is pumped dry.
+  const open = (l: number) => l >= 0 && l <= depthOf(b) && at[l] < STRATA[l].room && !shutAt(s, b, l) && !floodedAt(b, l);
+  if (want !== undefined && open(want) && veinLeft(b, want, seam) > 0) return want;
+  for (let l = depthOf(b); l >= 0; l--) if (open(l) && veinLeft(b, l, seam) > 0) return l;
+  // A seam held only below (#924 m3, m4) is dug nowhere else: no place where its vein isn't.
+  if (boundLayer(s, b, seam) >= 0) return -1;
+  if (want !== undefined && open(want)) return want;
+  for (let l = depthOf(b); l >= 0; l--) if (open(l)) return l;
+  return -1;
+}
+
+/** One miner's stroke at the face: what it digs in a tick, and the vein it takes from while that lasts. */
+export function digAt(s: GameState, b: Building, seam: SeamId, layer: number, rate: number, u: Unit): void {
+  const vein = veinLeft(b, layer, seam) > 0;
+  // A hurt winch (#924 m2) hauls slowly from below the first layer.
+  u.frac += rate * digShare(s, b, seam, layer) * (layer > 0 && winchHurt(s, b) ? SHAFT.winchSlow : 1);
+  while (u.frac >= 1) {
+    u.frac -= 1;
+    u.carry++;
+    if (vein && veinLeft(b, layer, seam) > 0) takeVein(b, layer, seam);
+  }
+}
+
+/** Whether every layer a shaft reaches has its vein of this seam dug out (a seam no layer holds counts as spent). */
+export function spentAt(b: Building, seam: SeamId): boolean {
+  for (let l = 0; l <= depthOf(b); l++) if (veinLeft(b, l, seam) > 0) return false;
+  return true;
+}
+
+/** Why a shaft can't be sunk a layer deeper now, or null. Its cost is checked where it is paid. */
+export function deepenProblem(s: GameState, b: Building): string | null {
+  if (b.type !== 'shaft') return 'Only a Mine Shaft is sunk';
+  if (!b.built) return 'Finish the shaft first';
+  if (b.deepening !== undefined) return 'Already sinking';
+  const next = STRATA[depthOf(b) + 1];
+  if (!next) return 'The shaft is as deep as it goes';
+  if (s.players[b.owner].epoch < next.epoch) return `${next.name} is reached from the ${EPOCHS[next.epoch].name}`;
+  return null;
+}
+
+/** Start sinking a shaft a layer deeper (paid by the caller). */
+export function deepen(s: GameState, b: Building): void {
+  b.deepening = s.tick + secs(STRATA[depthOf(b) + 1].time);
+}
+
+/** Seconds until a shaft being sunk reaches its next layer, or 0. */
+export const deepeningLeft = (s: GameState, b: Building): number => (b.deepening === undefined ? 0 : Math.max(0, Math.ceil((b.deepening - s.tick) / secs(1))));
+
+/** Each tick: shafts being sunk reach their next layer. */
+export function deepenStep(s: GameState): void {
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'shaft' || e.deepening === undefined || s.tick < e.deepening) continue;
+    e.depth = depthOf(e) + 1;
+    delete e.deepening;
+  }
+}
+
+// ---- The wet deep: floods and the pump (#924 m4) -----------------------------------------------------------------
+
+/** Whether a layer takes on water (it has a `fill`). */
+export const wetAt = (l: number): boolean => (STRATA[l]?.fill ?? 0) > 0;
+
+/** How high the water stands in a layer of this shaft: 0 dry, 1 flooded to the roof. */
+export const waterAt = (b: Building, l: number): number => b.water?.[l] ?? 0;
+
+/** Whether a layer is flooded: it takes no miner until it is pumped. */
+export const floodedAt = (b: Building, l: number): boolean => waterAt(b, l) >= 1;
+
+/** The first wet layer of `STRATA`, or -1. */
+export const wetLayer = (): number => STRATA.findIndex((L) => L.fill > 0);
+
+/** How many seconds the water takes to fill a layer of this shaft from dry, unpumped: its `fill`, sooner on wet ground. */
+export const fillOf = (b: { lode?: number }, l: number): number => (wetAt(l) ? STRATA[l].fill / LODES[kindOf(b.lode ?? 0)].wet : 0);
+
+/** Whether a shaft's pump works now: raised, and its pithead above `SHAFT.winchHurt` of its health (a hurt one stalls). */
+export const pumping = (s: GameState, b: Building): boolean => !!b.pump && b.hp >= maxHp(s, b) * SHAFT.winchHurt;
+
+/** The pump a people raises: a windmill pump for one that walked the Age of Dykes (#701), else a steam engine. */
+export const pumpKind = (s: GameState, owner: number): 'mill' | 'steam' => (s.players[owner] && hasWalked(s.players[owner], 'dykes') ? 'mill' : 'steam');
+
+/** What a people's pump costs. */
+export const pumpCost = (s: GameState, owner: number) => (pumpKind(s, owner) === 'mill' ? SHAFT.mill : SHAFT.pump);
+
+/** Why a pump can't be raised at this shaft now, or null. Its cost is checked where it is paid. */
+export function pumpProblem(s: GameState, b: Building): string | null {
+  if (b.type !== 'shaft') return 'Only a Mine Shaft is pumped';
+  if (!b.built) return 'Finish the shaft first';
+  if (b.pump) return 'A pump stands at the pithead already';
+  const wet = wetLayer();
+  if (wet < 0 || depthOf(b) < wet - 1) return wet < 0 ? 'No layer takes on water' : `Nothing to pump until the shaft nears ${STRATA[wet].name.toLowerCase()}`;
+  if (pumpKind(s, b.owner) === 'steam' && s.players[b.owner].epoch < SHAFT.pumpAge) return `A steam pump comes with the ${EPOCHS[SHAFT.pumpAge].name} (a windmill pump sooner, for a people that walked the Age of Dykes)`;
+  return null;
+}
+
+/** Raise a pump at the pithead (paid by the caller). */
+export function raisePump(s: GameState, b: Building): void {
+  b.pump = pumpKind(s, b.owner);
+}
+
+function setWater(b: Building, l: number, w: number): void {
+  b.water ??= [];
+  while (b.water.length <= l) b.water.push(0);
+  b.water[l] = w;
+}
+
+/**
+ * The water breaks in, or rises to the roof: the layer stands flooded, and the miners at its face are driven up. An inrush
+ * drowns each with chance `SHAFT.drown` (in id order, on the match's dice); the rest climb out hurt. Water that rose slowly
+ * lets them climb out whole. Those driven up carry their basket to the drop, or go back to the pithead for another place.
+ */
+export function floodOut(s: GameState, b: Building, layer: number, why: 'inrush' | 'rose'): void {
+  setWater(b, layer, 1);
+  let dead = 0;
+  let up = 0;
+  for (const e of s.ents) {
+    if (!crewman(e, b) || e.order.layer !== layer || e.order.phase !== 'work') continue;
+    if (why === 'inrush' && roll(s) < SHAFT.drown) {
+      e.hp = 0;
+      dead++;
+      continue;
+    }
+    if (why === 'inrush') e.hp = Math.max(1, Math.floor(e.hp * SHAFT.strandHurt));
+    delete e.order.layer;
+    e.order.phase = e.carry > 0 ? 'drop' : 'go';
+    up++;
+  }
+  s.events.push({ k: 'flood', owner: b.owner, id: b.id, x: b.x, y: b.y, layer, dead, up, why });
+}
+
+/** A full basket dug where the water stands: a roll of the match's dice, `SHAFT.inrush` times its height, for an inrush. True if one came. */
+export function riskFlood(s: GameState, b: Building, layer: number): boolean {
+  const w = waterAt(b, layer);
+  if (w <= 0 || w >= 1) return false;
+  if (roll(s) >= SHAFT.inrush * w) return false;
+  floodOut(s, b, layer, 'inrush');
+  return true;
+}
+
+/** Each tick: the water rises in every wet layer a shaft reaches, or falls where its pump works. */
+export function seepStep(s: GameState): void {
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'shaft' || !e.built || e.hp <= 0) continue;
+    for (let l = 0; l <= depthOf(e); l++) {
+      if (!wetAt(l)) continue;
+      const w = waterAt(e, l);
+      if (pumping(s, e)) {
+        if (w > 0) setWater(e, l, Math.max(0, w - 1 / secs(SHAFT.drain)));
+        continue;
+      }
+      if (w >= 1) continue;
+      const next = Math.min(1, w + 1 / secs(fillOf(e, l)));
+      setWater(e, l, next);
+      if (next >= 1) floodOut(s, e, l, 'rose');
+    }
+  }
 }

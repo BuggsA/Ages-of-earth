@@ -1,3 +1,4 @@
+import { lodeOfSite } from './lodes';
 import { digsAt, hiddenFrom } from './undercity';
 import { kinBonus } from './landmarks';
 import { BUILDINGS, LANDMARKS, POP_MAX, domainOf, type UnitStats } from './data';
@@ -135,6 +136,8 @@ export function placeBuilding(s: GameState, owner: number, type: BuildingType, t
     born: s.tick,
   };
   if (type === 'dock') b.dir = waterSide(s, tx, ty, size);
+  // A Mine Shaft keeps the lode under it (#924 m3): what its layers hold.
+  if (type === 'shaft') b.lode = lodeOfSite(s, b);
   s.ents.push(b);
   s.byId.set(b.id, b);
   stampBuilding(s, b, true);

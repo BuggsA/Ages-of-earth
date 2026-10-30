@@ -42,13 +42,14 @@ import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
 import { FoundationView } from './foundationView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, bent, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { airOf } from './ageAir';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
-import { FogTexture, TerrainView, heightAt } from './terrain';
+import { FogTexture, TerrainView, heightAt, terrainMaterial } from './terrain';
+import { CoresView } from './coresView';
 import { AIR_ALT, UnitsView, wearOf } from './unitsView';
 import { ageSparks } from './ageGrounds';
 import { WATER_Y, WaterView } from './water';
@@ -124,6 +125,14 @@ export class View {
   readonly ruins = new RuinsView();
   readonly finds = new FindsView();
   readonly springs = new SpringsView();
+  /** Core samples (#924 m3): the viewer's striped columns, and their patches in the underground view. */
+  readonly cores = new CoresView();
+  /**
+   * The underground view (#924 m3, U): the surface fades (its people, trees and other buildings set aside, the ground darkened)
+   * and the pitheads and cores stand out, the cored patches lit in their lodes' colours.
+   */
+  underground = false;
+  private wasUnder = false;
   readonly vents = new VentsView();
   /** Chasms and charging cracks (#900). */
   readonly chasms = new ChasmView();
@@ -217,7 +226,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.vents.group, this.chasms.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.cores.group, this.vents.group, this.chasms.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -286,6 +295,7 @@ export class View {
     this.ruins.clear();
     this.finds.clear();
     this.springs.clear();
+    this.cores.clear();
     this.vents.clear();
     this.chasms.clear();
     this.rubble.clear();
@@ -576,6 +586,8 @@ export class View {
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.springs.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
+    this.cores.update(s, this.viewer, this.underground);
+    this.goUnder(this.underground);
     this.vents.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.chasms.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, performance.now() / 1000);
     this.tides.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
@@ -687,6 +699,26 @@ export class View {
         for (const g of sortieRings(s, this.viewer, a)) if (guides.length < MAX_RANGE_GUIDES) guides.push(g);
         break;
       }
+    }
+    // High ground (#925): without Alt, one ring for the selection, its bowman nearest the middle, when the land bends its reach.
+    if (!sel.allBars && guides.length < MAX_RANGE_GUIDES) {
+      let cx = 0, cy = 0, n = 0;
+      for (const id of sel.ids) {
+        const at = this.units.drawn.get(id);
+        if (at) { cx += at.x; cy += at.z; n++; }
+      }
+      let pick: RangeGuide | null = null;
+      let pd = Infinity;
+      for (const id of sel.ids) {
+        const e = s.byId.get(id);
+        const at = this.units.drawn.get(id);
+        if (!e || e.kind !== 'unit' || !at) continue;
+        const g = selectedRange(s, this.viewer, e);
+        if (!g?.high) continue;
+        const d = (at.x - cx / n) ** 2 + (at.z - cy / n) ** 2;
+        if (d < pd) { pd = d; pick = { ...g, x: at.x, y: at.z }; }
+      }
+      if (pick && bent(s, pick)) guides.push(pick);
     }
     for (const id of sel.ids) {
       const e = s.byId.get(id);
@@ -1543,6 +1575,30 @@ export class View {
           this.cue('tideWash', this.rig.target.x, this.rig.target.z, ev.level === 0 || ev.bared === 0 ? 0.45 : 0.3);
           this.resources.markDirty();
           break;
+        case 'caveIn': {
+          // A layer of a Mine Shaft falls in (#924 m2): a cough of dust from the pithead and a dull thud from under the ground.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.2);
+          this.effects.burst(at, { count: 14, speed: 0.7, up: 1.2, life: 2.2, size: 0.16, grow: 2.6, gravity: -0.3, drag: 1, soft: true, colors: ['#8a7d6c', '#6e6355', '#a69886'] });
+          this.cue('caveIn', ev.x, ev.y, ev.owner === this.viewer ? 1 : 0.6);
+          break;
+        }
+        case 'flood': {
+          // The water breaks into a Mine Shaft's wet deep (#924 m4): a plume of spray from the pithead and the roar under it.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.3);
+          if (ev.why === 'inrush') this.effects.burst(at, { count: 16, speed: 0.8, up: 1.8, life: 1.6, size: 0.12, grow: 1.6, gravity: 1.2, drag: 0.8, soft: true, colors: ['#a8c8d8', '#7aa0b4', '#dfeef4'] });
+          this.cue('inrush', ev.x, ev.y, ev.owner === this.viewer ? (ev.why === 'inrush' ? 1 : 0.5) : 0.5);
+          break;
+        }
+        case 'blast': {
+          // A Mine Shaft blasted a layer deeper (#924 m2): the charge goes off below, a muffled boom and smoke up the shaft.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.3);
+          this.effects.burst(at, { count: 18, speed: 0.9, up: 1.6, life: 2.8, size: 0.2, grow: 3, gravity: -0.5, drag: 1, soft: true, colors: ['#3a3430', '#5a524a', '#7a7064'] });
+          this.cue('kegBlow', ev.x, ev.y, 0.55);
+          break;
+        }
         case 'tideSwept': {
           // Caught on the flats (#739): a wave breaking over them where they stood.
           if (!this.sees(ev.x, ev.y)) break;
@@ -1921,6 +1977,15 @@ export class View {
   }
 
   /** A ring and spark where an order was given. */
+  /** Fade the surface for the underground view (#924 m3), or bring it back; only on a change. */
+  private goUnder(on: boolean): void {
+    if (on === this.wasUnder) return;
+    this.wasUnder = on;
+    for (const g of [this.units.group, this.resources.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.caches.group, this.kegs.group, this.webs.group, this.landmarks.group, this.weather.group, this.birds.mesh, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points, this.rangeGuides.mesh, this.graze.mesh]) g.visible = !on;
+    this.buildings.only = on ? 'shaft' : null;
+    terrainMaterial.color.setScalar(on ? 0.34 : 1);
+  }
+
   marker(s: GameState, x: number, y: number, attack: boolean): void {
     const at = this.ground(s, x, y, 0.06);
     this.effects.ring(at, attack ? '#ff5a4a' : '#9dff9a', 0.7, 0.55);

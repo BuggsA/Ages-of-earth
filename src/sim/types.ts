@@ -129,8 +129,16 @@ export const R_COCKLE = 11;
 export const R_GLOWCAP = 12;
 export type RareId = 'salt' | 'saltpetre' | 'bloodiron' | 'glowcap';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron', 'glowcap'];
-/** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings. */
-export type SeamId = 'stone' | 'gold' | RareId;
+/** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings; gems in the wet deep only (#924 m4). */
+export type SeamId = 'stone' | 'gold' | RareId | 'gems';
+
+/** A core sample (#924 m3): where it was drilled, the lode found there (`lodes.ts`), the lodge that drew it, and when it is ready. */
+export interface CoreSample {
+  tile: number;
+  lode: number;
+  by: number;
+  at: number;
+}
 /** A key resource (#555 spine §3): something only some worlds place that opens an age or a technology. The Prospector's Lodge answers for each. */
 export type KeyId = 'bogIron' | RareId | 'ruin';
 export const KEYS: readonly KeyId[] = ['bogIron', ...RARES, 'ruin'];
@@ -193,8 +201,11 @@ export type Order =
   | { k: 'tame'; target: number; t: number }
   /** Walk the trap line (#485): empty a snare of its people's, on to the next with game in it, and the catch home. */
   | { k: 'snare'; target: number; phase: 'go' | 'work' | 'drop' }
-  /** Work a Mine Shaft (#681): dig its seam, carry the load to a drop site, and back. `res` is the stock the seam pays into, kept in step with it. */
-  | { k: 'shaft'; target: number; res: Res; phase: 'go' | 'work' | 'drop' }
+  /**
+   * Work a Mine Shaft (#681): dig its seam, carry the load to a drop site, and back. `res` is the stock the seam pays into, kept in step with it.
+   * `layer` (#924 m1): the layer of `STRATA` its place is in, once it has one at the shaft; absent on the way to it.
+   */
+  | { k: 'shaft'; target: number; res: Res; phase: 'go' | 'work' | 'drop'; layer?: number }
   /**
    * A priest turning an enemy to your side: `done` ticks of chanting so far. A Blood-rite priest (#355 s4) may instead chant a `rite`
    * over a living enemy: to `sacrifice` it for its blood, or to `curse` it.
@@ -272,8 +283,8 @@ export interface Unit {
   cool: number;
   carry: number;
   carryRes: Res | null;
-  /** A rare ore in the basket (#356): its paid into `Player.rare`, not the four stocks. */
-  carryRare?: RareId | null;
+  /** A rare ore in the basket (#356): its paid into `Player.rare`, not the four stocks. Gems (#924 m4) ride as gold and are paid into `Player.gems`. */
+  carryRare?: RareId | 'gems' | null;
   /** A trader's load: a bit for each player whose toll it has paid since it was loaded (safe passage, #334). */
   tolled?: number;
   /** Fraction of the next carried unit gathered so far. */
@@ -487,6 +498,22 @@ export interface Building {
   snared?: number;
   /** A Mine Shaft (#681): the seam its miner digs (`SHAFT.seams`). Absent: the best its ground holds (`shafts.ts`). */
   seam?: SeamId;
+  /** A Mine Shaft (#924 m1): the deepest layer of `STRATA` it reaches, 0 the first. Absent: 0 (a shaft from an older save too). */
+  depth?: number;
+  /** A Mine Shaft being sunk a layer deeper (#924 m1): the tick it reaches it. While set it digs nothing. */
+  deepening?: number;
+  /** A Mine Shaft (#924 m1): per layer, how much of each vein it has dug (`STRATA[layer].veins`). Absent: none. */
+  worked?: Partial<Record<SeamId, number>>[];
+  /** A Mine Shaft (#924 m2): per layer, whether it is shored with timber props. Absent: none is. */
+  propped?: boolean[];
+  /** A Mine Shaft (#924 m2): per layer, the tick a cave-in's rubble is cleared by (the layer is shut till then). Absent: none. */
+  shut?: number[];
+  /** A Mine Shaft (#924 m3): the ground below it (`lodes.ts`: a `LODES` kind, and a rare seam held there), stamped when it is placed. Absent: common ground (an older save). */
+  lode?: number;
+  /** A Mine Shaft (#924 m4): per layer, how high the water stands in it, 0 dry to 1 flooded. Absent: dry. */
+  water?: number[];
+  /** A Mine Shaft (#924 m4): a pump stands at its pithead, keeping the wet layers dry while the pithead holds. Absent: none. */
+  pump?: 'steam' | 'mill';
 }
 
 export type Ent = Unit | Building;
@@ -1044,6 +1071,8 @@ export interface Player {
   blood?: number;
   /** Rare ores mined (#356); absent until the first is brought home. */
   rare?: Partial<Record<RareId, number>>;
+  /** Gems dug in the wet deep (#924 m4), kept apart from the four stocks and sold at the Market for gold. Absent: none. */
+  gems?: number;
   /** Powder kegs in store (#577): ground in the Age of Alchemy, laid in the Age of Sappers; absent until the first is ground. */
   kegs?: number;
   /** Seconds of milling toward the next keg (#577); absent when none is under way. */
@@ -1103,6 +1132,8 @@ export interface Player {
   vis: Uint8Array;
   /** Tiles this player has ever seen. */
   seen: Uint8Array;
+  /** Core samples its Prospector's Lodges drew (#924 m3), oldest first: the tile, the lode found there, the lodge, and the tick it is ready. Absent: none. */
+  cores?: CoreSample[];
   defeated: boolean;
   stats: PlayerStats;
   history: HistoryPoint[];
@@ -1206,7 +1237,7 @@ export type GameEvent =
   | { k: 'placed'; id: number; owner: number; type: BuildingType }
   | { k: 'built'; id: number; owner: number; type: BuildingType }
   | { k: 'epoch'; owner: number; epoch: number; age?: AgeId; back?: boolean }
-  | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number; rare?: RareId }
+  | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number; rare?: RareId; /** Gems from the wet deep (#924 m4). */ gems?: true }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
   /** A coppice stool or a planted sapling (#501) grew into a full tree on `tile`. */
@@ -1226,6 +1257,12 @@ export type GameEvent =
   /** The tide turned to a new level (#739): `level` 0 is low water, `TIDE.flats.length` high; `rising` while it floods. `bared` tiles came out, `covered` went under. */
   | { k: 'tide'; level: number; rising: boolean; bared: number; covered: number }
   /** A unit caught on the flats by the rising tide (#739) was swept ashore and hurt (`drowned`: no shore near, it was lost). */
+  /** A layer of a Mine Shaft fell in (#924 m2): an unshored layer (`fall`), firedamp after a blast, or a fallen pithead's miners stranded. */
+  | { k: 'caveIn'; owner: number; id: number; x: number; y: number; layer: number; dead: number; why: 'fall' | 'firedamp' | 'stranded' }
+  /** A wet layer floods (#924 m4): the water broke in on a full basket (`inrush`) or rose to the roof (`rose`); `dead` drowned, `up` were driven up. */
+  | { k: 'flood'; owner: number; id: number; x: number; y: number; layer: number; dead: number; up: number; why: 'inrush' | 'rose' }
+  /** A Mine Shaft blasted a layer deeper (#924 m2). */
+  | { k: 'blast'; owner: number; id: number; x: number; y: number; layer: number }
   | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean; /** Swept by this people's Tide Gate scour (#785). */ by?: number }
   /** A land unit stops on the shore to wait for the tide (#755), until tick `until`. */
   | { k: 'tideHold'; id: number; owner: number; x: number; y: number; until: number }
@@ -1341,7 +1378,7 @@ export type GameEvent =
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   /** A Wonder's foundation was laid (#361): every player hears of it, so the whole build can be contested. */
   | { k: 'wonderRising'; owner: number; id: number; x: number; y: number }
-  | { k: 'trade'; owner: number; res: Res; buy: boolean }
+  | { k: 'trade'; owner: number; res: Res | 'gems'; buy: boolean; /** Gold a lot of gems fetched (#924 m4). */ gold?: number }
   /** An explorer of `owner` came on a rival army of `n` soldiers at (x, y) (#454 s3). */
   | { k: 'sighted'; owner: number; x: number; y: number; n: number }
   | { k: 'defeated'; owner: number }
@@ -1522,11 +1559,16 @@ export interface GameState {
   rares?: RareId[];
   /** Cave mouths (#356); absent in older saves and campaigns (none). */
   caves?: Cave[];
+  /** The ground below (#924 m3, `lodes.ts`): per `LODE.cell` patch, row by row, its lode. Absent in older saves and campaigns (common ground everywhere). */
+  lodes?: Uint8Array;
   nextId: number;
   shots: Shot[];
   rng: number;
   /** Gold for 100 of each resource at the market; it rises as people buy and falls as they sell. */
-  market: Record<'food' | 'wood' | 'stone', number>;
+  market: Record<'food' | 'wood' | 'stone', number> & {
+    /** Gold for a lot of gems (#924 m4, `GEMS`): falls as anyone sells, every seller's alike. Absent: `GEMS.price` (an older save). */
+    gems?: number;
+  };
   /** No fighting between players until this tick (a peace treaty set before the match). */
   peaceUntil: number;
   /** Ticks a finished wonder must stand to win. */
@@ -1570,6 +1612,10 @@ export interface AiMemory {
   dockless?: number;
   /** Tick it last looked whether the deposits near home are gone, for a Mine Shaft (#681). */
   shaftLook?: number;
+  /** Tick it last looked whether a shaft of its own has dug out every layer it reaches, to sink it deeper (#924 m1). */
+  deepLook?: number;
+  /** Tick its band last set out to bring down a rival's deep pithead (#924 m2). */
+  pitRaid?: number;
   /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
   scout?: { id: number; sent: number };
   /** The route this seat favours (#749): its side ages chosen from the start; 'none' for a seat that keeps an open mind. Settled on its first turn. */
@@ -1757,6 +1803,16 @@ export type Command =
   | { t: 'beacon'; p: number; building: number }
   /** Choose the seam a Mine Shaft digs (#681). */
   | { t: 'seam'; p: number; building: number; seam: SeamId }
+  /** Sink a Mine Shaft a layer deeper (#924 m1). */
+  | { t: 'deepen'; p: number; building: number; /** Blast the layer open at once, from the Gunpowder Age (#924 m2). */ blast?: boolean }
+  /** Shore a layer of a Mine Shaft with timber props (#924 m2). */
+  | { t: 'prop'; p: number; building: number; layer: number }
+  /** Raise a pump at a Mine Shaft's pithead (#924 m4): a steam engine from the Industrial Age, or a windmill pump for a people that walked the Age of Dykes. */
+  | { t: 'pump'; p: number; building: number }
+  /** A Prospector's Lodge drills a core sample at a tile (#924 m3). */
+  | { t: 'core'; p: number; building: number; x: number; y: number }
+  /** Send one of a Mine Shaft's miners to a layer it reaches (#924 m1): from the layer with the least left to dig. */
+  | { t: 'toLayer'; p: number; building: number; layer: number }
   /** Call citizens to arms at a War Camp in the Age of Total War (#313): up to `n`, the nearest first. */
   | { t: 'callUp'; p: number; building: number; n?: number }
   /** Strike camp (#297): pack a Town Center or House onto a wagon. At a Sluice (#701 s4) it opens or shuts the gate instead. */
@@ -1800,7 +1856,7 @@ export type Command =
   /** Move `n` citizens from one job to another without picking them: idle first, then those carrying nothing, in id order. */
   | { t: 'reassign'; p: number; from: Job; to: Job; n: number }
   /** A rare ore (#356) can only be sold, a lot of it for gold at a flat price. */
-  | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId; buy: boolean }
+  | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId | 'gems'; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
   /** The polis (#501): citizens take up arms where they stand, or soldiers lay them down near home. */
   | { t: 'arm'; p: number; ids: number[] }

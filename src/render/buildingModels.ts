@@ -241,6 +241,65 @@ function ironHouse(k: Kit, st: Style): void {
   k.glow(k.octa(0.025, '#ff7a2a', 0.62, 0.12, 0.63));
 }
 
+/**
+ * The Iron Age's Town Center (#816): a hillfort. A ring of banked earth with a stake palisade on its crest and one timber
+ * gate, the thing that stands for the age across Iron Age Europe. Inside, the great roundhouse sits beside a smaller one and
+ * the bloomery fire, so a town of this age reads from afar as a walled mound, not a hall.
+ */
+function ironHillfort(k: Kit, st: Style): void {
+  pad(k, 4, st.base);
+  const R = 1.78;
+  const N = 18;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * 2 * Math.PI;
+    const x = Math.sin(a) * R;
+    const z = Math.cos(a) * R - 0.1;
+    // The gate faces +z (the front); leave the bank open there.
+    if (Math.cos(a) > 0.93) continue;
+    const bank = k.box(0.7, 0.34, 0.5, i % 2 ? '#6b5a3c' : '#756346', x, 0, z);
+    bank.rotation.y = a;
+    // Stakes along the crest, sharpened and leaning a little outward.
+    for (const d of [-0.22, 0.0, 0.22]) {
+      const sx = x + Math.cos(a) * d;
+      const sz = z - Math.sin(a) * d;
+      const h = 0.62 + ((i + Math.round(d * 10) + 9) % 3) * 0.08;
+      k.cyl(0.04, 0.05, h, 4, '#7a5a38', sx, 0.3, sz);
+      k.cone(0.05, 0.12, 4, '#8a6a44', sx, 0.3 + h, sz);
+    }
+    if (i % 2 === 0) k.box(0.52, 0.04, 0.05, '#5a4630', x, 0.62, z).rotation.y = a;
+  }
+  // The gate: two stout posts and a lintel across the gap, with a torch each side.
+  const gz = R - 0.1;
+  for (const x of [-0.42, 0.42]) {
+    k.cyl(0.09, 0.1, 1.15, 6, '#6b4b2f', x, 0, gz);
+    k.cone(0.1, 0.16, 6, '#8a6a44', x, 1.15, gz);
+    k.cyl(0.05, 0.06, 0.4, 5, '#6b4b2f', x * 1.35, 0.25, gz + 0.05);
+  }
+  k.box(1.0, 0.1, 0.12, '#5c4630', 0, 0.92, gz);
+  k.team(k.box(0.42, 0.18, 0.04, TEAM, 0, 0.62, gz + 0.02));
+  torch(k, -0.62, 0, gz + 0.25);
+  torch(k, 0.62, 0, gz + 0.25);
+  // The trodden way from the gate to the hearth.
+  k.box(0.7, 0.04, 1.0, st.trim, 0, 0.02, 1.15);
+  // The great roundhouse, a daub drum under a steep thatch cone, and a smaller one beside it.
+  const house = (x: number, z: number, r: number, h: number): void => {
+    k.cyl(r, r * 1.05, h, 12, st.wall, x, 0, z);
+    k.cone(r * 1.4, h * 2.4, 12, '#7d6a4c', x, h * 0.9, z);
+    k.cone(r * 0.8, h * 1.3, 12, '#8d7a58', x, h * 1.9, z);
+    k.cone(r * 0.2, h * 0.5, 8, '#4f4130', x, h * 3.05, z);
+    k.box(r * 0.45, h * 0.8, 0.03, '#2a1f17', x, 0, z + r * 1.02);
+  };
+  house(-0.15, -0.55, 0.78, 0.5);
+  house(-1.0, 0.55, 0.42, 0.3);
+  // The bloomery: a clay stack with a glowing mouth and a heap of ore, the age's wealth, and the town's banner.
+  k.cyl(0.17, 0.24, 0.55, 8, '#6a5848', 0.95, 0, 0.35);
+  k.glow(k.box(0.14, 0.12, 0.03, '#ff7a2a', 0.95, 0.1, 0.58));
+  k.glow(k.octa(0.05, '#ff9a3c', 0.95, 0.6, 0.35));
+  k.rock(0.12, '#3d3330', 0.55, 0.0, 0.7);
+  k.rock(0.09, '#4a3d38', 1.35, 0.0, 0.55);
+  banner(k, 0.45, 0, -0.1, 1.5, 1.2);
+}
+
 // ---- Storehouse ------------------------------------------------------------------------------------
 
 function storehouse(k: Kit, e: number, st: Style): void {
@@ -645,8 +704,8 @@ function huntcamp(k: Kit, e: number, st: Style): void {
 
 // ---- Mine Shaft (#681) ---------------------------------------------------------------------------------
 
-/** The spoil heap's colours by seam (`SEAMS` order: stone, gold, salt, saltpetre, blood-iron): the rock, and the flecks of what is dug. */
-const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'], ['#9a948a', '#eeeae0'], ['#8f8a7c', '#d9d2b0'], ['#5e5650', '#6a1f24']];
+/** The spoil heap's colours by seam (`SEAMS` order: stone, gold, salt, saltpetre, blood-iron, glowcaps, gems): the rock, and the flecks of what is dug. */
+const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'], ['#9a948a', '#eeeae0'], ['#8f8a7c', '#d9d2b0'], ['#5e5650', '#6a1f24'], ['#6a6458', '#b8f0c0'], ['#4e5a60', '#7fe0f0']];
 
 /**
  * A shaft collar of squared timbers round a dark hole, the headframe over it, and a spoil heap beside it that shows the seam:
@@ -654,8 +713,16 @@ const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'
  * a windlass and a hanging bucket; Gunpowder: a taller timber frame with a sheave wheel; Industrial: an iron lattice headframe,
  * a winding-engine house and its stack. A rail of ore tubs runs from the collar.
  */
-function shaft(k: Kit, e: number, st: Style, seam: number): void {
+function shaft(k: Kit, e: number, st: Style, variant: number): void {
   pad(k, 2, st.base);
+  // The variant carries the seam and, from the deep mine (#924 m1), the layer reached: `seam + 8 * depth`. The pithead
+  // grows with depth, so a rival sees a deep mine from outside: a taller headframe, a bigger spoil heap, a winding shed.
+  // Shored (#924 m2) adds 64: a stack of pit-props by the collar. A pump (#924 m4) adds 128 for a steam engine, 256 for a
+  // windmill pump: either works a rod down the shaft and spills the water it lifts into a trough by the collar.
+  const seam = variant % 8;
+  const deep = Math.floor((variant % 64) / 8);
+  const shored = (variant % 128) >= 64;
+  const pump = Math.floor(variant / 128);
   const [rock, fleck] = SPOIL[Math.min(Math.max(seam, 0), SPOIL.length - 1)];
   // The collar and the hole.
   k.box(0.62, 0.03, 0.62, '#1c1712', -0.25, 0.02, -0.2);
@@ -663,7 +730,7 @@ function shaft(k: Kit, e: number, st: Style, seam: number): void {
     k.box(w, 0.12, d, e >= 3 ? STONE : WOOD, x, 0, z);
   }
   const frame = e >= 4 ? '#3a3e44' : st.post;
-  const top = e >= 3 ? 1.75 : 1.25;
+  const top = (e >= 3 ? 1.75 : 1.25) + deep * 0.3;
   // Two A-frames over the hole, joined at the top by the axle beam.
   for (const z of [-0.5, 0.1]) {
     for (const sx of [-1, 1]) {
@@ -672,7 +739,7 @@ function shaft(k: Kit, e: number, st: Style, seam: number): void {
     }
   }
   k.box(0.08, 0.08, 0.72, frame, -0.25, top - 0.06, -0.2);
-  if (e >= 3) {
+  if (e >= 3 || deep >= 1) {
     // The sheave wheel, its rope down the shaft.
     const wheel = k.cyl(0.26, 0.26, 0.05, 12, e >= 4 ? '#6a6e74' : WOOD, -0.25, top - 0.3, -0.2);
     wheel.rotation.z = Math.PI / 2;
@@ -695,9 +762,19 @@ function shaft(k: Kit, e: number, st: Style, seam: number): void {
     cable.rotation.y = 1.1;
     cable.rotation.z = 0.5;
   }
-  // The spoil heap: the seam shows in it.
-  k.sphere(0.42, rock, 0.55, 0.0, 0.42).scale.set(1, 0.55, 1);
-  k.sphere(0.24, rock, 0.25, 0.0, 0.7).scale.set(1, 0.5, 1);
+  if (deep >= 2 && e < 4) {
+    // A winding shed: a horse gin's drum under a pitched roof, the rope run out to the wheel.
+    k.box(0.5, 0.42, 0.42, st.wall, 0.62, 0, -0.58);
+    k.prism(0.54, 0.2, 0.46, st.roof, 0.62, 0.42, -0.58);
+    const rope = k.box(0.012, 0.012, 0.95, '#c9b98f', 0.18, 0.9, -0.4);
+    rope.rotation.y = 1.1;
+    rope.rotation.z = 0.55;
+  }
+  // The spoil heap: the seam shows in it, and it grows with every layer sunk.
+  const heap = 1 + deep * 0.28;
+  k.sphere(0.42 * heap, rock, 0.55, 0.0, 0.42).scale.set(1, 0.55, 1);
+  k.sphere(0.24 * heap, rock, 0.25, 0.0, 0.7).scale.set(1, 0.5, 1);
+  if (deep >= 1) k.sphere(0.2 * heap, rock, 0.85, 0.0, 0.05).scale.set(1, 0.5, 1);
   for (const [x, y, z] of [[0.45, 0.17, 0.3], [0.62, 0.15, 0.55], [0.72, 0.1, 0.25], [0.35, 0.12, 0.55], [0.22, 0.06, 0.75]] as [number, number, number][]) {
     k.octa(0.055, fleck, x, y, z);
   }
@@ -706,6 +783,48 @@ function shaft(k: Kit, e: number, st: Style, seam: number): void {
   for (const z of [0.45, 0.78]) {
     k.box(0.36, 0.2, 0.22, e >= 3 ? '#4a4a4e' : WOOD, -0.65, 0.04, z);
     k.sphere(0.1, fleck, -0.65, 0.24, z).scale.set(1.3, 0.5, 0.8);
+  }
+  if (shored) {
+    // Pit-props stacked crosswise by the collar, timber waiting to go down.
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3 - i; j++) {
+        const log = k.cyl(0.035, 0.035, 0.5, 5, i % 2 ? '#a87a44' : WOOD, 0.62 + (j - (2 - i) / 2) * 0.075, 0.035 + i * 0.065, -0.05);
+        log.rotation.x = Math.PI / 2;
+      }
+    }
+  }
+  if (pump) {
+    // The trough the lifted water spills into, running off the pad, and the rising main up out of the hole.
+    k.box(0.14, 0.08, 0.6, WOOD, -0.86, 0, -0.2);
+    k.box(0.1, 0.02, 0.58, '#4a90c0', -0.86, 0.07, -0.2);
+    k.box(0.3, 0.035, 0.035, '#55595e', -0.72, 0.16, -0.36);
+    k.cyl(0.03, 0.03, 0.2, 5, '#55595e', -0.86, 0.0, -0.36);
+  }
+  if (pump === 1) {
+    // A Cornish engine house: a tall narrow stone house, its beam nodding out over the shaft, the rod down to the pump, a stack.
+    k.box(0.36, 0.95, 0.34, STONE, -0.82, 0, -0.78);
+    k.prism(0.4, 0.14, 0.38, st.roof, -0.82, 0.95, -0.78);
+    k.box(0.12, 0.2, 0.02, '#2a2420', -0.82, 0.55, -0.6);
+    const bob = k.box(0.62, 0.07, 0.07, '#3a3e44', -0.55, 0.92, -0.5);
+    bob.rotation.y = -0.75;
+    bob.rotation.z = -0.12;
+    k.box(0.025, 0.85, 0.025, '#3a3e44', -0.32, 0.08, -0.3);
+    k.cyl(0.05, 0.065, 1.35, 6, '#7a3a2c', -1.0, 0, -0.95);
+  } else if (pump === 2) {
+    // A windmill pump, as on the polders (#701): an open trestle, a cap, four sails, and the rod down into the shaft.
+    for (const [x, z] of [[-0.95, -0.9], [-0.65, -0.9], [-0.95, -0.6], [-0.65, -0.6]] as [number, number][]) {
+      const leg = k.box(0.04, 1.15, 0.04, st.post, x, 0, z);
+      leg.rotation.set((z + 0.75) * -0.12, 0, (x + 0.8) * -0.12);
+    }
+    k.box(0.26, 0.16, 0.26, st.roof, -0.8, 1.12, -0.75);
+    const hub = k.cyl(0.04, 0.04, 0.12, 6, WOOD, -0.8, 1.2, -0.6);
+    hub.rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) {
+      const sail = k.box(0.09, 0.62, 0.015, '#e8e0d0', -0.8, 0.95, -0.53);
+      sail.geometry.translate(0, 0.31, 0);
+      sail.rotation.z = i * (Math.PI / 2) + 0.4;
+    }
+    k.box(0.025, 1.0, 0.025, WOOD, -0.6, 0.12, -0.42);
   }
   // A pick and a shovel against the collar.
   const haft = k.cyl(0.018, 0.018, 0.55, 4, WOOD, 0.25, 0.0, -0.75);
@@ -2890,10 +3009,10 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.
-      if (['airfield', 'towncenter', 'house', 'forge', 'wonder'].includes(type)) {
-        const span = type === 'airfield' || type === 'wonder' ? 1.8 : big ? 1.4 : 0.7;
+      if (type === 'wonder') {
+        const span = 1.8;
         k.box(span * 2, 0.12, 0.04, '#76c6d6', 0, 0.55, span);
-        const h = type === 'wonder' ? 3.3 : big ? 2.5 : 1.6;
+        const h = 3.3;
         k.cyl(0.025, 0.025, h, 5, '#d7e4e8', span, 0, 0);
         k.box(0.48, 0.12, 0.1, '#76c6d6', span + 0.24, h, 0);
         k.box(0.12, 0.12, 0.11, '#f4efe4', span + 0.18, h, 0);
@@ -2959,11 +3078,11 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
     }
     case 'merchant':
       if (type === 'market') {
-        awning(k, -0.9, 0.78, 1.25, 1.2, 4, 0);
-        awning(k, 0.9, 0.78, 1.25, 1.2, 4, 2);
-        k.box(0.5, 0.3, 0.04, '#e2b23c', 0, 1.55, 0.2);
+        // The counting-house (`merchantMarket`) is the whole look.
       } else if (type === 'house') awning(k, 0, 0.62, 0.85, 0.7, 3, 1);
-      else if (big) {
+      else if (type === 'towncenter') {
+        // The guildhall (`merchantTownCenter`) is the whole look.
+      } else if (big) {
         awning(k, -0.8, 1.0, 2.1, 1.4, 4, 0);
         awning(k, 0.8, 1.0, 2.1, 1.4, 4, 2);
       } else if (type === 'storehouse') awning(k, 0, 0.7, 1.0, 1.0, 4, 3);
@@ -2978,6 +3097,8 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         k.glow(k.box(0.5, 0.4, 0.05, '#ff7a2a', 0, 0.2, 1.52));
         k.box(2.6, 0.18, 0.04, RUST, 0, 0.1, 1.5);
         k.glow(k.octa(0.08, '#ff9a3c', 1.1, 2.7, -1.1));
+      } else if (type === 'towncenter') {
+        // The hillfort (`ironHillfort`) is the whole look.
       } else if (big) {
         k.box(3.0, 0.2, 3.0, RUST, 0, 0, 0);
         torch(k, -1.4, 0, 2.05);
@@ -3073,9 +3194,331 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heartstone: (k: Kit, _e: number, st: Style) => heartstone(k, st.base),
 };
 
+/**
+ * The Merchants' Market (#816): a guild counting-house, not a stall row. A narrow stepped-gable house over an arcade, a hoist
+ * beam at its peak with a bale on the rope, and out front the hiring table where the age sells swords: a team-coloured board,
+ * a balance, a coin chest and spears racked for hire (`AGES.merchant.hire`).
+ */
+function merchantMarket(k: Kit, st: Style): void {
+  pad(k, 3, st.base);
+  k.box(1.7, 1.1, 1.9, st.wall, 0, 0, -0.35);
+  k.box(1.76, 0.07, 1.95, st.trim, 0, 0.55, -0.35);
+  // Three arches along the ground floor and a lit window row above.
+  for (const x of [-0.55, 0, 0.55]) {
+    k.box(0.36, 0.46, 0.03, '#2a1f17', x, 0, 0.6);
+    k.box(0.44, 0.06, 0.05, st.trim, x, 0.46, 0.61);
+    window(k, st, x, 0.78, 0.6, 0.14, 0.2);
+    for (const dx of [-0.11, 0.11]) k.box(0.05, 0.22, 0.02, st.trim, x + dx, 0.77, 0.61);
+  }
+  // The roof ridge runs front to back; the stepped gable stands against its front end.
+  k.prism(1.84, 0.7, 1.9, st.roof, 0, 1.1, -0.35).rotation.y = Math.PI / 2;
+  const steps: [number, number][] = [[1.76, 1.1], [1.4, 1.33], [1.04, 1.56], [0.68, 1.79], [0.34, 2.02]];
+  for (const [w, y] of steps) k.box(w, 0.24, 0.12, st.wall2, 0, y, 0.64);
+  k.box(0.1, 0.08, 0.14, st.trim, 0, 2.26, 0.64);
+  k.sphere(0.04, '#e2b23c', 0, 2.38, 0.64);
+  // The hoist: a beam out over the street, a rope and a bale.
+  k.box(0.07, 0.07, 0.75, WOOD, 0, 2.02, 0.95);
+  k.cyl(0.012, 0.012, 0.4, 4, '#5b4330', 0, 1.64, 1.25);
+  k.box(0.26, 0.2, 0.22, '#d8c08a', 0, 1.44, 1.25);
+  k.box(0.28, 0.03, 0.04, '#7d5a3a', 0, 1.52, 1.25);
+  // The hiring table: counter, coin chest, gold, and the board behind it in the team's colour.
+  k.box(1.0, 0.32, 0.3, WOOD, 0, 0, 1.25);
+  k.box(1.06, 0.04, 0.36, '#9a7a52', 0, 0.32, 1.25);
+  k.box(0.24, 0.16, 0.16, '#5a3a22', -0.3, 0.36, 1.25);
+  k.box(0.26, 0.04, 0.18, '#e2b23c', -0.3, 0.52, 1.25);
+  for (let i = 0; i < 3; i++) k.cyl(0.05, 0.05, 0.05 + i * 0.05, 8, '#e2b23c', 0.1 + i * 0.14, 0.36, 1.2);
+  k.cyl(0.02, 0.02, 0.7, 4, st.post, -0.45, 0, 1.0);
+  k.cyl(0.02, 0.02, 0.7, 4, st.post, 0.45, 0, 1.0);
+  k.team(k.box(0.9, 0.34, 0.03, TEAM, 0, 0.74, 1.0));
+  k.box(0.94, 0.04, 0.05, st.trim, 0, 1.08, 1.0);
+  // A balance on a post at the left, and spears racked for hire at the right.
+  k.cyl(0.02, 0.03, 0.6, 5, WOOD, -1.05, 0, 0.95);
+  k.box(0.5, 0.03, 0.03, '#b8893a', -1.05, 0.62, 0.95);
+  for (const dx of [-0.23, 0.23]) k.cyl(0.08, 0.04, 0.03, 8, '#e2b23c', -1.05 + dx, 0.5, 0.95);
+  for (const [x, lean] of [[1.05, 0.08], [1.17, 0], [1.29, -0.08]] as const) {
+    const sp = k.group(x, 0, 0.95);
+    sp.rotation.z = lean;
+    k.cyl(0.014, 0.016, 0.95, 4, '#6b4b2f', 0, 0, 0, sp);
+    k.cone(0.035, 0.16, 4, '#9a9ca2', 0, 0.95, 0, sp);
+  }
+  // Bales and a barrel against the house.
+  k.box(0.34, 0.24, 0.26, '#d8c08a', -1.15, 0, 0.3);
+  k.box(0.3, 0.22, 0.26, '#c8b07a', -1.12, 0.24, 0.3);
+  k.cyl(0.12, 0.1, 0.28, 8, '#8a6440', 1.15, 0, 0.3);
+  // Sacks of coin and grain stacked by the arcade, and hanging lanterns at the door: a counting-house is full of small stores.
+  for (const [x, z, c] of [[-0.85, 0.42, '#d8c08a'], [-0.7, 0.5, '#c8b07a'], [0.9, 0.45, '#d8c08a'], [0.75, 0.52, '#c8b07a'], [1.0, 0.6, '#e2b23c']] as const) k.sphere(0.13, c, x, 0.12, z).scale.set(1, 0.85, 1);
+  for (const x of [-0.28, 0.28]) {
+    k.cyl(0.012, 0.012, 0.16, 4, IRON_DARK, x, 0.38, 0.66);
+    k.glow(k.sphere(0.06, '#ffd890', x, 0.34, 0.66));
+  }
+  for (const [x, z] of [[1.3, 0.1], [1.15, -0.05]]) k.cyl(0.12, 0.1, 0.28, 8, '#8a6440', x, 0, z);
+  banner(k, -1.35, 0, 1.35, 1.3);
+}
+
+/** The Aeronauts' House (#816): a flier's cottage under a rounded hangar roof, a small tethered balloon riding above it, a rooftop windsock, a round door and a rack of sandbags. */
+function aeroHouse(k: Kit, st: Style): void {
+  const STEEL = '#d7e4e8';
+  pad(k, 2, st.base);
+  k.box(1.2, 0.62, 0.95, st.wall, 0, 0, -0.1);
+  k.box(1.28, 0.05, 1.03, st.trim, 0, 0.62, -0.1);
+  // The roof is a half-barrel of ribs, lit by a row of small round windows.
+  const vault = k.cyl(0.46, 0.46, 1.2, 10, '#a9d6e0', 0, 0.66, -0.1);
+  vault.rotation.z = Math.PI / 2;
+  vault.scale.set(0.5, 1, 1);
+  for (const x of [-0.45, 0, 0.45]) k.box(0.04, 0.27, 0.92, STEEL, x, 0.66, -0.1).scale.y = 0.9;
+  for (const x of [-0.32, 0.32]) window(k, st, x, 0.22, 0.38, 0.2, 0.22);
+  k.cyl(0.14, 0.14, 0.03, 10, '#1d1e24', 0, 0.16, 0.39).rotation.x = Math.PI / 2;
+  // The tethered balloon: a cream envelope with a team-coloured band, slung basket and a line to the roof.
+  const bx = 0.25;
+  const env = k.sphere(0.3, '#e9e6df', bx, 1.8, -0.1);
+  env.scale.set(1, 1.15, 1);
+  k.team(k.ring(0.28, 0.045, TEAM, 1.8)).position.set(bx, 1.8, -0.1);
+  k.cone(0.12, 0.2, 8, '#c2cbd0', bx, 1.35, -0.1).rotation.x = Math.PI;
+  k.box(0.14, 0.1, 0.14, '#9a7a52', bx, 1.02, -0.1);
+  k.cyl(0.008, 0.008, 0.4, 4, STEEL, bx, 0.8, -0.1);
+  // A windsock on the gable, and sandbag ballast by the door.
+  k.cyl(0.02, 0.025, 0.5, 5, STEEL, -0.55, 0.62, -0.4);
+  k.box(0.34, 0.09, 0.08, '#f4a04a', -0.38, 1.05, -0.4);
+  k.box(0.09, 0.09, 0.09, '#f4efe4', -0.4, 1.05, -0.4);
+  for (const [x, z] of [[0.62, 0.5], [0.78, 0.45], [0.7, 0.62]]) k.box(0.14, 0.08, 0.1, '#b9a982', x, 0, z);
+}
+
+/**
+ * The Merchants' Barracks (#816): a condottiere's company house, not a drill hall. A brick hall with a paymaster's window and
+ * a striped awning over the muster door, a contract board in the team's colour, and a yard with a pike rack and a quintain
+ * post to drill on. Swords here are hired (`AGES.merchant.hire`), so the building keeps the ledger as much as the weapons.
+ */
+function merchantBarracks(k: Kit, st: Style): void {
+  pad(k, 2.2, st.base);
+  // The hall, set back, with a plinth, a band course and a hipped roof.
+  k.box(1.7, 0.18, 1.1, st.wall2, 0, 0, -0.45);
+  k.box(1.6, 0.86, 1.0, st.wall, 0, 0.18, -0.45);
+  k.box(1.7, 0.07, 1.1, st.trim, 0, 0.62, -0.45);
+  k.prism(1.8, 0.55, 1.2, st.roof, 0, 1.04, -0.45);
+  // Muster door and the paymaster's barred window with a lit slot above.
+  k.box(0.38, 0.55, 0.03, '#2a1f17', -0.35, 0.18, 0.06);
+  k.box(0.46, 0.06, 0.05, st.trim, -0.35, 0.73, 0.07);
+  k.box(0.3, 0.26, 0.03, '#2a1f17', 0.4, 0.4, 0.06);
+  for (const dx of [-0.08, 0, 0.08]) k.box(0.02, 0.26, 0.04, IRON_DARK, 0.4 + dx, 0.4, 0.08);
+  k.box(0.4, 0.05, 0.06, st.trim, 0.4, 0.66, 0.08);
+  window(k, st, -0.35, 0.86, 0.06, 0.14, 0.14);
+  window(k, st, 0.4, 0.86, 0.06, 0.14, 0.14);
+  // The striped awning over the muster door, on two posts.
+  awning(k, -0.35, 0.88, 0.32, 0.7, 4, 1);
+  for (const x of [-0.65, -0.05]) k.cyl(0.018, 0.02, 0.84, 5, WOOD, x, 0, 0.52);
+  // The contract board: a post-framed board in the team's colour with pinned bills.
+  k.cyl(0.02, 0.025, 0.8, 5, st.post, 0.55, 0, 0.62);
+  k.cyl(0.02, 0.025, 0.8, 5, st.post, 1.0, 0, 0.62);
+  k.team(k.box(0.5, 0.36, 0.03, TEAM, 0.78, 0.5, 0.62));
+  k.box(0.56, 0.04, 0.05, st.trim, 0.78, 0.88, 0.62);
+  for (const [x, y] of [[0.68, 0.62], [0.85, 0.55]]) k.box(0.1, 0.13, 0.01, '#e8dcc0', x, y, 0.65);
+  // A coin chest and sacks at the paymaster's window.
+  k.box(0.24, 0.15, 0.16, '#5a3a22', 0.25, 0, 0.3);
+  k.box(0.26, 0.04, 0.18, '#e2b23c', 0.25, 0.15, 0.3);
+  // The yard: a pike rack and a quintain post with a swinging arm and a shield target.
+  k.box(0.5, 0.05, 0.06, WOOD, -0.85, 0.3, 0.6);
+  for (const x of [-1.05, -0.65]) k.cyl(0.02, 0.025, 0.4, 4, WOOD, x, 0, 0.6);
+  for (let i = 0; i < 4; i++) {
+    const sp = k.group(-1.0 + i * 0.12, 0, 0.6);
+    sp.rotation.x = -0.1;
+    k.cyl(0.012, 0.014, 1.1, 4, '#6b4b2f', 0, 0, 0, sp);
+    k.cone(0.03, 0.14, 4, '#9a9ca2', 0, 1.1, 0, sp);
+  }
+  k.cyl(0.04, 0.05, 0.9, 6, WOOD, -0.6, 0, 0.98);
+  k.box(0.7, 0.05, 0.05, WOOD, -0.6, 0.85, 0.98).rotation.y = 0.5;
+  k.cyl(0.13, 0.13, 0.03, 10, '#b8893a', -0.88, 0.62, 0.84).rotation.x = Math.PI / 2;
+  k.sphere(0.07, '#d8c08a', -0.32, 0.8, 1.12);
+  // Lanterns at the door, and a banner on the gable.
+  for (const x of [-0.62, -0.08]) {
+    k.cyl(0.012, 0.012, 0.14, 4, IRON_DARK, x, 0.62, 0.34);
+    k.glow(k.sphere(0.05, '#ffd890', x, 0.58, 0.34));
+  }
+  banner(k, 0.78, 1.05, -0.45, 0.75, 1.1);
+}
+
+/** The Aeronauts' Forge (#816): an engine works, a sawtooth-roofed shop with a hangar door, a gantry hoisting an engine, a propeller test stand out front and fuel drums, not a smithy. */
+function aeroForge(k: Kit, st: Style): void {
+  const SKY = '#76c6d6';
+  const STEEL = '#d7e4e8';
+  pad(k, 3, st.base);
+  // The shop: a cream hall with a sawtooth roof whose glazed faces catch the light, and a tall sliding hangar door.
+  k.box(2.3, 0.85, 1.4, st.wall, -0.3, 0, -0.55);
+  k.box(2.38, 0.06, 1.48, st.trim, -0.3, 0.85, -0.55);
+  for (let i = 0; i < 3; i++) {
+    const x = -1.05 + i * 0.75;
+    k.prism(0.75, 0.38, 1.4, SKY, x, 0.91, -0.55);
+    k.box(0.04, 0.3, 1.34, '#2a3f4f', x + 0.34, 0.93, -0.55);
+  }
+  k.box(0.9, 0.65, 0.03, '#2a3f4f', -0.6, 0, 0.16);
+  for (const x of [-0.9, -0.6, -0.3]) k.box(0.025, 0.65, 0.04, STEEL, x, 0, 0.17);
+  window(k, st, 0.4, 0.4, 0.16, 0.2, 0.2);
+  window(k, st, 0.8, 0.4, 0.16, 0.2, 0.2);
+  // The gantry over the yard: two legs, a beam, a hoist with an engine block slung under it.
+  for (const x of [0.55, 1.35]) k.cyl(0.04, 0.05, 1.5, 5, STEEL, x, 0, 0.85);
+  k.box(1.0, 0.07, 0.1, STEEL, 0.95, 1.5, 0.85);
+  k.cyl(0.008, 0.008, 0.4, 4, '#44484c', 0.95, 1.1, 0.85);
+  k.box(0.3, 0.2, 0.22, '#5b6168', 0.95, 0.85, 0.85);
+  for (const dx of [-0.08, 0, 0.08]) k.cyl(0.035, 0.035, 0.12, 6, '#8b9298', 0.95 + dx, 1.05, 0.85);
+  // The test stand: a trestle with a propeller on a hub, and a tailplane of ribs leaning by the door.
+  k.box(0.5, 0.25, 0.3, '#6a4e32', -1.2, 0, 0.9);
+  k.cyl(0.08, 0.08, 0.25, 8, '#5b6168', -1.2, 0.25, 0.9).rotation.x = Math.PI / 2;
+  k.sphere(0.07, SKY, -1.2, 0.38, 1.04);
+  k.box(0.07, 0.62, 0.02, '#c9a368', -1.2, 0.07, 1.06);
+  k.box(0.62, 0.07, 0.02, '#c9a368', -1.2, 0.35, 1.06).rotation.z = 0.5;
+  // Fuel drums and a pennant mast in the team's colour.
+  for (const [x, z] of [[1.7, 0.2], [1.85, 0.45], [1.7, 0.7]]) k.cyl(0.1, 0.1, 0.28, 8, '#5a6450', x, 0, z);
+  k.cyl(0.025, 0.03, 1.9, 5, STEEL, -1.4, 0, -0.1);
+  k.team(k.box(0.5, 0.2, 0.03, TEAM, -1.15, 1.55, -0.1));
+  for (const x of [-0.9, 0.2]) {
+    k.cyl(0.012, 0.012, 0.12, 4, IRON_DARK, x, 0.7, 0.2);
+    k.glow(k.sphere(0.045, '#ffd890', x, 0.66, 0.2));
+  }
+}
+
+/** The Merchants' Town Center (#816): a two-storey guildhall with a clock gable and a loading hoist, a canopied stall at each flank and a scale-and-bell post out front. */
+function merchantTownCenter(k: Kit, st: Style): void {
+  pad(k, 4, st.base);
+  // The hall: plinth, two floors parted by a band course, and a hipped roof under a clock gable.
+  k.box(2.6, 0.2, 1.9, st.wall2, 0, 0, -0.5);
+  k.box(2.4, 1.0, 1.7, st.wall, 0, 0.2, -0.5);
+  k.box(2.5, 0.07, 1.8, st.trim, 0, 1.2, -0.5);
+  k.box(2.3, 0.8, 1.6, st.wall, 0, 1.27, -0.5);
+  k.prism(2.5, 0.8, 1.8, st.roof, 0, 2.07, -0.5);
+  // Ground-floor arcade of three doors with lit windows over them.
+  for (const x of [-0.75, 0, 0.75]) {
+    k.box(0.42, 0.62, 0.03, '#2a1f17', x, 0.2, 0.36);
+    k.box(0.52, 0.07, 0.05, st.trim, x, 0.82, 0.37);
+    window(k, st, x, 1.5, 0.31, 0.16, 0.26);
+  }
+  // The clock gable and a gilded finial.
+  k.box(0.9, 0.5, 0.2, st.wall2, 0, 2.07, 0.3);
+  k.prism(1.0, 0.4, 0.22, st.roof, 0, 2.57, 0.3);
+  k.cyl(0.15, 0.15, 0.03, 10, '#efe3c0', 0, 2.17, 0.42).rotation.x = Math.PI / 2;
+  k.box(0.02, 0.12, 0.02, IRON_DARK, 0, 2.18, 0.45);
+  k.sphere(0.05, '#e2b23c', 0, 3.0, 0.3);
+  // The hoist over the side street, with rope and bale.
+  k.box(0.07, 0.07, 0.8, WOOD, 1.0, 2.0, 0.65);
+  k.cyl(0.012, 0.012, 0.45, 4, '#5b4330', 1.0, 1.52, 1.0);
+  k.box(0.26, 0.2, 0.22, '#d8c08a', 1.0, 1.32, 1.0);
+  // A canopied stall at each flank, striped cloth over a counter and goods.
+  for (const [sx, a] of [[-1.55, 0], [1.55, 2]] as [number, number][]) {
+    k.box(0.7, 0.32, 0.4, WOOD, sx, 0, 0.95);
+    for (const dx of [-0.32, 0.32]) k.cyl(0.018, 0.02, 0.85, 5, WOOD, sx + dx, 0, 1.2);
+    awning(k, sx, 0.88, 1.0, 0.8, 4, a);
+    k.sphere(0.07, '#c8553a', sx - 0.15, 0.32, 0.95);
+    k.box(0.16, 0.1, 0.14, '#d8c08a', sx + 0.15, 0.32, 0.95);
+  }
+  // The scale-and-bell post at the door, a team-coloured pennant beneath the bell.
+  k.cyl(0.04, 0.05, 1.5, 6, st.post, -0.45, 0, 1.45);
+  k.box(0.5, 0.04, 0.04, IRON_DARK, -0.45, 1.5, 1.45);
+  for (const dx of [-0.23, 0.23]) k.cyl(0.1, 0.1, 0.02, 8, '#e2b23c', -0.45 + dx, 1.28, 1.45);
+  k.cone(0.09, 0.14, 6, '#e2b23c', -0.45, 1.5, 1.45).position.y = 1.64;
+  k.team(k.box(0.2, 0.3, 0.02, TEAM, -0.45, 0.8, 1.5));
+  // Lanterns at the door, and the banners.
+  for (const x of [-0.4, 0.4]) {
+    k.cyl(0.012, 0.012, 0.14, 4, IRON_DARK, x, 0.96, 0.4);
+    k.glow(k.sphere(0.05, '#ffd890', x, 0.92, 0.4));
+  }
+  banner(k, 1.2, 0, -1.2, 1.4, 1.2);
+}
+
+/** The Aeronauts' Airfield (#816): no runway but a mooring mast, an airship riding at its nose with a winch house and fuel drums below. */
+function aeroAirfield(k: Kit, st: Style): void {
+  k.box(3.9, 0.05, 3.9, '#8fa586', 0, -0.02, 0);
+  k.cyl(1.7, 1.7, 0.03, 20, '#aeb2a8', 0, 0.02, -0.2);
+  // The mast: a tapering lattice of three legs with a landing cap, and the winch house at its foot.
+  const mx = 1.45;
+  for (const a of [0, 2.1, 4.2]) {
+    const leg = k.box(0.05, 1.9, 0.05, '#d7e4e8', mx + Math.sin(a) * 0.14, 0, -0.2 + Math.cos(a) * 0.14);
+    leg.rotation.z = Math.sin(a) * -0.05;
+  }
+  for (const y of [0.5, 1.0, 1.5]) k.cyl(0.14 - y * 0.03, 0.14 - y * 0.03, 0.04, 6, '#9aa6ab', mx, y, -0.2);
+  k.cyl(0.13, 0.1, 0.12, 8, '#2b3a48', mx, 1.9, -0.2);
+  k.box(0.6, 0.4, 0.5, st.wall, 1.1, 0, 1.0);
+  k.prism(0.7, 0.2, 0.6, st.roof, 1.1, 0.4, 1.0);
+  k.box(0.2, 0.22, 0.02, '#1d1e24', 1.1, 0, 1.26);
+  // The airship: a long cream envelope nosed on to the mast, tail fins in team colour, a slung gondola.
+  const ship = k.sphere(0.5, '#e9e6df', 0, 2.05, -0.2);
+  ship.scale.set(3, 0.95, 0.95);
+  const belly = k.sphere(0.5, '#c2cbd0', 0, 1.9, -0.2);
+  belly.scale.set(2.7, 0.7, 0.8);
+  k.cone(0.12, 0.3, 8, '#2b3a48', mx - 0.15, 2.05, -0.2).rotation.z = -Math.PI / 2;
+  k.team(k.box(0.5, 0.8, 0.04, TEAM, -1.15, 1.65, -0.2));
+  k.team(k.box(0.5, 0.04, 0.8, TEAM, -1.15, 2.03, -0.2));
+  k.box(0.9, 0.18, 0.26, '#2b3a48', 0, 1.35, -0.2);
+  k.box(0.7, 0.07, 0.02, '#9ad0dc', 0, 1.4, -0.06);
+  for (const x of [-0.3, 0.3]) k.cyl(0.015, 0.015, 0.25, 4, '#d7e4e8', x, 1.52, -0.2);
+  // Bollards for the tail lines, and fuel drums by the winch house.
+  for (const z of [-1.1, 0.7]) k.cyl(0.07, 0.08, 0.14, 6, '#5a6450', -1.9, 0, z);
+  for (const [x, z] of [[0.5, 1.2], [0.7, 1.4]]) k.cyl(0.1, 0.1, 0.26, 8, '#5a6450', x, 0, z);
+}
+
+/** The Aeronauts' Town Center (#816): an air terminal, a long glazed concourse with a barrel roof, a round control tower with a beacon lamp, a windsock and a luggage apron. */
+function aeroTerminal(k: Kit, st: Style): void {
+  const SKY = '#76c6d6';
+  const STEEL = '#d7e4e8';
+  const NAVY = '#2b3a48';
+  k.box(3.9, 0.05, 3.9, '#aeb2a8', 0, -0.02, 0);
+  for (const x of [-1.3, -0.65, 0, 0.65, 1.3]) k.box(0.06, 0.02, 0.5, '#f4efe4', x, 0.04, 1.5);
+  // The concourse: a cream hall with a row of tall glass bays and a barrel roof of sky-blue ribs.
+  k.box(3.0, 0.9, 1.5, st.wall, -0.2, 0, -0.5);
+  k.box(3.08, 0.07, 1.58, st.trim, -0.2, 0.9, -0.5);
+  for (let i = 0; i < 6; i++) {
+    const x = -1.45 + i * 0.5;
+    k.box(0.34, 0.55, 0.03, '#2a3f4f', x, 0.15, 0.26);
+    window(k, st, x, 0.2, 0.275, 0.26, 0.45);
+    k.box(0.04, 0.55, 0.04, STEEL, x - 0.2, 0.15, 0.27);
+  }
+  k.box(3.0, 0.5, 1.5, SKY, -0.2, 0.97, -0.5).scale.set(1, 0.5, 1);
+  for (let i = 0; i < 7; i++) {
+    const x = -1.6 + i * 0.5;
+    k.box(0.05, 0.22, 1.55, STEEL, x, 1.1, -0.5);
+    k.box(0.05, 0.12, 1.55, STEEL, x, 1.3, -0.5).scale.x = 0.9;
+  }
+  k.box(3.0, 0.07, 1.5, SKY, -0.2, 1.4, -0.5);
+  // The entrance canopy and the team's pennant over the doors.
+  k.box(1.1, 0.06, 0.55, st.roof, -0.2, 0.7, 0.55);
+  for (const x of [-0.7, 0.3]) k.cyl(0.03, 0.03, 0.7, 5, STEEL, x, 0, 0.8);
+  k.box(0.5, 0.45, 0.03, '#1d1e24', -0.2, 0, 0.27);
+  k.team(k.box(0.9, 0.18, 0.03, TEAM, -0.2, 0.9, 0.82));
+  // The control tower: a round shaft, a glazed cab, a lamp room and a mast with a beacon.
+  const tx = 1.45;
+  const tz = -0.9;
+  k.cyl(0.36, 0.42, 1.9, 12, st.wall2, tx, 0, tz);
+  k.ring(0.4, 0.03, SKY, 0.5).position.set(tx, 0.5, tz);
+  k.cyl(0.58, 0.46, 0.2, 12, st.trim, tx, 1.9, tz);
+  k.cyl(0.5, 0.5, 0.34, 12, '#2a3f4f', tx, 2.1, tz);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * 2 * Math.PI;
+    window(k, st, tx + Math.sin(a) * 0.5, 2.15, tz + Math.cos(a) * 0.5, 0.2, 0.22, true, Math.abs(Math.sin(a)) > 0.7);
+  }
+  k.cyl(0.6, 0.6, 0.06, 12, NAVY, tx, 2.44, tz);
+  k.cone(0.6, 0.3, 12, SKY, tx, 2.5, tz);
+  k.cyl(0.02, 0.03, 0.9, 5, STEEL, tx, 2.8, tz);
+  k.glow(k.sphere(0.09, '#fff2b0', tx, 3.75, tz));
+  for (const a of [0, 2.1, 4.2]) k.box(0.3, 0.02, 0.02, NAVY, tx + Math.sin(a) * 0.15, 3.45, tz + Math.cos(a) * 0.15).rotation.y = a;
+  // A windsock on the hall roof, caught by the breeze.
+  k.cyl(0.02, 0.025, 0.7, 5, STEEL, -1.4, 1.4, -0.9);
+  k.box(0.5, 0.12, 0.1, '#f4a04a', -1.15, 2.0, -0.9);
+  k.box(0.12, 0.12, 0.11, '#f4efe4', -1.2, 2.0, -0.9);
+  // The apron: a luggage cart, crates and a fuel drum, mooring bollards and a lamp post each side.
+  k.box(0.5, 0.12, 0.3, NAVY, 1.2, 0.04, 1.2);
+  k.box(0.34, 0.2, 0.22, '#9a7a52', 1.18, 0.16, 1.2);
+  for (const x of [1.0, 1.4]) k.cyl(0.05, 0.05, 0.05, 6, '#1d1e24', x, 0, 1.38);
+  k.cyl(0.1, 0.1, 0.26, 8, '#5a6450', 1.6, 0, 0.6);
+  for (const x of [-1.7, 1.7]) {
+    k.cyl(0.02, 0.03, 0.8, 5, STEEL, x, 0, 1.6);
+    k.glow(k.sphere(0.06, '#ffd890', x, 0.84, 1.6));
+  }
+  for (const z of [-1.6, 0.4]) k.cyl(0.07, 0.08, 0.14, 6, '#5a6450', -1.85, 0, z);
+  banner(k, -1.0, 0, 1.45, 1.2);
+}
+
 /** Buildings an age raises in a shape of its own (#816), in place of the trunk's model; its touches still follow. */
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
-  iron: { house: ironHouse },
+  iron: { house: ironHouse, towncenter: ironHillfort },
+  merchant: { market: merchantMarket, barracks: merchantBarracks, towncenter: merchantTownCenter },
+  aeronaut: { house: aeroHouse, forge: aeroForge, airfield: aeroAirfield, towncenter: aeroTerminal },
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

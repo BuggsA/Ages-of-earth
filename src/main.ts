@@ -10,13 +10,16 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
-import { wallLine } from './sim/commands';
-import { AGES, FAULT, LIVING, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { shortfall, wallLine } from './sim/commands';
+import { AGES, FAULT, LIVING, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, GEMS, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { siteGrade } from './sim/shafts';
+import { coreProblem, coresOf, lodeName, patchOf } from './sim/lodes';
+import { coreTip } from './ui/cutaway';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
+import { prominence, standAt } from './sim/terrain';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { carriesTorch, torchProblem } from './sim/fire';
 import { apartProblem, launchProblem, ringsFor, salvoProblem, salvoSilos, type WarheadKind } from './sim/silo';
@@ -33,7 +36,7 @@ import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
 import { AI_FLOAT, FLOAT } from './sim/data';
 import { mooringSpot } from './sim/floating';
 import { R_COCKLE } from './sim/types';
-import { AI_BARRAGE, BLOOM, INTERCEPT, SALVO, secs } from './sim/data';
+import { AI_BARRAGE, BLOOM, CORE, INTERCEPT, SALVO, STRATA, secs } from './sim/data';
 import { rooted, slingProblem } from './sim/bloom';
 import { isCarrier } from './sim/units';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
@@ -42,7 +45,7 @@ import { journeyHtml } from './ui/journeyReport';
 import { phoneWelcome } from './ui/phoneWelcome';
 import { shareMatch } from './ui/shareCard';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
-import { KEYS, R_FISH, R_NONE, RES, T_WATER } from './sim/types';
+import { KEYS, R_FISH, R_NONE, RES, T_ROCK, T_WATER } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { salvages } from './sim/salvage';
@@ -135,7 +138,9 @@ let slingSpire = 0;
 let launchWarhead: WarheadKind | undefined;
 /** A salvo being aimed (#765): the points clicked so far, until there are `SALVO.trio`; null for a single launch. */
 let salvoAims: { x: number; y: number }[] | null = null;
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'delve' | 'fault' | 'earth' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'core' | 'delve' | 'fault' | 'earth' | null = null;
+/** The Prospector's Lodge whose core sample (#924 m3) the next click places. */
+let coreLodge = 0;
 /** The Fault Engine whose crack is being aimed (#900), or the Heartstone whose order is (#904), and the tile a line begins on once the first click is made. */
 let faultEngine = 0;
 let faultFrom: { x: number; y: number } | null = null;
@@ -235,6 +240,11 @@ const hud = new Hud({
   slingMode: (spire) => {
     slingSpire = spire;
     targetMode = 'sling';
+    placing = null;
+  },
+  coreMode: (lodge) => {
+    coreLodge = lodge;
+    targetMode = 'core';
     placing = null;
   },
   unloadMode: () => {
@@ -594,6 +604,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   game = saved ?? createGame(setup);
   viewer = seat;
   record = [];
+  setUnderground(false);
   if (!watchingNext) {
     watching = null;
     $('replay-bar').classList.add('hidden');
@@ -1861,7 +1872,10 @@ function placeHere(shift: boolean): void {
   if (kind === 'shaft') {
     const site = { tx: placeAt.tx, ty: placeAt.ty, size: BUILDINGS.shaft.size };
     const g = siteGrade(s, site);
-    hud.toast(`${{ old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[g]}: a shaft here digs at ${Math.round(SHAFT.grade[g] * 100)}% of an open deposit's pace`);
+    // A core drawn on that patch (#924 m3) says what lies below too.
+    const patch = patchOf(site.tx + 1, site.ty + 1);
+    const cored = coresOf(s, viewer).find((c) => patchOf(c.tile % s.w, Math.floor(c.tile / s.w)).x0 === patch.x0 && patchOf(c.tile % s.w, Math.floor(c.tile / s.w)).y0 === patch.y0);
+    hud.toast(`${{ old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[g]}: a shaft here digs at ${Math.round(SHAFT.grade[g] * 100)}% of an open deposit's pace${cored ? `. Below: ${lodeName(cored.lode, (m) => SHAFT.seams[m].name).toLowerCase()}` : ''}`);
   }
   if (!shift) {
     placing = null;
@@ -2082,6 +2096,23 @@ canvas.addEventListener('pointerdown', (e) => {
     targetMode = null;
     return;
   }
+  if (targetMode === 'core') {
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (g && s) {
+      const why = coreProblem(s, viewer, s.byId.get(coreLodge), g.x, g.y) ?? shortfall(s.players[viewer], CORE.cost);
+      if (why) {
+        hud.toast(why, 'bad');
+        play('error');
+      } else {
+        issue({ t: 'core', p: viewer, building: coreLodge, x: g.x, y: g.y });
+        view.marker(s, g.x, g.y, false);
+        play('queue');
+      }
+    }
+    targetMode = null;
+    return;
+  }
   if (targetMode === 'unload') {
     unloadAt(e.clientX, e.clientY, e.shiftKey);
     targetMode = null;
@@ -2112,13 +2143,32 @@ canvas.addEventListener('pointermove', (e) => {
     }
   }
   if (placing) updatePlacement(e.clientX, e.clientY);
+  coreHover(e.clientX, e.clientY);
   if (wallDrag && placeAt) {
     wallDrag.x1 = placeAt.tx;
     wallDrag.y1 = placeAt.ty;
   }
 });
 
-canvas.addEventListener('pointerleave', () => (pointer.inside = false));
+canvas.addEventListener('pointerleave', () => {
+  pointer.inside = false;
+  hud.worldTip(null, 0, 0);
+});
+
+/** The underground view (#924 m3): U, or Esc, toggles it; the surface fades and pitheads and cores stand out. */
+function setUnderground(on: boolean): void {
+  view.underground = on;
+  $('underground-note').classList.toggle('hidden', !on);
+}
+
+/** Hovering a core sample of the viewer's (#924 m3) reads what lies below it, layer by layer. */
+function coreHover(cx: number, cy: number): void {
+  const s = game;
+  if (!s || placing || boxing || panDrag) return hud.worldTip(null, 0, 0);
+  const g = view.groundAt(cx, cy);
+  const c = g ? coresOf(s, viewer).find((k) => Math.abs((k.tile % s.w) + 0.5 - g.x) < 0.7 && Math.abs(Math.floor(k.tile / s.w) + 0.5 - g.y) < 0.7) : undefined;
+  hud.worldTip(c ? coreTip(c.lode) : null, cx, cy);
+}
 
 canvas.addEventListener('pointerup', (e) => {
   if (panDrag && (e.button === 1 || e.button === 0)) {
@@ -2388,6 +2438,10 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (k === 'Escape') {
+    if (view.underground && !placing && !targetMode) {
+      setUnderground(false);
+      return;
+    }
     if (placing || targetMode) {
       placing = null;
       placeAt = null;
@@ -2407,6 +2461,11 @@ window.addEventListener('keydown', (e) => {
   if (k === 'Enter' && online) {
     e.preventDefault();
     openChat();
+    return;
+  }
+  // The underground view (#924 m3): U, unless the selection's card has an open button on U (a shut one gives way).
+  if (k.toLowerCase() === 'u' && !e.ctrlKey && !e.metaKey && !hud.hasOpenKey('U')) {
+    setUnderground(!view.underground);
     return;
   }
   // The command card first: its letters change with the selection.
@@ -2751,6 +2810,24 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           play('pondShut');
         }
         break;
+      case 'caveIn':
+        // The deep mine (#924 m2): a cave-in on your own shaft is its one toast.
+        if (ev.owner === viewer) {
+          lastAlert = { x: ev.x, y: ev.y };
+          const L = STRATA[ev.layer]?.name.toLowerCase() ?? 'a layer';
+          const lost = ev.dead ? `${ev.dead} ${ev.dead === 1 ? 'miner' : 'miners'} lost` : 'nobody was at the face';
+          hud.toast(ev.why === 'stranded' ? `⛏ Your pithead has fallen: the winch is gone and ${ev.dead} ${ev.dead === 1 ? 'miner' : 'miners'} below are lost. (Space to look)` : ev.why === 'firedamp' ? `⛏ Firedamp! The blast brought down ${L}: ${lost}. It is shut ${SHAFT.shut}s, or shore it (P) to clear it now. (Space to look)` : `⛏ Cave-in! ${STRATA[ev.layer]?.name ?? 'A layer'} fell in: ${lost}. Shore it (P) to dig it safely and clear it now, or it is shut ${SHAFT.shut}s. (Space to look)`, 'alert');
+        }
+        break;
+      case 'flood':
+        // The wet deep (#924 m4): a flood on your own shaft is its one toast.
+        if (ev.owner === viewer) {
+          lastAlert = { x: ev.x, y: ev.y };
+          const L = STRATA[ev.layer]?.name ?? 'A layer';
+          const toll = [ev.dead ? `${ev.dead} ${ev.dead === 1 ? 'miner' : 'miners'} drowned` : '', ev.up ? `${ev.up} driven up` : ''].filter(Boolean).join(', ') || 'nobody was at the face';
+          hud.toast(ev.why === 'inrush' ? `🌊 Inrush! The water broke into ${L.toLowerCase()}: ${toll}. It takes no one until it is pumped (F). (Space to look)` : `🌊 ${L} has flooded to the roof: ${toll}. Pump it (F) to dig there again. (Space to look)`, 'alert');
+        }
+        break;
       case 'tideSwept':
         // A rival's Tide Gate scoured the flats your people stood on (#785).
         if (ev.by !== undefined && ev.by !== viewer && ev.owner === viewer && s.tick - sweptToldAt > TICK_HZ * 10) {
@@ -2917,7 +2994,8 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       case 'trade':
-        if (ev.owner === viewer && !ev.buy && ev.res in RARE) {
+        if (ev.owner === viewer && ev.res === 'gems' && ev.gold !== undefined) hud.toast(`💠 Sold ${GEMS.lot} gems for ${ev.gold} gold`, 'good');
+        else if (ev.owner === viewer && !ev.buy && ev.res in RARE) {
           const ore = ev.res as keyof typeof ORE_TRADE.gold;
           hud.toast(`Sold ${ORE_TRADE.lot} ${RARE[ore].name.toLowerCase()} for ${ORE_TRADE.gold[ore]} gold`, 'good');
         }
@@ -3575,6 +3653,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'unload' || targetMode === 'delve') return 'cur-garrison';
   if (targetMode === 'fault' || targetMode === 'earth') return 'cur-attack';
   if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch' || targetMode === 'sling') return 'cur-attack';
+  if (targetMode === 'core') return 'cur-place';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);
@@ -4195,6 +4274,41 @@ function frame(now: number): void {
     setSelection([gate.id]);
     view.rig.focus(gate.x, gate.y);
     return gate.id;
+  },
+  /**
+   * High ground (testing, #925): five of the player's bowmen on the highest rise within 22 tiles of their start, selected, and a rival
+   * line of six spearmen on the lowest ground 9 tiles from them. Returns how far the rise stands above the land round it.
+   */
+  highGround(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    let best: { x: number; y: number; h: number } | null = null;
+    for (let ty = Math.floor(p.startY) - 22; ty <= p.startY + 22; ty++) {
+      for (let tx = Math.floor(p.startX) - 22; tx <= p.startX + 22; tx++) {
+        if ((tx - p.startX) ** 2 + (ty - p.startY) ** 2 < 64 || !walkable(s, tx, ty)) continue;
+        // A grassy rise, not the foot of a crag.
+        let open = true;
+        for (let dy = -2; dy <= 2 && open; dy++) for (let dx = -2; dx <= 2 && open; dx++) open = s.terrain[(ty + dy) * s.w + tx + dx] !== T_ROCK && s.terrain[(ty + dy) * s.w + tx + dx] !== T_WATER;
+        if (!open) continue;
+        const h = prominence(s, tx + 0.5, ty + 0.5);
+        if (!best || h > best.h) best = { x: tx + 0.5, y: ty + 0.5, h };
+      }
+    }
+    if (!best) return 0;
+    const ids: number[] = [];
+    for (let i = 0; i < 5; i++) ids.push(spawnUnit(s, owner, 'ranged', best.x - 0.8 + (i % 3) * 0.8, best.y - 0.4 + Math.floor(i / 3) * 0.8).id);
+    let low: { x: number; y: number } | null = null;
+    for (let k = 0; k < 16; k++) {
+      const x = best.x + Math.cos((k * Math.PI) / 8) * 9;
+      const y = best.y + Math.sin((k * Math.PI) / 8) * 9;
+      if (walkable(s, Math.floor(x), Math.floor(y)) && (!low || standAt(s, x, y) < standAt(s, low.x, low.y))) low = { x, y };
+    }
+    const rival = s.players.find((q) => q.id !== owner && isEnemy(s, owner, q.id));
+    if (rival && low) for (let i = 0; i < 6; i++) spawnUnit(s, rival.id, 'infantry', low.x - 1.2 + (i % 3) * 0.8, low.y + Math.floor(i / 3) * 0.8);
+    setSelection(ids);
+    view.rig.focus(best.x, best.y);
+    return best.h;
   },
   cocklerHut(owner: number) {
     if (!game) return 0;

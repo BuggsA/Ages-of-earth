@@ -4,9 +4,11 @@ import { TIDE_GATE } from '../sim/data';
 import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
 import { gateReach } from '../sim/tides';
-import { isEnemy } from '../sim/world';
+import { isEnemy, statsOf } from '../sim/world';
 import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, STRAND, WHEELYARD, PHAROS, CHANTRY, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
+import { TERRAIN, domainOf } from '../sim/data';
+import { heightSight } from '../sim/terrain';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
@@ -14,6 +16,7 @@ import { R_FISH, R_GOLD, R_STONE } from '../sim/types';
 import { isIdleCitizen } from './idle';
 import { laterTip, type Opening } from './opening';
 import { findResource } from '../sim/units';
+import { deepenProblem, seamOf, spentAt, waterAt, wetLayer } from '../sim/shafts';
 import { seasonAt } from '../sim/seasons';
 import { tideWaitLeft } from '../sim/tides';
 import { bared } from '../sim/tides';
@@ -92,6 +95,10 @@ const TIPS: Tip[] = [
   { id: 'wayWarband', when: (s, me) => s.players[me].way === 'warband' && s.players[me].epoch <= 1, text: '<b>The Warband Way:</b> your soldiers eat by raiding. Send a few to strike a rival\'s <b>Storehouse</b>, <b>Farms</b> or <b>Hunting Camp</b>: every blow carries food home. Your bell never rings, so keep soldiers by home too.' },
   // Mine Shafts (#681): once the open stone and gold near home are gone.
   { id: 'shaft', when: (s, me) => s.players[me].epoch >= 1 && secsIn(s) > 240 && !has(s, me, 'shaft') && !buildings(s, me).some((b) => BUILDINGS[b.type].drop.length && (findResource(s, R_STONE, b.x, b.y, SHAFT.aiNear) >= 0 || findResource(s, R_GOLD, b.x, b.y, SHAFT.aiNear) >= 0)), text: 'No stone or gold left near home? A <b>Mine Shaft</b> (<kbd>B</kbd> <kbd>H</kbd>, 150 wood) digs it from the ground for good. Best over <b>old workings</b> where a deposit was worked out, then beside mountain rock, then plain ground. Right-click it with a citizen and pick the seam.' },
+  // The deep mine (#924 m1): a shaft whose vein is dug out in every layer it reaches can be sunk deeper.
+  { id: 'deepen', when: (s, me) => buildings(s, me).some((b) => b.type === 'shaft' && b.built && !deepenProblem(s, b) && (() => { const m = seamOf(s, b); return !!m && (m === 'stone' || m === 'gold') && spentAt(b, m); })()), text: 'A <b>Mine Shaft</b>\'s vein is spent: it still digs, at the plain pace. Select it and <b>sink it deeper</b> (<kbd>D</kbd>) for a richer layer and room for more miners. The cut-away in the panel shows what each layer holds.' },
+  // The wet deep (#924 m4): the water rises in a shaft that reaches it unpumped.
+  { id: 'wetDeep', when: (s, me) => buildings(s, me).some((b) => b.type === 'shaft' && b.built && !b.pump && waterAt(b, wetLayer()) > 0), text: 'Water is rising in your <b>Mine Shaft</b>\'s wet deep. Dig its <b>gems</b> while it is low, and sell them at a Market, but every full basket risks an <b>inrush</b> that floods the layer and may drown its miners, likelier the higher it stands. Raise a <b>pump</b> (<kbd>F</kbd>) to drain it and keep it dry.' },
   { id: 'train', when: (s) => secsIn(s) > 25, text: 'More citizens mean a faster economy. Click your <b>Town Center</b> and press <kbd>Q</kbd> to train one (you can queue several).' },
   { id: 'house', when: (s, me) => s.players[me].pop >= s.players[me].cap - 2, text: 'You are nearly out of room. Select a citizen, press <kbd>B</kbd> then <kbd>E</kbd> to build a <b>house</b> (5 more people each).' },
   { id: 'idle', when: (s, me) => secsIn(s) > 60 && s.ents.some((e) => isIdleCitizen(e, me)), text: 'Someone is standing around: press <kbd>.</kbd> to find an idle citizen, or <kbd>Shift</kbd> + <kbd>.</kbd> to select every idle citizen and put them to work.' },
@@ -109,6 +116,7 @@ const TIPS: Tip[] = [
   { id: 'legion', when: (s, me) => !!CIVS[s.players[me].civ].legion && secsIn(s) > 30, text: `🦅 <b>The legion builds.</b> A Roman town keeps only ${LEGION.citizens} citizens (three more each epoch): leave them the food and the gold. Raise a <b>Barracks</b> early, and put your foot soldiers to work: select them and <b>right-click a tree or a stone</b> to fell and quarry, or <b>right-click a building site</b> to raise it. A soldier at work still keeps watch and drops his tools for a foe who comes near, but a wave marched off to war leaves the wood-line empty.` },
   // The set line (#501): a British bowman who stands still draws the longbow to the full.
   { id: 'longbow', when: (s, me) => !!CIVS[s.players[me].civ].longbow && secsIn(s) > 60, text: `🏹 <b>The set line.</b> A bowman who stands still ${LONGBOW.after} seconds is <b>set</b>: he reaches ${LONGBOW.range} tiles farther and strikes ${LONGBOW.attack} harder until he takes a step. Pick your ground, plant the line, and let the foe walk onto it. A line that chases is only archers, and horsemen that reach it before it sets ride it down.` },
+  { id: 'highGround', when: (s, me) => units(s, me).some((u) => !u.inside && !!statsOf(s, u).shot && domainOf(u.type) !== 'air' && heightSight(s, u.x, u.y) >= 1), text: `⛰ <b>High ground.</b> Your archers stand on a rise. Shooting down at a foe more than a step below, a bowman reaches up to ${TERRAIN.reachUp} tiles farther; shooting up at one above, up to ${TERRAIN.reachDown} shorter. Any soldier on a rise sees farther, and an army climbs slowly. Select your bowmen: their range ring swells where the land falls away and pulls in where it climbs. Take the ridge first, or go round it.` },
   // The household tax (#501): a Chinese town's gold is owed by its houses, not dug.
   { id: 'household', when: (s, me) => !!CIVS[s.players[me].civ].household && secsIn(s) > 30, text: `🏮 <b>The household tax.</b> Nobody here mines gold: every <b>house</b> pays it every ${HOUSEHOLD.every} seconds, in proportion to how full your town is, and <b>more for each house on its street</b> (within ${HOUSEHOLD.reach} tiles, a Market counting as two). Build houses in lanes close together and keep the town full of people; hover the gold to see the tax a minute. A rival who <b>burns your houses</b> takes ${HOUSEHOLD.raid} gold from the treasury for each, so guard the streets.` },
   // Born on the move (#501): a Mongol camp is on wagons from the first minute, with no fields and no quarry.
