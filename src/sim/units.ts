@@ -183,7 +183,12 @@ function deposit(s: GameState, u: Unit, at: Building): void {
     const p = s.players[u.owner];
     p.gems = (p.gems ?? 0) + u.carry;
     s.events.push({ k: 'deliver', owner: u.owner, res: 'gold', amount: u.carry, x: at.x, y: at.y, gems: true });
-  } else if (u.carry > 0 && u.carryRes === 'stone' && u.carryRare && u.carryRare !== 'gems') {
+  } else if (u.carry > 0 && u.carryRare === 'crystal') {
+    // Crystal from the hot deep (#924 m5) is kept apart, to be bartered at the Market.
+    const p = s.players[u.owner];
+    p.crystal = (p.crystal ?? 0) + u.carry;
+    s.events.push({ k: 'deliver', owner: u.owner, res: 'stone', amount: u.carry, x: at.x, y: at.y, crystal: true });
+  } else if (u.carry > 0 && u.carryRes === 'stone' && u.carryRare && u.carryRare !== 'gems' && u.carryRare !== 'crystal') {
     const p = s.players[u.owner];
     const stock = (p.rare ??= {});
     stock[u.carryRare] = (stock[u.carryRare] ?? 0) + u.carry;
@@ -569,14 +574,16 @@ function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): vo
     face(u, b.x, b.y);
     if (o.phase !== 'work') {
       // At the pithead: a place at the face, or, the shaft full, another free shaft nearby, or stand by.
-      const layer = placeFor(s, b, u, seam, o.layer);
+      const layer = placeFor(s, b, u, seam, o.layer, o.hand);
       if (layer < 0) {
         delete o.layer;
+        delete o.hand;
         const other = freeShaft(s, u.owner, b.x, b.y, 12, new Set([b.id]), seam);
         if (other) setOrder(u, { k: 'shaft', target: other.id, res: resOfSeam(seamOf(s, other) ?? 'stone'), phase: 'go' });
         else setOrder(u, { k: 'idle' });
         return;
       }
+      if (layer !== o.layer) delete o.hand;
       o.layer = layer;
     }
     o.phase = 'work';

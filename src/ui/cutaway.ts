@@ -9,10 +9,14 @@
  *
  * The wet deep (#924 m4): water seeps from the roof of a wet layer in drips and stands in it, rising from the floor, glassy
  * blue over the rock; flooded, it fills the band to the roof. A pump shows as a pipe down the shaft and a beam at the pithead.
+ *
+ * The hot deep (#924 m5): an ember glow rises from the floor of a hot layer and heat shimmers over it; foul air hangs in it as
+ * a sallow haze, thicker the fouler. Crystal stands in it as pale shards, glowcaps as small glowing caps. A fan shows as a fan
+ * house and its flared chimney at the pithead, an air pipe down the shaft's other side.
  */
 import { LODES, STRATA, SHAFT } from '../sim/data';
 import { kindOf, lodeName } from '../sim/lodes';
-import { SEAMS, crewOf, deepeningLeft, depthOf, digShare, fallOf, fillOf, floodedAt, pumping, safeAt, seamOf, shutLeft, veinFull, veinLeft, waterAt, wetAt } from '../sim/shafts';
+import { SEAMS, airAt, bearsAt, crewOf, cutOff, deepeningLeft, depthOf, digShare, fallOf, fanning, fillOf, floodedAt, hotAt, pumping, safeAt, seamOf, shutLeft, veinFull, veinLeft, ventilated, waterAt, wetAt } from '../sim/shafts';
 import type { Building, GameState, SeamId } from '../sim/types';
 
 const W = 116;
@@ -24,7 +28,10 @@ const SX = 52;
 const SW = 12;
 
 /** A seam's glint colour (a later seam adds one). */
-const GLINT: Partial<Record<SeamId, string>> = { stone: '#e6e0d2', gold: '#ffd24a', salt: '#f4f6f8', saltpetre: '#b8e0d0', bloodiron: '#c0303a', gems: '#7fe0f0' };
+const GLINT: Partial<Record<SeamId, string>> = { stone: '#e6e0d2', gold: '#ffd24a', salt: '#f4f6f8', saltpetre: '#b8e0d0', bloodiron: '#c0303a', gems: '#7fe0f0', crystal: '#e8dcff', glowcap: '#b8f0c0' };
+
+/** Where in a layer's scatter each seam's glints start, so seams sharing a layer don't sit on each other. */
+const SCATTER: Partial<Record<SeamId, number>> = { stone: 0, gold: 8, gems: 24, crystal: 32, glowcap: 48 };
 
 /** The seams a layer of this ground holds, and how much of each at first (#924 m3: the lode scales them). */
 const veinsIn = (b: { lode?: number }, l: number): [SeamId, number][] => SEAMS.map((m) => [m, veinFull(b, l, m)] as [SeamId, number]).filter(([, n]) => n > 0);
@@ -40,7 +47,9 @@ export function coreTip(code: number): string {
     const fall = fallOf({ lode: code }, l);
     // The wet deep (#924 m4): how fast the water rises under this ground.
     const wet = wetAt(l) ? `; floods in ${Math.round(fillOf({ lode: code }, l))}s unpumped${k.wet > 1 ? ' (wet ground)' : k.wet < 1 ? ' (dry ground)' : ''}` : '';
-    return `<span style="color:${L.tint}">■</span> ${L.name}: ${veins}${fall > 0 ? `; ${Math.round(fall * 100)}% cave-in a basket unshored` : ''}${wet}`;
+    // The hot deep (#924 m5): how many its air bears unventilated.
+    const hot = hotAt(l) ? `; hot: the air bears ${SHAFT.bears} ${SHAFT.bears === 1 ? 'miner' : 'miners'} unventilated` : '';
+    return `<span style="color:${L.tint}">■</span> ${L.name}: ${veins}${fall > 0 ? `; ${Math.round(fall * 100)}% cave-in a basket unshored` : ''}${wet}${hot}`;
   });
   return `<b>Core sample · ${lodeName(code, (m) => SHAFT.seams[m].name)}</b>${k.blurb[0].toUpperCase()}${k.blurb.slice(1)}${k.add > 0 ? `, ${Math.round(k.add * 100)} points faster while a vein lasts` : ''}.<br>${rows.join('<br>')}<br>A shaft sunk on this patch digs what it shows.`;
 }
@@ -102,10 +111,15 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
       // Four glints for a plain layer's vein; more on rich ground (#924 m3), fewer on poor.
       const shown = Math.ceil((veinLeft(b, l, m) / Math.max(1, STRATA[l].veins[m] ?? nv)) * 4);
       for (let k = 0; k < Math.min(shown, 8); k++) {
-        const [x, y] = spot(l, k + (m === 'gold' ? 8 : m === 'stone' ? 0 : m === 'gems' ? 24 : 16), y0, h);
-        // A gem is a cut stone with a bright facet; the rest are plain glints.
+        const [x, y] = spot(l, k + (SCATTER[m] ?? 16), y0, h);
+        // A gem is a cut stone with a bright facet; crystal a cluster of tall shards; a glowcap a little cap on its stem,
+        // haloed; the rest are plain glints.
         glints.push(m === 'gems'
           ? `<path d="M${(x - 2).toFixed(1)} ${y.toFixed(1)} l2 -2.6 l2 2.6 l-2 2.6Z" fill="${c}"/><path d="M${x.toFixed(1)} ${(y - 2.6).toFixed(1)} l2 2.6 h-2Z" fill="#e8fbff"/>`
+          : m === 'crystal'
+          ? `<path d="M${(x - 2.4).toFixed(1)} ${(y + 2).toFixed(1)} l0.8 -3.4 l0.9 -1 l0.7 4.4Z M${(x - 0.6).toFixed(1)} ${(y + 2).toFixed(1)} l0.4 -5 l1 -1.3 l1 6.3Z M${(x + 1.4).toFixed(1)} ${(y + 2).toFixed(1)} l0.6 -2.8 l0.8 -0.7 l0.4 3.5Z" fill="${c}" opacity="0.92"/><path d="M${(x - 0.2).toFixed(1)} ${(y - 3).toFixed(1)} l0.6 -0.8 l0.3 3" stroke="#ffffff" stroke-width="0.5" fill="none"/>`
+          : m === 'glowcap'
+          ? `<circle cx="${x.toFixed(1)}" cy="${(y - 0.8).toFixed(1)}" r="2.6" fill="${c}" opacity="0.22"/><rect x="${(x - 0.35).toFixed(1)}" y="${(y - 0.6).toFixed(1)}" width="0.7" height="2" fill="#e8f0e0"/><path d="M${(x - 1.6).toFixed(1)} ${(y - 0.4).toFixed(1)} a1.6 1.3 0 0 1 3.2 0Z" fill="${c}"/>`
           : `<path d="M${x.toFixed(1)} ${(y - 2.2).toFixed(1)} l2 2.2 l-2 2.2 l-2 -2.2Z" fill="${c}"/>`);
       }
     }
@@ -151,9 +165,28 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
         }
       }
     }
+    // The hot deep (#924 m5): an ember glow from the floor and shimmer over it; foul air as a sallow haze over the whole band.
+    const air = reached && hotAt(l) ? airAt(b, l) : 0;
+    if (hotAt(l)) {
+      marks.push(`<path d="M0 ${(y0 + h).toFixed(1)} V${(y0 + h * 0.6).toFixed(1)} L${W * 0.25} ${(y0 + h * 0.72).toFixed(1)} L${W * 0.5} ${(y0 + h * 0.58).toFixed(1)} L${W * 0.78} ${(y0 + h * 0.7).toFixed(1)} L${W} ${(y0 + h * 0.6).toFixed(1)} V${(y0 + h).toFixed(1)}Z" fill="#ff7a2a" opacity="${reached ? 0.28 : 0.14}"/>`);
+      if (reached) {
+        for (let k = 0; k < 3; k++) {
+          const [x] = spot(l, k + 56, y0, h);
+          marks.push(`<path d="M${x.toFixed(1)} ${(y0 + h - 2).toFixed(1)} q1.2 -2 0 -4 q-1.2 -2 0 -4" stroke="#ffc080" stroke-width="0.6" fill="none" opacity="0.55"/>`);
+        }
+      }
+      if (air > 0) marks.push(`<rect x="0" y="${y0.toFixed(1)}" width="${W}" height="${h.toFixed(1)}" fill="#b8a46a" opacity="${(0.12 + air * 0.5).toFixed(2)}"/>`);
+    }
+    const bears = bearsAt(s, b, l);
+    const hotNote = reached && hotAt(l)
+      ? air >= 1 || (air > SHAFT.airOpen && !at[l])
+        ? ` The air is foul: it takes no one until it clears (${Math.round(air * 100)}%).`
+        : ` Hot: ${ventilated(s, b) ? (fanning(s, b) ? 'the fan draws its air, so it bears a full face' : 'a hot Vent Forge near the pithead draws its air, so it bears a full face') : `unventilated, its air bears ${bears} ${bears === 1 ? 'miner' : 'miners'} at the face`}${air > 0 ? `; foul ${Math.round(air * 100)}% and ${at[l] > bears ? 'fouling' : 'clearing'}` : ''}. More by hand foul it, and foul air may overcome those at the face.${ventilated(s, b) ? '' : ' Raise a fan (V).'}`
+      : hotAt(l) ? ` Hot: its air bears ${SHAFT.bears} ${SHAFT.bears === 1 ? 'miner' : 'miners'} at the face unless the shaft is ventilated.` : '';
+    const cut = reached && cutOff(b, l) ? ' The way down is flooded: pump it dry.' : '';
     const wetNote = reached && wetAt(l) ? (water >= 1 ? ` Flooded: it takes no one${b.pump ? (pumped ? ' while the pump drains it.' : '; the pump has stalled with the hurt pithead.') : ' until pumped (F).'}` : pumped ? ` Pumped${water > 0 ? `: water ${Math.round(water * 100)}% and falling` : ' dry'}.` : ` Water ${Math.round(water * 100)}% and rising: to the roof in ${Math.ceil(fillOf(b, l) * (1 - water))} seconds. Every full basket risks an inrush, likelier the higher it stands. Pump it (F).`) : wetAt(l) ? ` Takes on water once reached: it floods in ${Math.round(fillOf(b, l))} seconds unless pumped.` : '';
     const state = shut > 0 ? ` Caved in: cleared in ${shut} seconds, or at once if shored.` : risky ? ` Unshored: ${Math.round(L.rush * 100)} points faster, a ${Math.round(fallOf(b, l) * 100)}% chance of a cave-in each basket. Shore it (P).` : shored ? ' Shored with props.' : '';
-    const tip = `<b>${L.name}</b>${reached ? '' : `Sink the shaft to reach it (${Object.entries(L.sink).map(([r, v]) => `${v} ${r}`).join(', ')}, ${L.time} seconds). `}${veinsIn(b, l).map(([m, v]) => `${SHAFT.seams[m].name}: ${veinLeft(b, l, m)} of ${v} left`).join(', ') || 'No vein'}. Room for ${room} miners${reached ? `, ${at[l]} here` : ''}.${reached && seam ? ` Digs ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}%.` : ''}${state}${wetNote}${reached && !shut && !floodedAt(b, l) ? ' Click to send a miner here.' : ''}`;
+    const tip = `<b>${L.name}</b>${reached ? '' : `Sink the shaft to reach it (${Object.entries(L.sink).map(([r, v]) => `${v} ${r}`).join(', ')}, ${L.time} seconds). `}${veinsIn(b, l).map(([m, v]) => `${SHAFT.seams[m].name}: ${veinLeft(b, l, m)} of ${v} left`).join(', ') || 'No vein'}. Room for ${room} miners${reached ? `, ${at[l]} here` : ''}.${reached && seam ? ` Digs ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}%.` : ''}${state}${wetNote}${hotNote}${cut}${reached && !shut && !floodedAt(b, l) && !cutOff(b, l) ? ' Click to send a miner here.' : ''}`;
     const dark = shut > 0 ? `<path d="${band}" fill="#000" opacity="0.28"/>` : '';
     parts.push(`<g data-layer="${l}" data-shaft="${b.id}" data-tip="${tip.replace(/"/g, '&quot;')}" opacity="${op}" class="${reached ? 'cut-reach' : ''}"><path d="${band}" fill="${fill}"/><path d="${facet}" fill="#000" opacity="0.12"/>${glints.join('')}${dark}${marks.join('')}${worked ? `<path d="M0 ${y0 + 0.5} H${W}" stroke="#fff" stroke-opacity="0.35" stroke-width="1"/>` : ''}</g>`);
   }
@@ -182,6 +215,12 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
       parts.push(`<rect x="${x}" y="${TOP - 12}" width="10" height="7" fill="#6b5a4a"/><rect x="${x + 7}" y="${TOP - 20}" width="2.4" height="9" fill="#7a3a2c"/>${pumping(s, b) ? `<circle cx="${x + 8.2}" cy="${TOP - 23}" r="2" fill="#c8c8c8" opacity="0.6"/>` : ''}`);
     }
   }
+  // The fan (#924 m5): an air pipe down the shaft's left side, and a fan house with its flared chimney left of the collar.
+  if (b.fan) {
+    const run = fanning(s, b) ? '#9aa2aa' : '#6a5a50';
+    const x = SX - 20;
+    parts.push(`<rect x="${SX + 1}" y="${TOP - 8}" width="2" height="${bottom - TOP + 6}" fill="${run}"/><path d="M${SX + 2} ${TOP - 8} L${x + 12} ${TOP - 9}" stroke="${run}" stroke-width="1.6"/><rect x="${x}" y="${TOP - 12}" width="12" height="7" fill="#6b5a4a"/><circle cx="${x + 6}" cy="${TOP - 10}" r="4.2" fill="#4a4e54" stroke="#2a2a2e" stroke-width="0.6"/><path d="M${x + 6} ${TOP - 14} v8 M${x + 2} ${TOP - 10} h8" stroke="#8a8f96" stroke-width="0.8" transform="rotate(${fanning(s, b) ? 45 : 20} ${x + 6} ${TOP - 10})"/><path d="M${x + 1} ${TOP - 12} L${x - 1} ${TOP - 21} H${x + 5} L${x + 4} ${TOP - 12}Z" fill="#7a5a44"/>`);
+  }
   // The pithead: a headframe and its wheel, taller the deeper the shaft.
   const tall = 10 + depth * 3;
   const top = TOP - 6 - tall;
@@ -199,6 +238,6 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
   const lode = b.lode ?? 0;
   parts.push(`<g data-tip="${coreTip(lode).replace(/"/g, '&quot;')}"><rect x="2" y="2" width="5" height="5" rx="1" fill="${LODES[kindOf(lode)].tint}" stroke="#0008" stroke-width="0.6"/><text x="9" y="6.6" font-size="7" fill="#e8e0d0" font-family="sans-serif">${LODES[kindOf(lode)].name}</text></g>`);
   const svg = `<svg class="cutaway${open ? ' cut-open' : ''}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="The shaft, cut away">${parts.join('')}</svg>`;
-  const key = `${lode}:${depth}:${sinking}:${at.join(',')}:${STRATA.map((_, l) => Math.ceil(veinsOf(b, l).left / 10)).join(',')}:${seam}:${open}:${STRATA.map((_, l) => `${safeAt(b, l) ? 1 : 0}${shutLeft(s, b, l)}${wetAt(l) ? `w${Math.round(waterAt(b, l) * 50)}` : ''}`).join(',')}:${b.pump ?? ''}${pumping(s, b) ? 1 : 0}`;
+  const key = `${lode}:${depth}:${sinking}:${at.join(',')}:${STRATA.map((_, l) => Math.ceil(veinsOf(b, l).left / 10)).join(',')}:${seam}:${open}:${STRATA.map((_, l) => `${safeAt(b, l) ? 1 : 0}${shutLeft(s, b, l)}${wetAt(l) ? `w${Math.round(waterAt(b, l) * 50)}` : ''}`).join(',')}:${b.pump ?? ''}${pumping(s, b) ? 1 : 0}:${STRATA.map((_, l) => (hotAt(l) ? Math.round(airAt(b, l) * 50) : '')).join(',')}:${b.fan ? (fanning(s, b) ? 'F' : 'f') : ''}${ventilated(s, b) ? 'v' : ''}`;
   return { svg, key };
 }

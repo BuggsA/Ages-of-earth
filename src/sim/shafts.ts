@@ -15,6 +15,10 @@
  *
  * The wet deep (#924 m4): a layer with a `fill` takes on water from the day it is reached, and floods unless a pump stands at
  * the pithead. Every full basket while the water stands risks an inrush on the match's dice; gems lie there and nowhere else.
+ *
+ * The hot deep (#924 m5): a layer with a `foul` is hot, and its air fouls with every miner past the few it bears. Foul, it
+ * overcomes those at its face on the match's dice. A fan at the pithead, or a hot Vent Forge near it, draws the air clear.
+ * Crystal and glowcaps lie there; a flooded wet deep above bars the way down to it.
  */
 import { LODE, LODES, MEGALITH, SHAFT, STRATA, EPOCHS, secs } from './data';
 import { hasWalked } from './ages';
@@ -23,6 +27,7 @@ import { roll } from './animals';
 import { deepQuarry } from './henge';
 import { mineable } from './household';
 import { maxHp } from './world';
+import { forgeDrives } from './forge';
 import type { Building, GameState, Order, Res, SeamId, Unit } from './types';
 import { R_BLOODIRON, R_GLOWCAP, R_GOLD, R_SALT, R_SALTPETRE, R_STONE, T_ROCK } from './types';
 
@@ -32,10 +37,13 @@ export type Grade = keyof typeof SHAFT.grade;
 export const SEAMS = Object.keys(SHAFT.seams) as SeamId[];
 
 /** The tile kind a seam is dug as (its pace and its mining technologies are that deposit's). */
-export const TILE_OF_SEAM: Record<SeamId, number> = { stone: R_STONE, gold: R_GOLD, salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON, glowcap: R_GLOWCAP, gems: R_GOLD };
+export const TILE_OF_SEAM: Record<SeamId, number> = { stone: R_STONE, gold: R_GOLD, salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON, glowcap: R_GLOWCAP, gems: R_GOLD, crystal: R_STONE };
 
-/** The stock a seam pays into: a rare ore is carried as stone and kept apart at the drop, as from its vein; gems (#924 m4) ride as gold and are kept apart too. */
+/** The stock a seam pays into: a rare ore is carried as stone and kept apart at the drop, as from its vein; gems (#924 m4) ride as gold and are kept apart too, crystal (#924 m5) as stone. */
 export const resOfSeam = (seam: SeamId): Res => (seam === 'gold' || seam === 'gems' ? 'gold' : 'stone');
+
+/** The first layer of `STRATA` holding a vein of a seam other than stone and gold (gems, crystal, glowcaps), or -1. */
+const heldBelow = (seam: SeamId): number => (seam === 'stone' || seam === 'gold' ? -1 : STRATA.findIndex((L) => (L.veins[seam] ?? 0) > 0));
 
 /** The tiles round a shaft's footprint (it too) that its ground is read from, `SHAFT.near` out. */
 function around(s: GameState, b: { tx: number; ty: number; size: number }, see: (i: number) => void): void {
@@ -55,7 +63,7 @@ export function groundAt(s: GameState, b: { tx: number; ty: number; size: number
   });
   const out = {} as Record<SeamId, Grade | null>;
   for (const seam of SEAMS) {
-    // A seam of the deep (#924 m4: gems) has no plain grade: no ground nearer the grass holds it.
+    // A seam of the deep (#924 m4, m5: gems, crystal) has no plain grade: no ground nearer the grass holds it.
     out[seam] = SHAFT.seams[seam].deep ? null : old.has(TILE_OF_SEAM[seam]) ? 'old' : SHAFT.seams[seam].old ? null : rock ? 'hill' : 'open';
   }
   return out;
@@ -69,8 +77,8 @@ export function seamsAt(s: GameState, b: { tx: number; ty: number; size: number;
   const g = groundAt(s, b);
   const p = s.players[b.owner];
   const ore = oreOf(codeOf(s, b));
-  // A seam of the deep (#924 m4: gems) is a shaft's to dig once it is sunk to the layer that holds it.
-  const deep = (m: SeamId) => !!SHAFT.seams[m].deep && 'kind' in b && b.kind === 'building' && depthOf(b as Building) >= STRATA.findIndex((L) => (L.veins[m] ?? 0) > 0);
+  // A seam of the deep (#924 m4, m5: gems, crystal, glowcaps) is a shaft's to dig once it is sunk to the layer that holds it.
+  const deep = (m: SeamId) => heldBelow(m) >= 0 && 'kind' in b && b.kind === 'building' && depthOf(b as Building) >= heldBelow(m);
   return SEAMS.filter((m) => (g[m] || ore === m || deep(m)) && mineable(p, TILE_OF_SEAM[m]));
 }
 
@@ -79,12 +87,13 @@ export const lodeOnly = (s: GameState, b: { tx: number; ty: number; size: number
 
 /**
  * The one layer a seam with no plain grade lies in at this shaft, or -1 for a seam its ground holds: a lode's rare seam in
- * `LODE.oreLayer` (#924 m3), gems in the wet deep (#924 m4). Such a seam is dug only there, while its vein lasts.
+ * `LODE.oreLayer` (#924 m3), gems in the wet deep (#924 m4), crystal and glowcaps in the hot deep (#924 m5). Such a seam is
+ * dug only there, while its vein lasts.
  */
 export function boundLayer(s: GameState, b: { tx: number; ty: number; size: number }, seam: SeamId): number {
-  if (groundAt(s, b)[seam]) return -1;
+  if (!(seam in SHAFT.seams) || groundAt(s, b)[seam]) return -1;
   if (oreOf(codeOf(s, b)) === seam) return LODE.oreLayer;
-  return SHAFT.seams[seam]?.deep ? STRATA.findIndex((L) => (L.veins[seam] ?? 0) > 0) : -1;
+  return heldBelow(seam);
 }
 
 /** The lode under a shaft (stamped on it when placed; common ground in an older save), or under a site for one. */
@@ -108,10 +117,10 @@ export function bestSeam(s: GameState, b: { tx: number; ty: number; size: number
 
 /** The seam a shaft digs now: its own choice while that still holds, else the best there (null: none its people may dig). */
 export function seamOf(s: GameState, b: Building): SeamId | null {
-  // A seam held only below (#924 m3, m4) is dug while its vein lasts and its layer is not under water; else the shaft goes
-  // back to the best of its ground, and to the seam again once its layer is pumped dry.
+  // A seam held only below (#924 m3, m4, m5) is dug while its vein lasts and its layer is not under water, nor cut off below
+  // a flooded one; else the shaft goes back to the best of its ground, and to the seam again once its layer is pumped dry.
   const at = b.seam ? boundLayer(s, b, b.seam) : -1;
-  if (at >= 0 && (depthOf(b) < at || veinLeft(b, at, b.seam!) <= 0 || floodedAt(b, at))) return bestSeam(s, b);
+  if (at >= 0 && (depthOf(b) < at || veinLeft(b, at, b.seam!) <= 0 || floodedAt(b, at) || cutOff(b, at))) return bestSeam(s, b);
   return b.seam && seamsAt(s, b).includes(b.seam) ? b.seam : bestSeam(s, b);
 }
 
@@ -130,10 +139,13 @@ export function seamProblem(s: GameState, b: Building, seam: SeamId): string | n
   const at = boundLayer(s, b, seam);
   if (at >= 0) {
     const name = SHAFT.seams[seam].name.toLowerCase();
+    const many = seam === 'gems' || seam === 'glowcap';
     if (!mineable(s.players[b.owner], TILE_OF_SEAM[seam])) return seam === 'gems' ? 'Your people mines no gold, nor gems' : 'Your people quarries no stone';
-    if (depthOf(b) < at) return `The ${name} ${seam === 'gems' ? 'lie' : 'lies'} in ${STRATA[at].name.toLowerCase()}: sink the shaft that deep`;
-    if (veinLeft(b, at, seam) <= 0) return seam === 'gems' ? 'The gems are dug out' : `The seam of ${name} is dug out`;
+    if (depthOf(b) < at) return `The ${name} ${many ? 'lie' : 'lies'} in ${STRATA[at].name.toLowerCase()}: sink the shaft that deep`;
+    if (veinLeft(b, at, seam) <= 0) return many ? `The ${name} are dug out` : `The seam of ${name} is dug out`;
     if (floodedAt(b, at)) return `${STRATA[at].name} is flooded: pump it dry`;
+    const wet = cutOff(b, at) ? STRATA.findIndex((_, l) => l < at && floodedAt(b, l)) : -1;
+    if (wet >= 0) return `${STRATA[wet].name} above is flooded: pump it dry to reach ${STRATA[at].name.toLowerCase()}`;
     return null;
   }
   if (!groundAt(s, b)[seam]) return `${SHAFT.seams[seam].name} is dug only where a vein of it was worked out`;
@@ -163,7 +175,9 @@ export function veinFull(b: { lode?: number }, layer: number, seam: SeamId): num
   if (oreOf(code) === seam && layer === LODE.oreLayer) return LODE.oreVein + (L.veins[seam] ?? 0);
   const k = LODES[kindOf(code)];
   const n = L.veins[seam] ?? 0;
-  return seam === 'stone' ? Math.round(n * k.stone) : seam === 'gold' ? Math.round(n * k.gold) : seam === 'gems' ? Math.round(n * k.gems) : n;
+  // The hot deep (#924 m5): crystal and glowcaps too.
+  const scale = seam === 'stone' ? k.stone : seam === 'gold' ? k.gold : seam === 'gems' ? k.gems : seam === 'crystal' ? k.crystal : seam === 'glowcap' ? k.caps : 1;
+  return scale === 1 ? n : Math.round(n * scale);
 }
 
 /** How much of a seam's vein is left to dig in a layer of this shaft (0 where the layer holds none, or it is spent). */
@@ -196,6 +210,9 @@ export function digShare(s: GameState, b: Building, seam: SeamId, layer: number)
   // Gems (#924 m4) are slow to cut from the wet rock: their own pace, not the layer's.
   if (seam === 'gems') return SHAFT.gemGrade + LODES[kindOf(b.lode ?? 0)].add + rush;
   const g = groundAt(s, b)[seam];
+  // Crystal, and glowcaps where no old workings hold them (#924 m5), are dug at a pace of their own.
+  const own = SHAFT.seams[seam].grade;
+  if (!g && own !== undefined) return own + LODES[kindOf(b.lode ?? 0)].add + rush;
   return Math.max(floor, (g ? SHAFT.grade[g] : LODE.oreGrade) + STRATA[layer].add + LODES[kindOf(b.lode ?? 0)].add) + rush;
 }
 
@@ -329,17 +346,20 @@ export function roomLeft(s: GameState, b: Building): number {
 
 /**
  * The layer a miner arriving at a shaft takes: its own while that still has a vein of the seam, else the deepest with room
- * and a vein, else its own, else the deepest with room (dug at the plain grade). -1: no room at all.
+ * and a vein, else its own, else the deepest with room (dug at the plain grade). -1: no room at all. A hot layer (#924 m5)
+ * has room for as many as its air bears, or for its whole room for a miner sent there by hand.
  */
-export function placeFor(s: GameState, b: Building, u: Unit, seam: SeamId, want?: number): number {
+export function placeFor(s: GameState, b: Building, u: Unit, seam: SeamId, want?: number, hand?: boolean): number {
   const { at } = crewOf(s, b, u);
-  // A flooded layer (#924 m4) takes no one until it is pumped dry.
-  const open = (l: number) => l >= 0 && l <= depthOf(b) && at[l] < STRATA[l].room && !shutAt(s, b, l) && !floodedAt(b, l);
-  if (want !== undefined && open(want) && veinLeft(b, want, seam) > 0) return want;
+  // A flooded layer (#924 m4) takes no one until it is pumped dry, nor does any below it (#924 m5); nor does a hot layer whose
+  // air is foul, and by default one takes only as many as its air bears. A miner sent there by hand may go past that.
+  const open = (l: number, mine?: boolean) =>
+    l >= 0 && l <= depthOf(b) && at[l] < (mine || !hotAt(l) ? STRATA[l].room : bearsAt(s, b, l)) && !shutAt(s, b, l) && !floodedAt(b, l) && !cutOff(b, l) && !(hotAt(l) && airAt(b, l) > SHAFT.airOpen);
+  if (want !== undefined && open(want, hand) && veinLeft(b, want, seam) > 0) return want;
   for (let l = depthOf(b); l >= 0; l--) if (open(l) && veinLeft(b, l, seam) > 0) return l;
   // A seam held only below (#924 m3, m4) is dug nowhere else: no place where its vein isn't.
   if (boundLayer(s, b, seam) >= 0) return -1;
-  if (want !== undefined && open(want)) return want;
+  if (want !== undefined && open(want, hand)) return want;
   for (let l = depthOf(b); l >= 0; l--) if (open(l)) return l;
   return -1;
 }
@@ -370,6 +390,8 @@ export function deepenProblem(s: GameState, b: Building): string | null {
   const next = STRATA[depthOf(b) + 1];
   if (!next) return 'The shaft is as deep as it goes';
   if (s.players[b.owner].epoch < next.epoch) return `${next.name} is reached from the ${EPOCHS[next.epoch].name}`;
+  // A flooded layer (#924 m5) bars the way down: it is pumped dry before the shaft goes deeper.
+  for (let l = 0; l <= depthOf(b); l++) if (floodedAt(b, l)) return `${STRATA[l].name} is flooded: pump it dry to sink deeper`;
   return null;
 }
 
@@ -448,7 +470,14 @@ export function floodOut(s: GameState, b: Building, layer: number, why: 'inrush'
   let dead = 0;
   let up = 0;
   for (const e of s.ents) {
-    if (!crewman(e, b) || e.order.layer !== layer || e.order.phase !== 'work') continue;
+    if (!crewman(e, b) || e.order.layer === undefined || e.order.layer < layer || e.order.phase !== 'work') continue;
+    // Those below (#924 m5) climb out before the water cuts them off, unhurt.
+    if (e.order.layer > layer) {
+      delete e.order.layer;
+      e.order.phase = e.carry > 0 ? 'drop' : 'go';
+      up++;
+      continue;
+    }
     if (why === 'inrush' && roll(s) < SHAFT.drown) {
       e.hp = 0;
       dead++;
@@ -486,6 +515,103 @@ export function seepStep(s: GameState): void {
       const next = Math.min(1, w + 1 / secs(fillOf(e, l)));
       setWater(e, l, next);
       if (next >= 1) floodOut(s, e, l, 'rose');
+    }
+  }
+}
+
+// ---- The hot deep: its air and the fan (#924 m5) -----------------------------------------------------------------
+
+/** Whether a layer is hot: its air fouls with the miners breathing it (it has a `foul`). */
+export const hotAt = (l: number): boolean => (STRATA[l]?.foul ?? 0) > 0;
+
+/** The first hot layer of `STRATA`, or -1. */
+export const hotLayer = (): number => STRATA.findIndex((L) => L.foul > 0);
+
+/** How foul the air stands in a layer of this shaft: 0 clear, 1 foul. */
+export const airAt = (b: Building, l: number): number => b.air?.[l] ?? 0;
+
+/** Whether a layer lies below a flooded one (#924 m5): the water bars the way down to it. */
+export function cutOff(b: Building, l: number): boolean {
+  for (let k = 0; k < l; k++) if (floodedAt(b, k)) return true;
+  return false;
+}
+
+/** Whether a shaft's fan works now: raised, and its pithead above `SHAFT.winchHurt` of its health (a hurt one stalls, as a pump does). */
+export const fanning = (s: GameState, b: Building): boolean => !!b.fan && b.hp >= maxHp(s, b) * SHAFT.winchHurt;
+
+/** Whether a shaft's hot air is drawn clear: by its fan, or by a hot Vent Forge of its people's in reach (the Deep Road, #884). */
+export const ventilated = (s: GameState, b: Building): boolean => fanning(s, b) || forgeDrives(s, b);
+
+/** How many miners at the face a hot layer's air bears: `SHAFT.bears`, or its whole room where it is ventilated. */
+export const bearsAt = (s: GameState, b: Building, l: number): number => (ventilated(s, b) ? STRATA[l].room : SHAFT.bears);
+
+/** How many of a shaft's miners are at the face in a layer now. */
+export function atFace(s: GameState, b: Building, l: number): number {
+  let n = 0;
+  for (const e of s.ents) if (crewman(e, b) && e.order.layer === l && e.order.phase === 'work') n++;
+  return n;
+}
+
+/** Why a fan can't be raised at this shaft now, or null. Its cost is checked where it is paid. */
+export function fanProblem(s: GameState, b: Building): string | null {
+  if (b.type !== 'shaft') return 'Only a Mine Shaft is ventilated';
+  if (!b.built) return 'Finish the shaft first';
+  if (b.fan) return 'A fan stands at the pithead already';
+  const hot = hotLayer();
+  if (hot < 0 || depthOf(b) < hot - 1) return hot < 0 ? 'No layer is hot' : `Nothing to ventilate until the shaft nears ${STRATA[hot].name.toLowerCase()}`;
+  if (s.players[b.owner].epoch < SHAFT.fanAge) return `A fan comes with the ${EPOCHS[SHAFT.fanAge].name}`;
+  return null;
+}
+
+/** Raise a fan at the pithead (paid by the caller). */
+export function raiseFan(b: Building): void {
+  b.fan = true;
+}
+
+function setAir(b: Building, l: number, a: number): void {
+  b.air ??= [];
+  while (b.air.length <= l) b.air.push(0);
+  b.air[l] = a;
+}
+
+/**
+ * The air goes foul in a hot layer: each miner at its face is overcome on the match's dice (`SHAFT.choke`, in id order), else
+ * carried up with `SHAFT.strandHurt` of their health, to the drop with their basket or back to the pithead.
+ */
+export function choke(s: GameState, b: Building, layer: number): void {
+  setAir(b, layer, 1);
+  let dead = 0;
+  let up = 0;
+  for (const e of s.ents) {
+    if (!crewman(e, b) || e.order.layer !== layer || e.order.phase !== 'work') continue;
+    if (roll(s) < SHAFT.choke) {
+      e.hp = 0;
+      dead++;
+      continue;
+    }
+    e.hp = Math.max(1, Math.floor(e.hp * SHAFT.strandHurt));
+    delete e.order.layer;
+    e.order.phase = e.carry > 0 ? 'drop' : 'go';
+    up++;
+  }
+  s.events.push({ k: 'choke', owner: b.owner, id: b.id, x: b.x, y: b.y, layer, dead, up });
+}
+
+/**
+ * Each tick: the air in every hot layer a shaft reaches fouls with each miner at its face past those it bears, a full layer's
+ * worth in its `foul` seconds a miner, and clears as fast with fewer. Foul, it overcomes them (`choke`).
+ */
+export function breatheStep(s: GameState): void {
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'shaft' || !e.built || e.hp <= 0) continue;
+    for (let l = 0; l <= depthOf(e); l++) {
+      if (!hotAt(l)) continue;
+      const n = atFace(s, e, l);
+      const a = airAt(e, l);
+      if (!n && a <= 0) continue;
+      const next = Math.min(1, Math.max(0, a + (n - bearsAt(s, e, l)) / secs(STRATA[l].foul)));
+      setAir(e, l, next);
+      if (next >= 1 && n > 0) choke(s, e, l);
     }
   }
 }

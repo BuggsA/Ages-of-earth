@@ -2986,10 +2986,13 @@ export const SHAFT = {
     salt: { name: 'Salt', old: true },
     saltpetre: { name: 'Saltpetre', old: true },
     bloodiron: { name: 'Blood-iron', old: true },
-    glowcap: { name: 'Glowcaps', old: true },
+    // Glowcaps (#924 m5) grow in the hot deep too, under any ground, dug there at `grade` while their vein lasts.
+    glowcap: { name: 'Glowcaps', old: true, grade: 0.45 },
     // Gems (#924 m4) lie in the wet deep only: no ground holds them nearer the grass, and they are dug only while their vein lasts.
     gems: { name: 'Gems', old: true, deep: true },
-  } as Record<'stone' | 'gold' | RareId | 'gems', { name: string; old: boolean; deep?: boolean }>,
+    // Crystal (#924 m5) lies in the hot deep only, dug at `grade` of an open deposit of stone's pace while its vein lasts.
+    crystal: { name: 'Crystal', old: true, deep: true, grade: 0.4 },
+  } as Record<'stone' | 'gold' | RareId | 'gems' | 'crystal', { name: string; old: boolean; deep?: boolean; grade?: number }>,
   aiNear: 26,
   aiReach: 18,
   aiWood: 250,
@@ -3020,6 +3023,13 @@ export const SHAFT = {
   gemGrade: 0.35,
   aiPump: 80,
   aiGems: 60,
+  // The hot deep (#924 m5): its air, the fan and crystal (`STRATA[].foul`, `LODES[].crystal` and `.caps`, `CRYSTAL`).
+  bears: 1,
+  airOpen: 0.5,
+  choke: 0.35,
+  fanAge: 4,
+  fan: { wood: 200, stone: 150, gold: 150 } as Cost,
+  aiFan: 60,
 };
 
 /**
@@ -3044,12 +3054,26 @@ export const SHAFT = {
  * `SHAFT.aiBlast` gold over the charge; its bombers are drawn to a rival's deep pithead (`SHAFT.aiRaid` a layer), and between
  * waves, at most every `SHAFT.aiRaidEvery` seconds, a band of `SHAFT.aiRaidBand` falls on one seen within `SHAFT.aiRaidNear` tiles.
  */
-export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | RareId | 'gems', number>>; add: number; room: number; sink: Cost; time: number; epoch: number; tint: string; prop: Cost; rush: number; fall: number; blast: Cost; fill: number }[] = [
-  { name: 'Clay and gravel', veins: { stone: 250 }, add: 0.2, room: 2, sink: {}, time: 0, epoch: 1, tint: '#b48a5c', prop: {}, rush: 0, fall: 0, blast: {}, fill: 0 },
-  { name: 'Bedrock', veins: { stone: 450, gold: 400 }, add: 0.4, room: 3, sink: { wood: 200 }, time: 40, epoch: 1, tint: '#857868', prop: { wood: 120 }, rush: 0.15, fall: 0.04, blast: { gold: 150 }, fill: 0 },
-  { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662', prop: { wood: 200 }, rush: 0.2, fall: 0.06, blast: { gold: 250 }, fill: 0 },
-  { name: 'The wet deep', veins: { stone: 200, gold: 500, gems: 360 }, add: 0.7, room: 4, sink: { wood: 450, stone: 150 }, time: 75, epoch: 3, tint: '#3e5a66', prop: { wood: 260 }, rush: 0.2, fall: 0.05, blast: { gold: 300 }, fill: 120 },
+export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | RareId | 'gems' | 'crystal', number>>; add: number; room: number; sink: Cost; time: number; epoch: number; tint: string; prop: Cost; rush: number; fall: number; blast: Cost; fill: number; foul: number }[] = [
+  { name: 'Clay and gravel', veins: { stone: 250 }, add: 0.2, room: 2, sink: {}, time: 0, epoch: 1, tint: '#b48a5c', prop: {}, rush: 0, fall: 0, blast: {}, fill: 0, foul: 0 },
+  { name: 'Bedrock', veins: { stone: 450, gold: 400 }, add: 0.4, room: 3, sink: { wood: 200 }, time: 40, epoch: 1, tint: '#857868', prop: { wood: 120 }, rush: 0.15, fall: 0.04, blast: { gold: 150 }, fill: 0, foul: 0 },
+  { name: 'The vein', veins: { stone: 300, gold: 900 }, add: 0.6, room: 3, sink: { wood: 350 }, time: 60, epoch: 2, tint: '#5f5662', prop: { wood: 200 }, rush: 0.2, fall: 0.06, blast: { gold: 250 }, fill: 0, foul: 0 },
+  { name: 'The wet deep', veins: { stone: 200, gold: 500, gems: 360 }, add: 0.7, room: 4, sink: { wood: 450, stone: 150 }, time: 75, epoch: 3, tint: '#3e5a66', prop: { wood: 260 }, rush: 0.2, fall: 0.05, blast: { gold: 300 }, fill: 120, foul: 0 },
+  { name: 'The hot deep', veins: { stone: 150, gold: 450, glowcap: 160, crystal: 300 }, add: 0.75, room: 4, sink: { wood: 500, stone: 250 }, time: 90, epoch: 4, tint: '#7a4636', prop: { wood: 300 }, rush: 0.2, fall: 0.05, blast: { gold: 350 }, fill: 0, foul: 45 },
 ];
+/**
+ * The hot deep (#924 m5, `docs/deep-mine.md`): a layer with a `foul` is hot, and its air fouls with the miners breathing it.
+ * Unventilated it bears `SHAFT.bears` miners at the face; each one past that fouls it fully in `foul` seconds, and with fewer
+ * it clears at the same pace. When it goes foul, each miner at its face is overcome on the match's dice with chance
+ * `SHAFT.choke`, else carried up with `SHAFT.strandHurt` of their health, and the layer takes no one until the air has cleared
+ * below `SHAFT.airOpen`. By default a hot layer takes only as many as its air bears; a miner sent there by hand (the cut-away)
+ * goes past that, at the player's risk. Ventilated, it bears its whole `room`: by a fan at the pithead, from age
+ * `SHAFT.fanAge` for `SHAFT.fan`, which stalls with a hurt pithead as a pump does; or, on the Deep Road, by a hot Vent Forge of
+ * its people's within `VENT.reach`, whose draught draws the air up as a furnace drew it up an old pit's upcast shaft. A
+ * flooded wet deep bars the way down: nothing is sunk below it, nobody goes below it, and those below are driven up with it.
+ * Crystal and glowcaps lie there and nowhere else so deep: crystal (`CRYSTAL`) is bartered at the Market. The computer raises
+ * a fan with `SHAFT.aiFan` to spare over its price, digs crystal while it lacks a stock, and barters it for that stock.
+ */
 /**
  * The wet deep (#924 m4, `docs/deep-mine.md`): a layer with a `fill` takes on water from the moment the shaft reaches it,
  * filling in `fill` seconds (sooner on wet ground: `LODES[].wet` scales the rise) unless a pump stands at the pithead. While the
@@ -3077,13 +3101,13 @@ export const STRATA: { name: string; veins: Partial<Record<'stone' | 'gold' | Ra
  * water rises, `gems` its vein of gems; a core shows both.
  */
 export const LODE = { cell: 8, patch: 22, home: 14, ore: 0.35, oreLayer: 2, oreVein: 300, oreGrade: 0.5 };
-export const LODES: { name: string; stone: number; gold: number; add: number; fall: number; weight: number; tint: string; blurb: string; wet: number; gems: number }[] = [
-  { name: 'Common ground', stone: 1, gold: 1, add: 0, fall: 1, weight: 4, tint: '#a08c6c', blurb: 'the plain run of the earth, as under every town', wet: 1, gems: 1 },
-  { name: 'A gold reef', stone: 0.7, gold: 2.2, add: 0.1, fall: 1, weight: 2, tint: '#e6bc3e', blurb: 'gold threaded thick through the deep rock', wet: 1, gems: 1.3 },
-  { name: 'Building stone', stone: 2.2, gold: 0.6, add: 0.05, fall: 0.8, weight: 2, tint: '#ddd5c0', blurb: 'sound, even beds of good stone', wet: 0.6, gems: 0.6 },
-  { name: 'Poor ground', stone: 0.4, gold: 0.35, add: 0, fall: 1, weight: 3, tint: '#6b6762', blurb: 'thin, worked-out rock: little to dig', wet: 1.4, gems: 0.5 },
-  { name: 'Sound rock', stone: 1.2, gold: 1, add: 0, fall: 0.3, weight: 2, tint: '#7d8ea6', blurb: 'hard rock that holds its roof', wet: 0.4, gems: 0.8 },
-  { name: 'Shattered ground', stone: 1.4, gold: 1.6, add: 0.1, fall: 2.5, weight: 2, tint: '#b0604c', blurb: 'faulted rock, rich and loose: it falls in', wet: 1.8, gems: 1.6 },
+export const LODES: { name: string; stone: number; gold: number; add: number; fall: number; weight: number; tint: string; blurb: string; wet: number; gems: number; crystal: number; caps: number }[] = [
+  { name: 'Common ground', stone: 1, gold: 1, add: 0, fall: 1, weight: 4, tint: '#a08c6c', blurb: 'the plain run of the earth, as under every town', wet: 1, gems: 1, crystal: 1, caps: 1 },
+  { name: 'A gold reef', stone: 0.7, gold: 2.2, add: 0.1, fall: 1, weight: 2, tint: '#e6bc3e', blurb: 'gold threaded thick through the deep rock', wet: 1, gems: 1.3, crystal: 0.8, caps: 0.8 },
+  { name: 'Building stone', stone: 2.2, gold: 0.6, add: 0.05, fall: 0.8, weight: 2, tint: '#ddd5c0', blurb: 'sound, even beds of good stone', wet: 0.6, gems: 0.6, crystal: 1.4, caps: 0.6 },
+  { name: 'Poor ground', stone: 0.4, gold: 0.35, add: 0, fall: 1, weight: 3, tint: '#6b6762', blurb: 'thin, worked-out rock: little to dig', wet: 1.4, gems: 0.5, crystal: 0.5, caps: 1.6 },
+  { name: 'Sound rock', stone: 1.2, gold: 1, add: 0, fall: 0.3, weight: 2, tint: '#7d8ea6', blurb: 'hard rock that holds its roof', wet: 0.4, gems: 0.8, crystal: 1.6, caps: 0.6 },
+  { name: 'Shattered ground', stone: 1.4, gold: 1.6, add: 0.1, fall: 2.5, weight: 2, tint: '#b0604c', blurb: 'faulted rock, rich and loose: it falls in', wet: 1.8, gems: 1.6, crystal: 1.2, caps: 1.4 },
 ];
 /**
  * Core samples (#924 m3): a finished Prospector's Lodge drills a core at any tile its people has seen, for `cost`, one at a
@@ -4117,6 +4141,12 @@ export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, mi
  * glut is everyone's: a rival dumping gems cheapens yours, and a patient seller gets the most.
  */
 export const GEMS = { lot: 20, price: 120, step: 8, min: 30, recover: 2 };
+/**
+ * Crystal at the Market (#924 m5): a lot of `lot` crystal buys `buys` of food, wood or stone at the price that stock opened the
+ * match at (`MARKET.start`), however high it stands now, and moves no price. It is never sold for gold nor bought. Where gems
+ * are gold whose price anyone can crash, crystal is the stock you lack, at the old price.
+ */
+export const CRYSTAL = { lot: 20, buys: 100 };
 
 export const START_RES = { food: 300, wood: 250, stone: 150, gold: 100 };
 /** Extra to start with when starting in a later epoch. */

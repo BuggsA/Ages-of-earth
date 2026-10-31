@@ -32,6 +32,7 @@ import { ashoreLeft, bedClock } from '../sim/tides';
 import { hutBeds, hutWorks } from '../sim/tides';
 import { gateHead, gateReach, gateWorks, pondBehind, tideGateProblem } from '../sim/tides';
 import { TIDE_GATE } from '../sim/data';
+import { CRYSTAL } from '../sim/data';
 import { COCKLER } from '../sim/data';
 import { COCKLE } from '../sim/data';
 import { CORE, LODE, LODES } from '../sim/data';
@@ -45,6 +46,7 @@ import { kinCount, kinProblem, vowProblem, wayBarred, wayProblem } from '../sim/
 import { catchIn, snareCap, snareFull, snareRate, snareWoods } from '../sim/snares';
 import { beaconProblem, lit } from '../sim/beacon';
 import { SEAMS, blastProblem, boundLayer, crewOf, deepenProblem, deepeningLeft, depthOf, digShare, fallOf, fillOf, floodedAt, lodeOnly, veinFull, groundAt, propProblem, pumpCost, pumpKind, pumpProblem, pumping, roomOf, safeAt, seamOf, seamProblem, seamsAt, shaftShare, shutLeft, toShore, veinLeft, waterAt, wetAt, wetLayer, winchHurt } from '../sim/shafts';
+import { airAt, bearsAt, fanProblem, fanning, hotAt, hotLayer, ventilated } from '../sim/shafts';
 import { cutaway } from './cutaway';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
@@ -893,7 +895,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(p.gems ?? 0)}:${s.market.gems ?? GEMS.price}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}${revealed(s, l) ? '!' : ''}${ringsFor(s, l, viewer).length}`).join(',')}|${(s.blooms ?? []).map((l) => `${l.id}:${bloomClock(s, l)}:${l.cut}`).join(',')}|${tideSig(s)}|${(s.faults ?? []).map((f) => `${f.engine}:${faultClock(f)}${f.held ? 'h' : ''}`).join(',')}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(p.gems ?? 0)}:${s.market.gems ?? GEMS.price}:${Math.floor(p.crystal ?? 0)}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}${revealed(s, l) ? '!' : ''}${ringsFor(s, l, viewer).length}`).join(',')}|${(s.blooms ?? []).map((l) => `${l.id}:${bloomClock(s, l)}:${l.cut}`).join(',')}|${tideSig(s)}|${(s.faults ?? []).map((f) => `${f.engine}:${faultClock(f)}${f.held ? 'h' : ''}`).join(',')}`;
     const sn = seasonOf(s);
     const tide = tideChip(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}${tide ? `  ${tide.text}` : ''}`;
@@ -909,6 +911,7 @@ export class Hud {
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
       ((p.gems ?? 0) > 0 ? `<div class="res" data-tip="<b>Gems</b>Cut from ${STRATA[wetLayer()].name.toLowerCase()} by your Mine Shafts. Sell them at a Market, ${GEMS.lot} at a time: a lot fetches ${s.market.gems ?? GEMS.price} gold now. Every seller's lot cheapens the next, anyone's, and the price climbs back ${GEMS.recover} gold every ${MARKET.every}s.">${GEM_ICON}${Math.floor(p.gems!)}</div>` : '') +
+      ((p.crystal ?? 0) > 0 ? `<div class="res" data-tip="<b>Crystal</b>Dug from ${STRATA[hotLayer()].name.toLowerCase()} by your Mine Shafts. Barter it at a Market: ${CRYSTAL.lot} crystal buys ${CRYSTAL.buys} food, wood or stone at the price that stock opened the match at, however high it stands now, and moves no price. It is never sold for gold.">${CRYSTAL_ICON}${Math.floor(p.crystal!)}</div>` : '') +
       (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
       (s.blooms ?? []).map((l) => `<div class="res" data-tip="<b>Bloom Seed</b>${seedTip(s, l, viewer)}">🌱 ${s.players[l.owner].name} ${bloomClock(s, l)}s</div>`).join('') +
       (s.faults ?? []).map((f) => `<div class="res" data-tip="<b>${f.kind === 'quake' ? 'The Quake wakes' : 'A tremor builds'}</b>${f.kind === 'quake' ? `${s.players[f.owner].name}'s Heartstone is waking the Quake: in ${faultClock(f)} seconds the ground splits along the golden seams, in a cross of chasm and ridge, and every building within ${LIVING.wide} tiles of its heart is shaken hard. Sunk buildings ride it best.` : f.kind === 'ridge' ? `${s.players[f.owner].name}'s Heartstone is raising a ridge: in ${faultClock(f)} seconds the golden line heaves up into rock that nothing crosses but fliers, and any chasm on it closes.` : `${s.players[f.owner].name}'s Fault Engine is charging: in ${faultClock(f)} seconds the ground along the glowing line opens into a chasm no one crosses on foot, and what stands there falls.`}${f.owner === viewer ? '' : ` Raze the ${f.kind ? 'stone' : 'engine'} to lose its charge, or hold its vent with soldiers to stall the clock.`}${f.held ? ' Its vent is held: the clock has stopped.' : ''}">${f.kind === 'quake' ? '🌋' : f.kind === 'ridge' ? '⛰' : '〰'} ${s.players[f.owner].name} ${faultClock(f)}s${f.held ? ' ⏸' : ''}</div>`).join('') +
@@ -1899,6 +1902,23 @@ export class Hud {
               run: () => (this.act.issue({ t: 'trade', p: viewer, res: 'gems', buy: false }), this.act.sound('click')),
             });
           }
+          // Crystal (#924 m5): a lot barters for a stock at its opening price, moving none; the buttons show once some is dug.
+          if ((p.crystal ?? 0) > 0) {
+            const have = Math.floor(p.crystal!);
+            for (const res of ['food', 'wood', 'stone'] as const) {
+              const worth = Math.round((MARKET.start[res] * CRYSTAL.buys) / MARKET.lot);
+              cmds.push({
+                key: '',
+                pic: '',
+                glyph: `<span class="trade">${CRYSTAL_ICON}<b>→</b>${icon(res, 16)}</span>`,
+                title: `Barter ${CRYSTAL.lot} crystal for ${CRYSTAL.buys} ${RES_LABEL[res].toLowerCase()}`,
+                desc: `Pay ${CRYSTAL.lot} crystal for ${CRYSTAL.buys} ${RES_LABEL[res].toLowerCase()}, as if bought at the ${worth} gold it opened the match at; it costs ${s.market[res]} gold now. Barter moves no price, for you or anyone. You hold ${have}.`,
+                ok: have >= CRYSTAL.lot,
+                why: `Need ${CRYSTAL.lot} crystal to barter`,
+                run: () => (this.act.issue({ t: 'trade', p: viewer, res, buy: true, crystal: true }), this.act.sound('click')),
+              });
+            }
+          }
           // Rare ore in hand sells at a flat price; the buttons show once some has been mined (#356).
           for (const ore of RARES.filter((r) => (p.rare?.[r] ?? 0) > 0)) {
             const have = Math.floor(p.rare![ore]!);
@@ -2277,6 +2297,8 @@ function hpBar(hp: number, max: number, frac: number): string {
 const RARE_ICON = { salt: '🧂', saltpetre: '💎', bloodiron: '🩸', glowcap: '🍄' } as const;
 /** Gems from the wet deep (#924 m4). */
 const GEM_ICON = '💠';
+/** Crystal from the hot deep (#924 m5): a cluster of pale shards. */
+const CRYSTAL_ICON = '<svg class="ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3 14 L4.6 7 L6.4 5.6 L7.4 14Z M6.6 14 L7.6 3 L9.6 1.4 L10.6 14Z M10 14 L11.4 8.4 L13 7.6 L13.4 14Z" fill="#e2d4ff" stroke="#6a5a9a" stroke-width="0.6"/><path d="M8.2 3.4 L9.4 2.4 L9.8 9" stroke="#fff" stroke-width="0.7" fill="none"/></svg>';
 
 function householdHint(s: GameState, viewer: number): string {
   const rate = Math.round(taxRate(s, viewer) * 60);

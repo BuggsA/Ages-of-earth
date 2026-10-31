@@ -3,7 +3,7 @@ import { engineLimit, fault, faultProblem, isChasm, spanOpen } from './fault';
 import { heaveProblem, quakeProblem, raiseRidge, stoneLimit, swallow, swallowProblem, wake } from './living';
 import { hiddenFrom, inert, sink, sinkProblem, surface, surfaceProblem } from './undercity';
 import { delve, delveProblem } from './delve';
-import { AUTO_WORK, BUILDINGS, CORE, FAULT, HENGE, GIANTS, EPOCHS, GEMS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, STRATA, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, CORE, CRYSTAL, FAULT, HENGE, GIANTS, EPOCHS, GEMS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SHAFT, SNARE, HIVE, COCKLER, SPREAD, STRATA, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { inBounds, placeProblem, stampBuilding, walkable } from './grid';
@@ -13,7 +13,7 @@ import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, journeyOf, keepsakeProblem, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
-import { blast, blastProblem, crewOf, deepen, deepenProblem, depthOf, floodedAt, prop, propProblem, pumpCost, pumpProblem, raisePump, resOfSeam, roomLeft, seamOf, seamProblem, shutAt, veinLeft } from './shafts';
+import { airAt, blast, blastProblem, crewOf, cutOff, deepen, deepenProblem, depthOf, fanProblem, floodedAt, hotAt, prop, propProblem, pumpCost, pumpProblem, raiseFan, raisePump, resOfSeam, roomLeft, seamOf, seamProblem, shutAt, veinLeft } from './shafts';
 import { coreProblem, drawCore } from './lodes';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, isCarrier, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
@@ -847,6 +847,18 @@ export function applyCommand(s: GameState, c: Command): void {
       raisePump(s, b);
       break;
     }
+    case 'fan': {
+      // A ventilation fan at the pithead (#924 m5): the hot deep's air is drawn clear while the pithead holds.
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = fanProblem(s, b);
+      if (why) return refuse(s, c.p, why);
+      const short = shortfall(p, SHAFT.fan);
+      if (short) return refuse(s, c.p, short);
+      pay(p, SHAFT.fan);
+      raiseFan(b);
+      break;
+    }
     case 'core': {
       // A Prospector's Lodge drills a core sample (#924 m3).
       const b = myBuilding(s, c.p, c.building);
@@ -865,6 +877,8 @@ export function applyCommand(s: GameState, c: Command): void {
       if (c.layer < 0 || c.layer > depthOf(b)) return refuse(s, c.p, 'The shaft is not sunk that deep yet');
       if (shutAt(s, b, c.layer)) return refuse(s, c.p, `${STRATA[c.layer].name} is shut by a cave-in: shore it to clear it now`);
       if (floodedAt(b, c.layer)) return refuse(s, c.p, `${STRATA[c.layer].name} is flooded: pump it dry`);
+      if (cutOff(b, c.layer)) return refuse(s, c.p, `The way down to ${STRATA[c.layer].name.toLowerCase()} is flooded: pump it dry`);
+      if (hotAt(c.layer) && airAt(b, c.layer) > SHAFT.airOpen) return refuse(s, c.p, `The air in ${STRATA[c.layer].name.toLowerCase()} is foul: let it clear`);
       const { at } = crewOf(s, b);
       if (at[c.layer] >= STRATA[c.layer].room) return refuse(s, c.p, `${STRATA[c.layer].name} has room for ${STRATA[c.layer].room} miners`);
       const seam = seamOf(s, b);
@@ -883,6 +897,8 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       if (!from || from.order.k !== 'shaft') return refuse(s, c.p, 'No miner in another layer to send');
       from.order.layer = c.layer;
+      // Sent by hand (#924 m5): into a hot layer past what its air bears, at the player's risk.
+      from.order.hand = true;
       break;
     }
     case 'beacon': {
@@ -1247,6 +1263,16 @@ export function applyCommand(s: GameState, c: Command): void {
         p.res.gold += price;
         s.market.gems = Math.max(GEMS.min, price - GEMS.step);
         s.events.push({ k: 'trade', owner: c.p, res: 'gems', buy: false, gold: price });
+        break;
+      }
+      // Crystal (#924 m5): a lot buys a stock at the price the Market opened at, and moves no price.
+      if (c.crystal) {
+        const have = p.crystal ?? 0;
+        if (!c.buy || !(c.res === 'food' || c.res === 'wood' || c.res === 'stone')) return refuse(s, c.p, 'Crystal buys food, wood or stone');
+        if (have < CRYSTAL.lot) return refuse(s, c.p, `Need ${CRYSTAL.lot} crystal to barter`);
+        p.crystal = have - CRYSTAL.lot;
+        p.res[c.res] += CRYSTAL.buys;
+        s.events.push({ k: 'trade', owner: c.p, res: c.res, buy: true, crystal: true });
         break;
       }
       const price = s.market[c.res];
