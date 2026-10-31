@@ -76,6 +76,7 @@ import { isNomad } from './nomad';
 import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
 import { myceliumStep } from './mycelium';
+import { coverStep } from './terrain';
 import { countPop, exitSpot, maxHp, placeBuilding, refund, restat, spawnUnit } from './world';
 
 /**
@@ -742,6 +743,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   wildwoodStep(s);
   bloomStep(s);
   myceliumStep(s, sp);
+  coverStep(s, sp);
   huntStep(s);
   seaStep(s);
   longbowStep(s);

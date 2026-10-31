@@ -13,6 +13,7 @@ import { alarm } from './flee';
 import { distToRect } from './grid';
 import { envenom } from './hive';
 import { grip } from './leviathans';
+import { woodsBlow } from './terrain';
 import type { Spatial } from './spatial';
 import { gunPower, gunRange, modsOf, statsFor } from './stats';
 import type { Animal, Building, Ent, GameState, Shot, Unit } from './types';
@@ -40,7 +41,7 @@ export function stirred(s: GameState, u: Unit): boolean {
 
 /** Damage of one blow or shot after the counter bonus, a hero's inspiration and armor. */
 export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, target: Ent, ranged: boolean): number {
-  const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1) * hemoBlow(s, attacker);
+  const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1) * hemoBlow(s, attacker) * woodsBlow(s, attacker, st);
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
     const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' || target.type === 'sluice' || target.type === 'dam' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
@@ -264,8 +265,8 @@ export function nearestEnemyUnit(s: GameState, sp: Spatial, owner: number, x: nu
   let best: Unit | null = null;
   let bestD = r * r;
   sp.near(x, y, r, (o) => {
-    // A unit hidden by the Mycelium's spores (#800) is no one's nearest enemy.
-    if (o.hp <= 0 || o.cloak || !isEnemy(s, owner, o.owner) || (filter && !filter(o))) return;
+    // A unit hidden by the Mycelium's spores (#800), or in a wood (#934), is no one's nearest enemy.
+    if (o.hp <= 0 || o.cloak || o.cover || !isEnemy(s, owner, o.owner) || (filter && !filter(o))) return;
     const dx = o.x - x;
     const dy = o.y - y;
     const d = dx * dx + dy * dy;

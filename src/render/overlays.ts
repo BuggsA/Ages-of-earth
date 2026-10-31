@@ -53,6 +53,8 @@ export class Overlays {
   private barBack: THREE.InstancedMesh;
   private barFill: THREE.InstancedMesh;
   private barMarks: THREE.InstancedMesh;
+  /** Forest cover (#934): one small leaf over each of the viewer's soldiers hidden in a wood. */
+  private leaves: THREE.InstancedMesh;
   private shots = new Map<Shot['kind'], THREE.InstancedMesh>();
   private ghost: THREE.Group;
   private ghostBody: THREE.Mesh;
@@ -105,6 +107,11 @@ export class Overlays {
       m.setColorAt(0, new THREE.Color());
       this.group.add(m);
     }
+    this.leaves = new THREE.InstancedMesh(leafGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, depthWrite: false, depthTest: false, fog: false, toneMapped: false }), MAX_BARS);
+    this.leaves.count = 0;
+    this.leaves.frustumCulled = false;
+    this.leaves.renderOrder = 13;
+    this.group.add(this.leaves);
     this.rings.renderOrder = 3;
     this.squares.renderOrder = 3;
     this.thin.renderOrder = 3;
@@ -310,6 +317,21 @@ export class Overlays {
     }
   }
 
+  /** A leaf over each point, facing the camera and stirring a little, as if in a breeze. */
+  setLeaves(list: THREE.Vector3[], camera: THREE.Camera, time: number): void {
+    const n = Math.min(list.length, MAX_BARS);
+    camera.getWorldQuaternion(this.q);
+    const tilt = new THREE.Quaternion();
+    const z = new THREE.Vector3(0, 0, 1);
+    for (let i = 0; i < n; i++) {
+      tilt.setFromAxisAngle(z, -0.55 + 0.12 * Math.sin(time * 1.7 + i * 2.3));
+      this.m.compose(list[i], this.q.clone().multiply(tilt), this.sc.set(1.25, 1.25, 1));
+      this.leaves.setMatrixAt(i, this.m);
+    }
+    this.leaves.count = n;
+    this.leaves.instanceMatrix.needsUpdate = true;
+  }
+
   /** Shots in flight, arcing (arrows and stones) or flat (musket balls), pointing along their path; bombs drop. */
   setShots(s: GameState, alpha: number, visible: (x: number, y: number) => boolean): void {
     const counts = new Map<Shot['kind'], number>();
@@ -431,3 +453,55 @@ export class Overlays {
   }
 }
 
+
+/**
+ * A small flat leaf, its two halves in two greens (lit and shaded) with a pale midrib and stalk, colours in the vertices; about a
+ * quarter of a tile long, pointing up.
+ */
+function leafGeometry(): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const col: number[] = [];
+  const c = new THREE.Color();
+  const tri = (a: number[], b: number[], d: number[], hex: string) => {
+    c.set(hex);
+    for (const p of [a, b, d]) {
+      pos.push(p[0], p[1], 0);
+      col.push(c.r, c.g, c.b);
+    }
+  };
+  // The blade's outline from the base (y -0.1) to the tip (y 0.16), widest a third of the way up.
+  const half = [[0, -0.1], [0.055, -0.06], [0.075, 0.0], [0.062, 0.07], [0.03, 0.125], [0, 0.16]];
+  for (let k = 0; k < half.length - 1; k++) {
+    tri([0, half[k][1]], [half[k][0], half[k][1]], [half[k + 1][0], half[k + 1][1]], '#4f9f3e');
+    tri([0, half[k][1]], [half[k + 1][0], half[k + 1][1]], [0, half[k + 1][1]], '#4f9f3e');
+    tri([0, half[k][1]], [0, half[k + 1][1]], [-half[k + 1][0], half[k + 1][1]], '#8fd66c');
+    tri([0, half[k][1]], [-half[k + 1][0], half[k + 1][1]], [-half[k][0], half[k][1]], '#8fd66c');
+  }
+  // A dark rim behind, so the leaf reads on grass as well as on snow.
+  const rim = 1.28;
+  const back: number[] = [];
+  const backCol: number[] = [];
+  c.set('#17301a');
+  for (let k = 0; k < half.length - 1; k++) {
+    for (const s of [1, -1]) {
+      const a = [0, half[k][1] * rim + 0.005];
+      const b = [s * half[k][0] * rim, half[k][1] * rim + 0.005];
+      const d = [s * half[k + 1][0] * rim, half[k + 1][1] * rim + 0.005];
+      const e = [0, half[k + 1][1] * rim + 0.005];
+      for (const p of [a, b, d, a, d, e]) {
+        back.push(p[0], p[1], -0.001);
+        backCol.push(c.r, c.g, c.b);
+      }
+    }
+  }
+  // The midrib and stalk: a thin pale strip.
+  const rib = (x0: number, y0: number, x1: number, y1: number, w: number) => {
+    tri([x0 - w, y0], [x0 + w, y0], [x1 + w, y1], '#d9f2b8');
+    tri([x0 - w, y0], [x1 + w, y1], [x1 - w, y1], '#d9f2b8');
+  };
+  rib(0, -0.14, 0, 0.13, 0.006);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([...back, ...pos], 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute([...backCol, ...col], 3));
+  return g;
+}

@@ -39,8 +39,8 @@ export function canHit(s: GameState, u: Unit, t: Ent): boolean {
   if (st.attack <= 0) return false;
   // A sunk building (#883): out of reach of shot, ships, aircraft and siege; a foot soldier's blade reaches it once its people found it.
   if (t.kind === 'building') return !t.sunk || (!hiddenFrom(s, t, u.owner) && digsAt(st));
-  // Hidden by the Mycelium's spores (#800): nobody aims at what it can't see.
-  if (t.cloak) return false;
+  // Hidden by the Mycelium's spores (#800), or in a wood (#934): nobody aims at what it can't see.
+  if (t.cloak || t.cover) return false;
   if (st.buildingsOnly) return t.type === 'siege';
   const d = domainOf(t.type);
   if (d === 'air') return st.range > 0 && st.cls !== 'siege' && st.cls !== 'bomber';

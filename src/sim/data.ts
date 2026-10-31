@@ -4864,13 +4864,26 @@ export const FLEE = { shelter: 14, run: 8, pad: 3, clear: 10, hold: 6 };
  * - Climbing: a soldier of the line (`climbers`) walking up a slope steeper than `climbFrom` (height a tile) goes slower, its pace
  *   divided by 1 + `climb` for each unit of slope past it, never under `climbMin` of its pace. The slope is read `look` tiles ahead.
  *   Workers know their own tracks, and beasts are sure-footed.
+ * The lay of the land t2: forest cover (#934). A point stands in a wood when at least `woods` of the nine tiles round it (its own
+ * and its eight neighbours) hold standing trees.
+ * - Cover: a soldier (`hiders`) standing in a wood is hidden from every rival (`Unit.cover`): not drawn, not aimed at, unless a
+ *   rival unit stands within `seen` tiles, a rival's finished tower or other armed building has it within its sight, it stands
+ *   inside a rival's border (a people knows its own woods), or it struck in the last `shown` seconds. Read every `coverEvery` ticks.
+ * - Pace: a soldier of the line (`climbers`) walks at `woodsFoot` of its pace in a wood; a rider (cavalry) at `woodsRide`.
+ * - The line: a rider fighting from a wood strikes for `rideBlow` of its blow, with no room to close up or charge.
  */
 export const TERRAIN = {
   sea: 0, rise: 0.3, reachPer: 2.5, reachUp: 2, reachDown: 1,
   ring: 8, around: 6, sightFrom: 0.15, sightPer: 6, sightMax: 3,
   climbFrom: 0.1, climb: 1.5, climbMin: 0.6, look: 0.5,
   climbers: ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'blowpipe'] as UnitType[],
+  woods: 4, seen: 4, shown: 3, coverEvery: 4,
+  hiders: ['infantry', 'ranged', 'cavalry', 'hero', 'blowpipe'] as UnitType[],
+  woodsFoot: 0.85, woodsRide: 0.75, rideBlow: 0.8,
 };
 
 /** The computer holds the high ground (#925): its army waits on the highest open ground within `reach` tiles of its muster, if that stands `gain` higher. */
 export const AI_RIDGE = { reach: 5, gain: 0.3 };
+
+/** The computer lies in wait in the woods (#934): its army waits in the wood nearest its muster (or the ridge it holds), if one lies within `reach` tiles. */
+export const AI_COVER = { reach: 4 };

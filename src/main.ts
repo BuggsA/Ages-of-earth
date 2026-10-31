@@ -19,7 +19,8 @@ import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
-import { prominence, standAt } from './sim/terrain';
+import { inWoods, prominence, standAt, treesRound } from './sim/terrain';
+import { borderMap } from './sim/borders';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { carriesTorch, torchProblem } from './sim/fire';
 import { apartProblem, launchProblem, ringsFor, salvoProblem, salvoSilos, type WarheadKind } from './sim/silo';
@@ -2144,6 +2145,8 @@ canvas.addEventListener('pointermove', (e) => {
   }
   if (placing) updatePlacement(e.clientX, e.clientY);
   coreHover(e.clientX, e.clientY);
+  // Forest cover (#934): the view traces a hovered wood's cover.
+  view.coverHover = boxing || panDrag ? null : view.groundAt(e.clientX, e.clientY);
   if (wallDrag && placeAt) {
     wallDrag.x1 = placeAt.tx;
     wallDrag.y1 = placeAt.ty;
@@ -2152,6 +2155,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 canvas.addEventListener('pointerleave', () => {
   pointer.inside = false;
+  view.coverHover = null;
   hud.worldTip(null, 0, 0);
 });
 
@@ -4309,6 +4313,55 @@ function frame(now: number): void {
     setSelection(ids);
     view.rig.focus(best.x, best.y);
     return best.h;
+  },
+  /**
+   * Forest cover (testing, #934): a wood of the nearest trees to the player's start that has open ground among them, five of the
+   * player's spearmen and three bowmen hidden in it, and a rival column of six walking past 7 tiles off. Hovers the wood, to trace
+   * its cover. Returns how many soldiers it set in the wood (0: no wood found).
+   */
+  forestCover(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    const rival = s.players.find((q) => q.id !== owner && isEnemy(s, owner, q.id));
+    const land = borderMap(s);
+    // Open tiles in a wood, outside every border, nearest the start first.
+    let best: { x: number; y: number; d: number } | null = null;
+    for (let ty = 2; ty < s.h - 2; ty++) {
+      for (let tx = 2; tx < s.w - 2; tx++) {
+        if (!walkable(s, tx, ty) || land[ty * s.w + tx] >= 0 || treesRound(s, tx + 0.5, ty + 0.5) < 5) continue;
+        let room = 0;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (walkable(s, tx + dx, ty + dy) && inWoods(s, tx + dx + 0.5, ty + dy + 0.5)) room++;
+        if (room < 9) continue;
+        const d = (tx - p.startX) ** 2 + (ty - p.startY) ** 2;
+        if (!best || d < best.d) best = { x: tx + 0.5, y: ty + 0.5, d };
+      }
+    }
+    if (!best) return 0;
+    const spots: { x: number; y: number }[] = [];
+    for (let r = 0; r <= 3 && spots.length < 8; r++)
+      for (let dy = -r; dy <= r && spots.length < 8; dy++)
+        for (let dx = -r; dx <= r && spots.length < 8; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = Math.floor(best.x) + dx;
+          const y = Math.floor(best.y) + dy;
+          if (walkable(s, x, y) && inWoods(s, x + 0.5, y + 0.5)) spots.push({ x: x + 0.5, y: y + 0.5 });
+        }
+    const ids = spots.map((q, i) => spawnUnit(s, owner, i < 5 ? 'infantry' : 'ranged', q.x, q.y).id);
+    // A rival column on open ground 7 tiles off, the nearest such spot.
+    if (rival) {
+      let open: { x: number; y: number } | null = null;
+      for (let k = 0; k < 32 && !open; k++) {
+        const x = best.x + Math.cos((k * Math.PI) / 16) * 7;
+        const y = best.y + Math.sin((k * Math.PI) / 16) * 7;
+        if (walkable(s, Math.floor(x), Math.floor(y)) && !inWoods(s, x, y)) open = { x, y };
+      }
+      if (open) for (let i = 0; i < 6; i++) spawnUnit(s, rival.id, 'infantry', open.x - 1 + (i % 3) * 0.8, open.y + Math.floor(i / 3) * 0.8);
+    }
+    setSelection(ids.slice(0, 1));
+    view.rig.focus(best.x, best.y);
+    view.coverHover = { x: best.x + 1, y: best.y };
+    return ids.length;
   },
   cocklerHut(owner: number) {
     if (!game) return 0;
