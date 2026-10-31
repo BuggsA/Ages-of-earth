@@ -447,8 +447,8 @@ export class Minimap {
     for (const e of s.ents) {
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
       if (e.owner !== viewer && !reveal && !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
-      // Hidden by a rival's spores (#800).
-      if (e.cloak && !reveal && s.players[e.owner].team !== p.team) continue;
+      // Hidden by a rival's spores (#800), or in a wood (#934).
+      if ((e.cloak || e.cover) && !reveal && s.players[e.owner].team !== p.team) continue;
       ctx.fillStyle = selected.has(e.id) ? '#ffffff' : s.players[e.owner].color;
       const dom = domainOf(e.type);
       const r = Math.max(1.6, sx * 0.8) * (dom === 'land' ? 1 : 1.35);

@@ -1,7 +1,7 @@
 import { canDelve } from './delve';
 import { COCKLE, BLOOMERY, AI_LEVELS, AUTO_WORK, BUILDINGS, GIANTS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TERRAIN, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
-import { climbPace, feelsHeight, reachAt } from './terrain';
+import { climbPace, feelsHeight, reachAt, woodsPace } from './terrain';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
@@ -2409,7 +2409,8 @@ export function walk(s: GameState, u: Unit): void {
   const dom = domainOf(u.type);
   // Uphill is slow going for an army (#925, the lay of the land); a people's workers know their own tracks, and beasts are sure-footed.
   const climb = TERRAIN.climbers.includes(u.type) ? climbPace(s, u, u.path[u.pathI * 2], u.path[u.pathI * 2 + 1]) : 1;
-  const land = dom === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') * climb : 1;
+  // So is a wood (#934): soldiers pick their way between the trees, riders slowest.
+  const land = dom === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') * climb * woodsPace(s, u) : 1;
   let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * stungPace(s, u) * woodPace(s, u) * (dom === 'land' ? land : dom === 'water' ? seaPace(s, u) : 1) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];

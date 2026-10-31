@@ -1,10 +1,15 @@
-import { TERRAIN, domainOf, type UnitStats } from './data';
+import { BUILDINGS, TERRAIN, domainOf, secs, type UnitStats } from './data';
+import { borderMap } from './borders';
 import { groundAt, walkable } from './grid';
-import type { Ent, GameState, Unit } from './types';
+import type { Spatial } from './spatial';
+import { R_TREE, type Building, type Ent, type GameState, type Unit } from './types';
+import { isEnemy, statsOf } from './world';
 
 /**
- * The lay of the land t1: high ground (#925, `docs/lay-of-the-land.md`). Shooting down reaches further and shooting up falls
- * short; a unit on a rise sees further; climbing is slow. Every number is `TERRAIN`'s.
+ * The lay of the land (`docs/lay-of-the-land.md`). Every number is `TERRAIN`'s.
+ * - t1, high ground (#925): shooting down reaches further and shooting up falls short; a unit on a rise sees further; climbing is slow.
+ * - t2, forest cover (#934): a soldier in a wood is hidden from rivals beyond a few tiles (`Unit.cover`); woods slow an army, riders most,
+ *   and blunt a rider's blow.
  */
 
 /** The height a unit stands at, with water counted at the sea's face. */
@@ -75,6 +80,105 @@ export function ridgeNear(s: GameState, x: number, y: number, reach: number, gai
       const h = standAt(s, tx + 0.5, ty + 0.5);
       if (h < top) continue;
       top = h + 1e-6;
+      best = { x: tx + 0.5, y: ty + 0.5 };
+    }
+  }
+  return best;
+}
+
+/** How many of the nine tiles round a point (its own and its eight neighbours) hold standing trees. */
+export function treesRound(s: GameState, x: number, y: number): number {
+  const tx = Math.floor(x);
+  const ty = Math.floor(y);
+  let n = 0;
+  for (let yy = ty - 1; yy <= ty + 1; yy++) {
+    if (yy < 0 || yy >= s.h) continue;
+    for (let xx = tx - 1; xx <= tx + 1; xx++) if (xx >= 0 && xx < s.w && s.res[yy * s.w + xx] === R_TREE) n++;
+  }
+  return n;
+}
+
+/** Whether a point stands in a wood: at least `TERRAIN.woods` of the nine tiles round it hold standing trees. */
+export const inWoods = (s: GameState, x: number, y: number): boolean => treesRound(s, x, y) >= TERRAIN.woods;
+
+/** A land unit's pace in a wood, as a share of its own: soldiers of the line go slower among the trees, riders slowest. */
+export function woodsPace(s: GameState, u: Unit): number {
+  if (!TERRAIN.climbers.includes(u.type) || !inWoods(s, u.x, u.y)) return 1;
+  return statsOf(s, u).cls === 'cavalry' ? TERRAIN.woodsRide : TERRAIN.woodsFoot;
+}
+
+/** A rider fighting from a wood strikes softer: no room to close up or charge. 1 for anyone else, or out of the woods. */
+export function woodsBlow(s: GameState, u: Unit | null, st: UnitStats): number {
+  return u && st.cls === 'cavalry' && inWoods(s, u.x, u.y) ? TERRAIN.rideBlow : 1;
+}
+
+/** Whether a unit could hide in a wood it stands in: a soldier on foot or horse, out in the open air, alive. */
+function hider(u: Unit): boolean {
+  return u.hp > 0 && !u.inside && TERRAIN.hiders.includes(u.type) && domainOf(u.type) === 'land';
+}
+
+/** Whether a rival sees into the wood where a unit stands: a rival unit within `TERRAIN.seen` tiles, or a rival's armed building in sight. */
+function seenInWoods(s: GameState, sp: Spatial, u: Unit, watch: Building[]): boolean {
+  const r = TERRAIN.seen;
+  let near = false;
+  sp.near(u.x, u.y, r, (o) => {
+    if (near || o.hp <= 0 || !isEnemy(s, u.owner, o.owner)) return;
+    const dx = o.x - u.x;
+    const dy = o.y - u.y;
+    if (dx * dx + dy * dy <= r * r) near = true;
+  });
+  if (near) return true;
+  for (const b of watch) {
+    if (!isEnemy(s, u.owner, b.owner)) continue;
+    const reach = BUILDINGS[b.type].sight + b.size / 2;
+    const dx = b.x - u.x;
+    const dy = b.y - u.y;
+    if (dx * dx + dy * dy <= reach * reach) return true;
+  }
+  return false;
+}
+
+/**
+ * Forest cover (#934), read every `TERRAIN.coverEvery` ticks: a soldier standing in a wood, unseen close to and quiet lately, is hidden
+ * from every rival (`Unit.cover`). A people knows its own woods: inside a rival's border nothing hides. Units in id order; a rival's
+ * towers and other armed buildings (finished, standing, not sunk) watch.
+ */
+export function coverStep(s: GameState, sp: Spatial): void {
+  if (s.tick % TERRAIN.coverEvery !== 0) return;
+  let watch: Building[] | null = null;
+  let land: Int8Array | null = null;
+  const quiet = secs(TERRAIN.shown);
+  for (const e of s.ents) {
+    if (e.kind !== 'unit') continue;
+    let hide = hider(e) && s.tick - e.swing >= quiet && inWoods(s, e.x, e.y);
+    if (hide) {
+      land ??= borderMap(s);
+      const o = land[Math.floor(e.y) * s.w + Math.floor(e.x)];
+      hide = o < 0 || !isEnemy(s, e.owner, o);
+    }
+    if (hide) {
+      watch ??= s.ents.filter((b): b is Building => b.kind === 'building' && b.hp > 0 && b.built && !b.sunk && !!BUILDINGS[b.type].guns);
+      hide = !seenInWoods(s, sp, e, watch);
+    }
+    if (hide) e.cover = true;
+    else if (e.cover) delete e.cover;
+  }
+}
+
+/**
+ * The nearest open ground in a wood within `reach` tiles of a point, standing no lower than `floor` (or null): where an army lying in
+ * wait should stand. Tiles row by row, the first of equal distance kept.
+ */
+export function woodsNear(s: GameState, x: number, y: number, reach: number, floor = -Infinity): { x: number; y: number } | null {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  let best: { x: number; y: number } | null = null;
+  let bestD = reach * reach + 1e-6;
+  for (let ty = cy - reach; ty <= cy + reach; ty++) {
+    for (let tx = cx - reach; tx <= cx + reach; tx++) {
+      const d = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
+      if (d >= bestD || !walkable(s, tx, ty) || !inWoods(s, tx + 0.5, ty + 0.5) || standAt(s, tx + 0.5, ty + 0.5) < floor) continue;
+      bestD = d;
       best = { x: tx + 0.5, y: ty + 0.5 };
     }
   }

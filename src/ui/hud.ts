@@ -15,6 +15,7 @@ import { peace, rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
+import { TERRAIN } from '../sim/data';
 import { LIVING, FAULT, VENT, UNDER, DELVE, HENGE, SEASON, FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, STRATA, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, GEMS, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
@@ -1185,6 +1186,8 @@ export class Hud {
         : '';
     // The Age of the Mycelium (#800): hidden by its people's spores.
     const spores = u.cloak ? `<span data-tip="<b>Hidden by spores</b>${mine ? 'It stands on your web' : 'It stands on its people\'s web'}: no rival sees it or aims at it unless one comes within ${MYCELIUM.reveal} tiles, and it shows for ${MYCELIUM.shown} seconds after it strikes.">🍄<em>Hidden</em></span>` : '';
+    // Forest cover (#934): hidden in a wood, the same leaf it wears over its head.
+    const leaf = u.cover ? `<span data-tip="<b>Hidden in the wood</b>No rival sees ${mine ? 'it' : 'this one'} or aims at it until one comes within ${TERRAIN.seen} tiles, a rival tower has it in sight, or it strikes (then it shows for ${TERRAIN.shown} seconds). Inside a rival's border the woods hide nothing.">🍃<em>Hidden</em></span>` : '';
     // Routes that read the tide (#755): waiting on the shore for the flats to bare.
     const ebbLeft = Math.ceil(tideWaitLeft(s, u));
     // Work on the flats that reads the tide (#767): stepped ashore before the flood, back when its ground bares.
@@ -1221,7 +1224,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${spores}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}${ashore}
+          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${spores}${leaf}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}${ashore}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;

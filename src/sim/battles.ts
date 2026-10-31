@@ -86,7 +86,8 @@ export function battlesFor(s: GameState, viewer: number): Battle[] {
       if (e.inside || !armed(s, e)) continue;
     } else if (e.kind !== 'building' || !armed(s, e)) continue;
     if (s.players[e.owner].team === team) ours.push(e);
-    else if (isEnemy(s, viewer, e.owner) && (e.kind === 'unit' ? sees(s, viewer, e.x, e.y) : seesRect(s, viewer, e.tx, e.ty, e.size))) foes.push(e);
+    // A foe hidden in a wood (#934) or by spores (#800) is not in the count: the player can't see it.
+    else if (isEnemy(s, viewer, e.owner) && (e.kind === 'unit' ? !e.cloak && !e.cover && sees(s, viewer, e.x, e.y) : seesRect(s, viewer, e.tx, e.ty, e.size))) foes.push(e);
   }
   if (!ours.length || !foes.length) return [];
 

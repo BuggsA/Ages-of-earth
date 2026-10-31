@@ -71,8 +71,8 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_DEEP, AI_TEMPER, CORE, CRYSTAL, LODE, LODES, ROUTES, STRATA, TRUNK, type RouteId } from './data';
-import { AI_RIDGE } from './data';
-import { ridgeNear } from './terrain';
+import { AI_COVER, AI_RIDGE, TERRAIN } from './data';
+import { ridgeNear, standAt, woodsNear } from './terrain';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY, AI_MEWS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
@@ -80,7 +80,7 @@ import { isMobile } from './steppe';
 import { flies, isRider, standardRival, standing } from './tribute';
 import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
-import { tames, wildBeast } from './tame';
+import { tames, wildBeast, type BeastKind } from './tame';
 import { grows } from './grove';
 import { keepsBees } from './hive';
 import { heartOf, treeToWake, treesRound, wakesForest } from './wildwood';
@@ -4258,9 +4258,12 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   const taming = tames(v.p);
   if (!taming && v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
     let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
-    // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it.
+    // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it; not a Grove
+    // people, whose food is its gardens (a party of five out on the far hunt left it wanting no fields at all), nor one bound for
+    // the Wild, which forages for the road and spares the beasts it will tame.
     let escort: Unit[] = [];
-    if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && s.tick >= s.peaceUntil) {
+    const wildBound = v.p.epoch === 0 && mem.roads?.wild === true;
+    if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && !grows(v.p) && !wildBound && s.tick >= s.peaceUntil) {
       const far = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.far);
       // Spare soldiers as the wolf hunt below counts them: idle, at the legion's axe, or on a plain walk (a muster, not an attack).
       const idle = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u) || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege' && u.type !== 'hero');
@@ -4391,11 +4394,15 @@ function wildRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   if (singers.length) return;
+  // With every kind it can find tamed and a herd in hand, the Den breeds the rest: a citizen always at the song is a gatherer lost.
+  const herd = v.army.filter((u) => u.type === 'warwolf' || u.type === 'tusker' || u.type === 'warmammoth').length;
+  const lacking = (k: BeastKind) => !p.tamed?.includes(k);
+  if (herd >= TAME.aiHerd && !s.animals.some((a) => wildBeast(a) && lacking(a.kind))) return;
   const escort = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || u.order.k === 'move'));
   let best: Animal | null = null;
   let bestD = TAME.aiNear * TAME.aiNear;
   for (const a of s.animals) {
-    if (!wildBeast(a) || s.tick - a.hurt < secs(TAME.wary) || (a.kind === 'wolf' && escort.length < TAME.aiEscort)) continue;
+    if (!wildBeast(a) || s.tick - a.hurt < secs(TAME.wary) || (a.kind === 'wolf' && escort.length < TAME.aiEscort) || (herd >= TAME.aiHerd && !lacking(a.kind))) continue;
     const d = (a.x - v.home.x) * (a.x - v.home.x) + (a.y - v.home.y) * (a.y - v.home.y);
     if (d < bestD) {
       bestD = d;
@@ -6055,7 +6062,8 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number; 
   let threatD = Infinity;
   let n = 0;
   for (const e of s.ents) {
-    // A rival hidden by its spores (#800) rings no bell: the town can't see it.
+    // A rival hidden by its spores (#800) rings no bell: the town can't see it. One in a wood (#934) still does: like the fog, the
+    // woods hide nothing from a town's sense of who is near (they hide it from aim and from sight).
     if (e.kind !== 'unit' || e.hp <= 0 || e.inside || e.cloak || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
     let near = Infinity;
     // Snares out in the woods (#485) are not the town: foes by them don't ring its bell.
@@ -7113,7 +7121,11 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;
   mem.muster = { x: v.home.x + (dx / dl) * 8, y: v.home.y + (dy / dl) * 8 };
   // Between waves the army holds the high ground near home (#925): its archers shoot further down at whoever comes.
-  mem.muster = ridgeNear(s, mem.muster.x, mem.muster.y, AI_RIDGE.reach, AI_RIDGE.gain) ?? mem.muster;
+  const ridge = ridgeNear(s, mem.muster.x, mem.muster.y, AI_RIDGE.reach, AI_RIDGE.gain);
+  mem.muster = ridge ?? mem.muster;
+  // And lies in wait in the nearest wood (#934), across the road a rival comes by: unseen until the rival is on it. Off a ridge, only
+  // into a wood that keeps the reach the ridge gives.
+  mem.muster = woodsNear(s, mem.muster.x, mem.muster.y, AI_COVER.reach, ridge ? standAt(s, ridge.x, ridge.y) - TERRAIN.rise : -Infinity) ?? mem.muster;
   const ford = L.clever ? stagingFord(s, p.id, v.home, enemy) : null;
   if (ford) mem.muster = { x: ford.x, y: ford.y };
   // The Blood-rite (#355 s5) gathers its army by its forward altar, where the hurt are mended and the fallen foe pays blood.

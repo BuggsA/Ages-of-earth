@@ -276,7 +276,7 @@ function nodesNear(s: GameState, tile: number, kind: number): number[] {
 function foesNear(s: GameState, p: number, t: Ent): Unit[] {
   const out: { u: Unit; d: number }[] = [];
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.id === t.id || e.hp <= 0 || e.inside || !isEnemy(s, p, e.owner)) continue;
+    if (e.kind !== 'unit' || e.id === t.id || e.hp <= 0 || e.inside || e.cloak || e.cover || !isEnemy(s, p, e.owner)) continue;
     const d = (e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y);
     if (d > SPREAD.foe * SPREAD.foe || !sees(s, p, e.x, e.y)) continue;
     out.push({ u: e, d });

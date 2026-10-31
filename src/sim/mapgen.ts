@@ -1,4 +1,4 @@
-import { AMOUNT, BOAR, BOG_IRON, CAVE, FINDS, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, SPRING, TRADE, VENT, WOLF } from './data';
+import { AI_WILD, AMOUNT, BOAR, BOG_IRON, CAVE, FINDS, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, TEEM, RUINS, SPRING, TRADE, VENT, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { Cave, FindKind, HomelandId, KeyId, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
@@ -61,6 +61,8 @@ export interface MapData {
   wild: { kind: 'mammoth' | 'wolf' | 'boar' | 'raider'; x: number; y: number }[];
   /** Contested landmarks: where they stand (tile centers) and what each is. */
   landmarks: { x: number; y: number; kind: LandmarkKind }[];
+  /** The teeming wild (`TEEM`): more beasts, laid last on dice of their own so nothing else moves. Empty on campaign maps. */
+  teem: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[];
   /** Raider camps (own pitch): the fire each band keeps (tile centers). Empty on campaign maps. */
   camps: { x: number; y: number }[];
   /** What lies round every town at the start (#473). */
@@ -696,6 +698,11 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     vents.push(...placeVents(seed, w, h, terrain, height, res, amount, starts, keep));
   }
 
+  // The teeming wild, after everything and on dice of its own: more beasts round every town and in the open, moving nothing else.
+  const teem = deposits
+    ? placeTeeming(seed, size, w, h, terrain, res, starts, later, [...deer, ...relics, ...posts, ...ruins, ...wild, ...landmarks, ...camps, ...finds, ...caves.map((c) => ({ x: c.tile % w, y: Math.floor(c.tile / w) })), ...springs.map((t) => ({ x: t % w, y: Math.floor(t / w) })), ...vents.map((t) => ({ x: t % w, y: Math.floor(t / w) }))], [...relics, ...posts, ...ruins, ...landmarks, ...finds])
+    : [];
+
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -703,7 +710,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps, homeland, finds, springs, vents };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, teem, landmarks, camps, homeland, finds, springs, vents };
 }
 
 /**
@@ -1570,6 +1577,107 @@ function placeWild(
   for (const d of dens) {
     for (let k = 0; k < WOLF.pack; k++) out.push({ kind: 'wolf', x: d.x + (k - 1) * 0.6, y: d.y + (k === 1 ? 0.5 : 0) });
   }
+  return out;
+}
+
+/**
+ * The teeming wild (`TEEM`): more mammoths, boars and wolf dens, on open ground every town can walk to, clear of everything already
+ * laid (`keep`), and its dens and boars well clear of the places people walk out to (`goals`: relics, posts, ruins, landmarks, finds). Each town's share sits nearer it than any other by 4 tiles, so the map stays fair.
+ */
+function placeTeeming(
+  seed: number,
+  size: MapSize,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  starts: { x: number; y: number }[],
+  reaches: Uint8Array[],
+  keep: { x: number; y: number }[],
+  goals: { x: number; y: number }[],
+): { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[] {
+  const rng = mulberry32(seed ^ 0x7ee3a1);
+  const land = (x: number, y: number) => x >= 3 && y >= 3 && x < w - 3 && y < h - 3 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
+  const near = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
+    list.some((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) < r * r);
+  const open = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
+    return true;
+  };
+  // A boar roots by berries, or out in the open at a wood's edge, where it digs for mast.
+  const berries = (x: number, y: number) => {
+    for (let dy = -BOAR.near; dy <= BOAR.near; dy++) for (let dx = -BOAR.near; dx <= BOAR.near; dx++) if (res[(y + dy) * w + x + dx] === R_BERRY || res[(y + dy) * w + x + dx] === R_TREE) return true;
+    return false;
+  };
+  const out: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[] = [];
+  const dens: { x: number; y: number }[] = [];
+  const gap = { mammoth: 8, boar: 5, wolf: 10 };
+  const ok = (x: number, y: number, kind: 'mammoth' | 'wolf' | 'boar') =>
+    land(x, y) && open(x, y) && reaches.every((r) => r[y * w + x] === 1) && !near(keep, x, y, gap[kind] - 2) && !near(out, x, y, gap[kind]) &&
+    (kind === 'mammoth' || (!near(goals, x, y, TEEM.clearOf[kind]) && offRoad(x + 0.5, y + 0.5, TEEM.clearOf.road))) && (kind !== 'boar' || berries(x, y));
+  // Clear of the straight way between any two towns, the road an army, a trader or a priest walks.
+  function offRoad(x: number, y: number, r: number): boolean {
+    for (let i = 0; i < starts.length; i++) {
+      for (let j = i + 1; j < starts.length; j++) {
+        const ax = starts[i].x, ay = starts[i].y, dx = starts[j].x - ax, dy = starts[j].y - ay;
+        const len = dx * dx + dy * dy;
+        const f = len > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len)) : 0;
+        const ex = ax + f * dx - x, ey = ay + f * dy - y;
+        if (ex * ex + ey * ey < r * r) return false;
+      }
+    }
+    return true;
+  }
+  const dists = (x: number, y: number) => starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y)));
+  const lay = (kind: 'mammoth' | 'wolf' | 'boar', list: number[]) => {
+    if (!list.length) return;
+    const i = list[Math.floor(rng() * list.length)];
+    const x = (i % w) + 0.5;
+    const y = Math.floor(i / w) + 0.5;
+    if (kind === 'wolf') {
+      dens.push({ x, y });
+      for (let k = 0; k < WOLF.pack; k++) out.push({ kind, x: x + (k - 1) * 0.6, y: y + (k === 1 ? 0.5 : 0) });
+    } else out.push({ kind, x, y });
+  };
+  // Each town's share, on a band `lo`–`hi` tiles out, nearer it than any other town by 4.
+  const own = (k: number, kind: 'mammoth' | 'wolf' | 'boar', lo: number, hi: number): number[] => {
+    const st = starts[k];
+    const list: number[] = [];
+    for (let y = Math.floor(st.y - hi - 1); y <= st.y + hi + 1; y++) {
+      for (let x = Math.floor(st.x - hi - 1); x <= st.x + hi + 1; x++) {
+        if (!land(x, y)) continue;
+        const ds = dists(x, y);
+        if (ds[k] < lo || ds[k] > hi || ds.some((d, j) => j !== k && d < ds[k] + 4) || !ok(x, y, kind)) continue;
+        list.push(y * w + x);
+      }
+    }
+    return list;
+  };
+  // Every town its share, or none of that kind: a map stays fair.
+  const each = (kind: 'mammoth' | 'wolf' | 'boar', lo: number, hi: number) => {
+    const lists = starts.map((_, k) => own(k, kind, lo, hi));
+    if (lists.every((l) => l.length)) for (const l of lists) lay(kind, l);
+  };
+  for (let n = 0; n < TEEM.mammoths; n++) each('mammoth', TEEM.mammothAt - 2, TEEM.mammothAt + 3);
+  for (let n = 0; n < TEEM.boars; n++) each('boar', TEEM.boarMin, TEEM.boarMax);
+  for (let n = 0; n < TEEM.dens; n++) each('wolf', TEEM.denAt - 3, TEEM.denAt + 8);
+  // The open ground between the towns, about as far from the two nearest.
+  const between = (kind: 'mammoth' | 'wolf' | 'boar', home: number, fair: number): number[] => {
+    const list: number[] = [];
+    for (let y = 3; y < h - 3; y++) {
+      for (let x = 3; x < w - 3; x++) {
+        if (!land(x, y)) continue;
+        const ds = nearestTwo(starts, x, y);
+        if (ds[0] < home || (starts.length > 1 && ds[1] - ds[0] > fair) || !ok(x, y, kind)) continue;
+        list.push(y * w + x);
+      }
+    }
+    return list;
+  };
+  // Dens first, as they need the most room; every one past `AI_WILD.clear`, like the towns' own.
+  for (let n = 0; n < TEEM.open.den[size]; n++) lay('wolf', between('wolf', AI_WILD.clear + 3, WOLF.fair * 2).filter((i) => !near(dens, i % w, Math.floor(i / w), WOLF.spacing - 4)));
+  for (let n = 0; n < TEEM.open.mammoth[size]; n++) lay('mammoth', between('mammoth', MAMMOTH.home + 5, 16));
+  for (let n = 0; n < TEEM.open.boar[size]; n++) lay('boar', between('boar', BOAR.max + 2, 16));
   return out;
 }
 

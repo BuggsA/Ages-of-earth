@@ -333,6 +333,8 @@ export interface Unit {
   gripped?: number;
   /** Hidden by spores (#800, `mycelium.ts`): it stands on its people's web, no rival is within `MYCELIUM.reveal` tiles and it has not struck lately. Rivals neither see nor target it. */
   cloak?: true;
+  /** Hidden in a wood (#934, `terrain.ts`): it stands among trees, no rival is within `TERRAIN.seen` tiles nor has it in an armed building's sight, and it has not struck lately. Rivals neither see nor target it. */
+  cover?: true;
   /** Shoved along by its people's Kraken (#789): the tick the push fades. Until then it sails faster. Absent: never shoved. */
   shoved?: number;
   /** A hemo-engineered soldier (#355 s3): the tick its graft runs dry unless a Transfusion Station tops it up; absent when ungrafted. */

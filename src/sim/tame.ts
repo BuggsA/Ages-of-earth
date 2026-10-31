@@ -74,34 +74,53 @@ export function finishTame(s: GameState, u: Unit, a: Animal & { kind: BeastKind 
 export const songOf = (a: Animal & { kind: BeastKind }): number => secs(TAME.secs[a.kind]);
 
 /**
- * The call of the wild: `TAME.callAt` seconds into every season, each finished Hunting Camp of a Wild people draws one wild beast
- * to it from `TAME.callFrom` tiles out (a boar in spring and summer, a lone wolf in autumn and winter), unless `TAME.callCap`
- * wild beasts already stand within `TAME.callNear` tiles. So the wild near a Wild town never runs dry, and what comes to the
- * door must be tamed or fought: a called boar guards where it stands.
+ * The call of the wild: every `TAME.callEvery` seconds from the second season on (the first `TAME.callAt` seconds into each), each
+ * finished Hunting Camp of a Wild people draws a wild beast to it from `TAME.callFrom` tiles out, unless `TAME.callCap` wild wolves
+ * and boars already stand within `TAME.callNear` tiles. It brings the kind the people has not tamed yet, or else the season's (a boar
+ * in spring and summer, a lone wolf in autumn and winter). A mammoth comes too, from the far side, while the people has tamed none,
+ * and after that on the first call of each winter, if none stands near (`TAME.callMammoths`). So every kind is within reach of a
+ * Wild town on every map, the wild near it never runs dry, and what comes to the door must be tamed or fought: a called boar guards
+ * where it stands.
  */
 export function callWild(s: GameState): void {
-  if (s.tick < secs(SEASON.len) || s.tick % secs(SEASON.len) !== secs(TAME.callAt)) return;
-  const kind = seasonAt(s) < 2 ? 'boar' : 'wolf';
+  const every = secs(TAME.callEvery);
+  if (s.tick < secs(SEASON.len) || s.tick % every !== secs(TAME.callAt) % every) return;
+  const season = seasonAt(s);
+  const winterCall = season === 3 && s.tick % secs(SEASON.len) < secs(TAME.callAt) + every;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.type !== 'huntcamp' || !e.built || e.hp <= 0 || !tames(s.players[e.owner])) continue;
+    if (e.kind !== 'building' || e.type !== 'huntcamp' || !e.built || e.hp <= 0) continue;
+    const p = s.players[e.owner];
+    if (!tames(p)) continue;
     const cx = e.x;
     const cy = e.y;
-    let near = 0;
-    for (const a of s.animals) if (wildBeast(a) && (a.x - cx) * (a.x - cx) + (a.y - cy) * (a.y - cy) <= TAME.callNear * TAME.callNear) near++;
-    if (near >= TAME.callCap) continue;
-    // The beast comes from a side that turns with the seasons, the first open ground found going round.
-    const turn = Math.floor(s.tick / secs(SEASON.len)) + e.id;
-    for (let i = 0; i < 8; i++) {
-      const d = CALL_DIRS[(turn + i) % 8];
-      const x = Math.floor(cx + d[0] * TAME.callFrom);
-      const y = Math.floor(cy + d[1] * TAME.callFrom);
-      if (!walkable(s, x, y) || s.res[y * s.w + x] !== R_NONE || s.bldAt[y * s.w + x] !== 0) continue;
-      const a = spawnAnimal(s, x + 0.5, y + 0.5, kind);
-      s.events.push({ k: 'wildCry', id: a.id, kind, x: a.x, y: a.y });
-      break;
+    const near = { wolf: 0, boar: 0, mammoth: 0 };
+    for (const a of s.animals) if (wildBeast(a) && (a.x - cx) * (a.x - cx) + (a.y - cy) * (a.y - cy) <= TAME.callNear * TAME.callNear) near[a.kind]++;
+    // The beast comes from a side that turns with each call, the first open ground found going round.
+    const turn = Math.floor(s.tick / every) + e.id;
+    const tamed = p.tamed ?? [];
+    if (near.wolf + near.boar < TAME.callCap) {
+      // The season's kind, unless another kind the people lacks (untamed, and none waiting by the camp) is wanted more.
+      const kind: BeastKind = season < 2 ? 'boar' : 'wolf';
+      const other: BeastKind = kind === 'boar' ? 'wolf' : 'boar';
+      const lacks = (k: BeastKind) => !tamed.includes(k) && !near[k];
+      callTo(s, cx, cy, turn, !lacks(kind) && lacks(other) ? other : kind);
     }
+    if (near.mammoth < TAME.callMammoths && (!tamed.includes('mammoth') || winterCall)) callTo(s, cx, cy, turn + 4, 'mammoth');
   }
 }
 
-/** Eight ways round a camp, a unit apart along each axis (diagonals a little further out). */
-const CALL_DIRS: [number, number][] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+/** One beast called to a camp at (cx, cy), on the first open ground going round from `turn`. */
+function callTo(s: GameState, cx: number, cy: number, turn: number, kind: BeastKind): void {
+  for (let i = 0; i < 8; i++) {
+    const d = CALL_DIRS[(turn + i) % 8];
+    const x = Math.floor(cx + d[0] * TAME.callFrom);
+    const y = Math.floor(cy + d[1] * TAME.callFrom);
+    if (!walkable(s, x, y) || s.res[y * s.w + x] !== R_NONE || s.bldAt[y * s.w + x] !== 0) continue;
+    const a = spawnAnimal(s, x + 0.5, y + 0.5, kind);
+    s.events.push({ k: 'wildCry', id: a.id, kind, x: a.x, y: a.y });
+    return;
+  }
+}
+
+/** Eight ways round a camp, each a unit long, so a called beast lands well inside the ring it is counted in. */
+const CALL_DIRS: [number, number][] = [[1, 0], [0.7, 0.7], [0, 1], [-0.7, 0.7], [-1, 0], [-0.7, -0.7], [0, -1], [0.7, -0.7]];

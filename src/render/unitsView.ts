@@ -9,6 +9,7 @@ import { unitMaterial } from './materials';
 import { FLOOD_DEPTH, heightAt } from './terrain';
 import { isInund } from '../sim/water';
 import { isDeck } from '../sim/floating';
+import { animalRadius } from '../sim/animals';
 import { boarGeometry, deerGeometry, mammothGeometry, raiderGeometry, sheepGeometry, LEGION_MODEL, THRALL_MODEL, unitGeometry, wolfGeometry } from './unitModels';
 import { WATER_Y } from './water';
 
@@ -273,7 +274,9 @@ export class UnitsView {
       b.anim.setXYZ(i, leg, lunge, bob);
       this.v.set(x, gy + (an.kind === 'mammoth' ? 0.6 : 0.35), y).project(camera);
       if (this.v.z < 1) {
-        this.animalScreen.push({ id: an.id, sx: ((this.v.x + 1) / 2) * width, sy: ((1 - this.v.y) / 2) * height, r: Math.max(10, 400 / Math.max(1, camera.position.distanceTo(this.p))) });
+        // As wide as the beast, but never narrower than before, so a wolf is as easy to click as ever and a mammoth easier.
+        const r = Math.max(12, (Math.max(0.34, animalRadius(an)) * 1200) / Math.max(1, camera.position.distanceTo(this.p)));
+        this.animalScreen.push({ id: an.id, sx: ((this.v.x + 1) / 2) * width, sy: ((1 - this.v.y) / 2) * height, r });
       }
     }
     for (const id of this.deerAnims.keys()) if (!seen.has(id)) this.deerAnims.delete(id);
