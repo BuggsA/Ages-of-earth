@@ -704,8 +704,8 @@ function huntcamp(k: Kit, e: number, st: Style): void {
 
 // ---- Mine Shaft (#681) ---------------------------------------------------------------------------------
 
-/** The spoil heap's colours by seam (`SEAMS` order: stone, gold, salt, saltpetre, blood-iron, glowcaps, gems): the rock, and the flecks of what is dug. */
-const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'], ['#9a948a', '#eeeae0'], ['#8f8a7c', '#d9d2b0'], ['#5e5650', '#6a1f24'], ['#6a6458', '#b8f0c0'], ['#4e5a60', '#7fe0f0']];
+/** The spoil heap's colours by seam (`SEAMS` order: stone, gold, salt, saltpetre, blood-iron, glowcaps, gems, crystal): the rock, and the flecks of what is dug. */
+const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'], ['#9a948a', '#eeeae0'], ['#8f8a7c', '#d9d2b0'], ['#5e5650', '#6a1f24'], ['#6a6458', '#b8f0c0'], ['#4e5a60', '#7fe0f0'], ['#6e4a3e', '#e2d4ff']];
 
 /**
  * A shaft collar of squared timbers round a dark hole, the headframe over it, and a spoil heap beside it that shows the seam:
@@ -718,11 +718,13 @@ function shaft(k: Kit, e: number, st: Style, variant: number): void {
   // The variant carries the seam and, from the deep mine (#924 m1), the layer reached: `seam + 8 * depth`. The pithead
   // grows with depth, so a rival sees a deep mine from outside: a taller headframe, a bigger spoil heap, a winding shed.
   // Shored (#924 m2) adds 64: a stack of pit-props by the collar. A pump (#924 m4) adds 128 for a steam engine, 256 for a
-  // windmill pump: either works a rod down the shaft and spills the water it lifts into a trough by the collar.
+  // windmill pump: either works a rod down the shaft and spills the water it lifts into a trough by the collar. A fan (#924 m5)
+  // adds 512: a fan house with its great drum and flared chimney, drawing the hot deep's air up.
   const seam = variant % 8;
   const deep = Math.floor((variant % 64) / 8);
   const shored = (variant % 128) >= 64;
-  const pump = Math.floor(variant / 128);
+  const pump = Math.floor((variant % 512) / 128);
+  const fan = variant >= 512;
   const [rock, fleck] = SPOIL[Math.min(Math.max(seam, 0), SPOIL.length - 1)];
   // The collar and the hole.
   k.box(0.62, 0.03, 0.62, '#1c1712', -0.25, 0.02, -0.2);
@@ -770,13 +772,14 @@ function shaft(k: Kit, e: number, st: Style, variant: number): void {
     rope.rotation.y = 1.1;
     rope.rotation.z = 0.55;
   }
-  // The spoil heap: the seam shows in it, and it grows with every layer sunk.
-  const heap = 1 + deep * 0.28;
-  k.sphere(0.42 * heap, rock, 0.55, 0.0, 0.42).scale.set(1, 0.55, 1);
+  // The spoil heap: the seam shows in it, and it grows with every layer sunk. Where a fan house stands (#924 m5) the spoil is
+  // carted out to a smaller tip further forward, so the house shows behind it.
+  const heap = 1 + (fan ? 1 : deep) * 0.28;
+  k.sphere(0.42 * heap, rock, 0.55, 0.0, fan ? 0.62 : 0.42).scale.set(1, 0.55, 1);
   k.sphere(0.24 * heap, rock, 0.25, 0.0, 0.7).scale.set(1, 0.5, 1);
-  if (deep >= 1) k.sphere(0.2 * heap, rock, 0.85, 0.0, 0.05).scale.set(1, 0.5, 1);
+  if (deep >= 1 && !fan) k.sphere(0.2 * heap, rock, 0.85, 0.0, 0.05).scale.set(1, 0.5, 1);
   for (const [x, y, z] of [[0.45, 0.17, 0.3], [0.62, 0.15, 0.55], [0.72, 0.1, 0.25], [0.35, 0.12, 0.55], [0.22, 0.06, 0.75]] as [number, number, number][]) {
-    k.octa(0.055, fleck, x, y, z);
+    k.octa(0.055, fleck, x, y, z + (fan ? 0.2 : 0));
   }
   // Ore tubs on a short rail from the collar.
   for (const x of [-0.85, -0.45]) k.box(0.025, 0.02, 0.62, '#4a4a4e', x, 0, 0.6);
@@ -825,6 +828,26 @@ function shaft(k: Kit, e: number, st: Style, variant: number): void {
       sail.rotation.z = i * (Math.PI / 2) + 0.4;
     }
     k.box(0.025, 1.0, 0.025, WOOD, -0.6, 0.12, -0.42);
+  }
+  if (deep >= 4) {
+    // The hot deep: an ember glow down the hole, and the rock round the collar scorched.
+    k.box(0.4, 0.02, 0.4, '#e0682a', -0.25, 0.035, -0.2);
+    k.box(0.5, 0.012, 0.12, '#3a2a22', -0.25, 0.13, -0.6);
+  }
+  if (fan) {
+    // A Guibal fan house: a low brick house with the great fan's half-drum on its side, and the flared chimney, wide at the
+    // top, the foul air goes up; an air drift runs from the collar to it.
+    k.box(0.46, 0.4, 0.34, '#8a4a36', 0.62, 0, 0.1);
+    k.prism(0.5, 0.14, 0.38, st.roof, 0.62, 0.4, 0.1);
+    const drum = k.cyl(0.3, 0.3, 0.12, 12, '#4a4e54', 0.62, 0.3, -0.12);
+    drum.rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) {
+      const vane = k.box(0.04, 0.5, 0.02, '#8a8f96', 0.62, 0.3, -0.19);
+      vane.geometry.translate(0, -0.25, 0);
+      vane.rotation.z = i * (Math.PI / 4) + 0.2;
+    }
+    k.cyl(0.2, 0.08, 0.95, 6, '#7a5a44', 0.86, 0.4, 0.2);
+    k.box(0.5, 0.1, 0.12, '#6a5a50', 0.25, 0.02, 0.0);
   }
   // A pick and a shovel against the collar.
   const haft = k.cyl(0.018, 0.018, 0.55, 4, WOOD, 0.25, 0.0, -0.75);

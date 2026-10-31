@@ -1591,6 +1591,14 @@ export class View {
           this.cue('inrush', ev.x, ev.y, ev.owner === this.viewer ? (ev.why === 'inrush' ? 1 : 0.5) : 0.5);
           break;
         }
+        case 'choke': {
+          // The hot deep's air goes foul (#924 m5): a sallow, hot breath sighs up out of the pithead.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.3);
+          this.effects.burst(at, { count: 12, speed: 0.4, up: 1.4, life: 2.6, size: 0.18, grow: 2.8, gravity: -0.6, drag: 1, soft: true, colors: ['#b8a46a', '#9a8a5a', '#d8c48a'] });
+          this.cue('choke', ev.x, ev.y, ev.owner === this.viewer ? 1 : 0.5);
+          break;
+        }
         case 'blast': {
           // A Mine Shaft blasted a layer deeper (#924 m2): the charge goes off below, a muffled boom and smoke up the shaft.
           if (!this.sees(ev.x, ev.y)) break;

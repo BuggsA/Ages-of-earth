@@ -219,7 +219,7 @@ export function cutaway(s: GameState, b: Building, color: string, open: boolean)
   if (b.fan) {
     const run = fanning(s, b) ? '#9aa2aa' : '#6a5a50';
     const x = SX - 20;
-    parts.push(`<rect x="${SX + 1}" y="${TOP - 8}" width="2" height="${bottom - TOP + 6}" fill="${run}"/><path d="M${SX + 2} ${TOP - 8} L${x + 12} ${TOP - 9}" stroke="${run}" stroke-width="1.6"/><rect x="${x}" y="${TOP - 12}" width="12" height="7" fill="#6b5a4a"/><circle cx="${x + 6}" cy="${TOP - 10}" r="4.2" fill="#4a4e54" stroke="#2a2a2e" stroke-width="0.6"/><path d="M${x + 6} ${TOP - 14} v8 M${x + 2} ${TOP - 10} h8" stroke="#8a8f96" stroke-width="0.8" transform="rotate(${fanning(s, b) ? 45 : 20} ${x + 6} ${TOP - 10})"/><path d="M${x + 1} ${TOP - 12} L${x - 1} ${TOP - 21} H${x + 5} L${x + 4} ${TOP - 12}Z" fill="#7a5a44"/>`);
+    parts.push(`<rect x="${SX + 1}" y="${TOP - 8}" width="2" height="${bottom - TOP + 6}" fill="${run}"/><path d="M${SX + 2} ${TOP - 8} L${x + 12} ${TOP - 9}" stroke="${run}" stroke-width="1.6"/><rect x="${x}" y="${TOP - 12}" width="12" height="7" fill="#6b5a4a"/><circle cx="${x + 6}" cy="${TOP - 10}" r="4.2" fill="#4a4e54" stroke="#2a2a2e" stroke-width="0.6"/><path d="M${x + 6} ${TOP - 14} v8 M${x + 2} ${TOP - 10} h8" stroke="#8a8f96" stroke-width="0.8" transform="rotate(${fanning(s, b) ? 45 : 20} ${x + 6} ${TOP - 10})"/><path d="M${x + 1} ${TOP - 12} L${x - 1} ${TOP - 18} H${x + 5} L${x + 4} ${TOP - 12}Z" fill="#7a5a44"/>`);
   }
   // The pithead: a headframe and its wheel, taller the deeper the shaft.
   const tall = 10 + depth * 3;

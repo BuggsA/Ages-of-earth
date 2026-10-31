@@ -2087,6 +2087,14 @@ export class Hud {
             const uwhy = pumpProblem(s, b) ?? shortfall(p, cost);
             cmds.push({ key: 'F', pic: '', glyph: mill ? '🌬' : '🚂', title: mill ? 'Raise a windmill pump' : 'Raise a steam pump', desc: `${mill ? 'A windmill over the pithead, as on the polders of the Age of Dykes, works a pump' : 'A steam engine at the pithead works a pump'} that drains ${W.name.toLowerCase()} dry in ${SHAFT.drain} seconds and keeps it dry, while the pithead stands above ${Math.round(SHAFT.winchHurt * 100)}% of its health: a hurt pithead's pump stalls. Unpumped, the water rises from the day the shaft reaches it, to the roof in ${Math.round(fillOf(b, wet))} seconds on this ground. While it stands, every full basket there has up to a ${Math.round(SHAFT.inrush * 100)}% chance (with the water's height) of an inrush that floods the layer at once and drowns each miner at its face half the time; flooded, the layer takes no one until pumped.${mill ? '' : ` From the ${EPOCHS[SHAFT.pumpAge].name}; a people that walked the Age of Dykes raises a windmill pump in any age, for less.`}`, cost, ok: !uwhy, why: uwhy ?? undefined, run: () => (this.act.issue({ t: 'pump', p: viewer, building: b.id }), this.act.sound('queue')) });
           }
+          // The fan (#924 m5): shown from the layer above the hot one, until it stands.
+          const hot = hotLayer();
+          if (hot >= 0 && depthOf(b) >= hot - 1 && !b.fan) {
+            const H = STRATA[hot];
+            const fwhy = fanProblem(s, b) ?? shortfall(p, SHAFT.fan);
+            const forge = ventilated(s, b) ? ' A hot Vent Forge near this pithead draws its air already, while it stays hot.' : ' On the Deep Road, a shaft within reach of a hot Vent Forge of yours needs none: the forge draws its air, as a furnace drew the old pits\' air up their upcast shafts.';
+            cmds.push({ key: 'V', pic: '', glyph: '🌀', title: 'Raise a ventilation fan', desc: `A steam fan in a fan house at the pithead draws the foul air out of ${H.name.toLowerCase()}, so its air bears a full face of ${H.room} miners. Unventilated it bears ${SHAFT.bears}: each miner past that fouls it to the full in ${H.foul} seconds, and foul air overcomes those at the face, each ${Math.round(SHAFT.choke * 100)}% likely to die, the rest carried up hurt. By default the shaft sends down only as many as the air bears; send more by hand (click the layer) at your own risk. A hurt pithead's fan stalls, as its pump does. From the ${EPOCHS[SHAFT.fanAge].name}.${forge}`, cost: SHAFT.fan, ok: !fwhy, why: fwhy ?? undefined, run: () => (this.act.issue({ t: 'fan', p: viewer, building: b.id }), this.act.sound('queue')) });
+          }
         }
         // The seam a Mine Shaft digs (#681).
         if (b.type === 'shaft') {
@@ -2094,16 +2102,19 @@ export class Hud {
           // Gems (#924 m4) show from the layer above the wet deep, so they are looked for before it is reached.
           const can = seamsAt(s, b);
           if (!can.includes('gems') && depthOf(b) >= boundLayer(s, b, 'gems') - 1 && mineable(p, R_GOLD)) can.push('gems');
+          // So do crystal and glowcaps (#924 m5), from the layer above the hot deep.
+          for (const m of ['crystal', 'glowcap'] as const) if (!can.includes(m) && boundLayer(s, b, m) >= 0 && depthOf(b) >= boundLayer(s, b, m) - 1 && mineable(p, R_STONE)) can.push(m);
           can.forEach((m, i) => {
             const why = seamProblem(s, b, m);
             const name = SHAFT.seams[m].name;
             const deepAt = boundLayer(s, b, m);
-            const seamDesc = m === 'gems'
+            const hotDesc = m === 'crystal' || m === 'glowcap' ? `Set this shaft to dig ${m === 'crystal' ? 'crystal' : 'glowcaps'} in ${STRATA[deepAt].name.toLowerCase()}: ${veinLeft(b, deepAt, m)} of ${veinFull(b, deepAt, m)} left on this ground, at ${Math.round(digShare(s, b, m, deepAt) * 100)}% of an open deposit's pace, and only there, while ${m === 'crystal' ? 'it lasts' : 'they last'}. ${m === 'crystal' ? `Barter it at a Market: ${CRYSTAL.lot} crystal buys ${CRYSTAL.buys} food, wood or stone at the price it opened the match at, moving no price.` : `They are paid in with your rare ores: sold at a Market, ${ORE_TRADE.lot} for ${ORE_TRADE.gold.glowcap} gold, and counted toward the doors they open.`} The hot deep's air bears ${bearsAt(s, b, deepAt)} ${bearsAt(s, b, deepAt) === 1 ? 'miner' : 'miners'} now${ventilated(s, b) ? '' : ': raise a fan (V) for a full face'}; the rest wait. Cut off or spent, its miners dig the ground's best seam meanwhile.` : '';
+            const seamDesc = hotDesc || m === 'gems'
               ? `Set this shaft to cut gems in ${STRATA[deepAt].name.toLowerCase()}: ${veinLeft(b, deepAt, m)} of ${veinFull(b, deepAt, m)} left on this ground, at ${Math.round(digShare(s, b, m, deepAt) * 100)}% of an open deposit's pace, and only there, while they last and the layer is not under water. Sell them at a Market: a lot of ${GEMS.lot} fetches ${s.market.gems ?? GEMS.price} gold now. Flooded or spent, its miners dig the ground's best seam meanwhile.`
               : lodeOnly(s, b, m)
               ? `Set this shaft to dig the seam of ${name.toLowerCase()} the ground holds in ${STRATA[LODE.oreLayer].name.toLowerCase()}: ${veinLeft(b, LODE.oreLayer, m)} of it left, at ${Math.round(digShare(s, b, m, LODE.oreLayer) * 100)}% of an open deposit's pace, and only there, while it lasts. Its miners switch at the next trip.`
               : `Set this shaft to dig ${name.toLowerCase()} at ${Math.round(shaftShare(s, b, m) * 100)}% of an open deposit's pace${m === 'gold' || m === 'stone' ? '' : ', over the old workings of that vein'}. Its miners switch at the next trip.`;
-            cmds.push({ key: 'QWERTY'[i] ?? '', pic: '', glyph: m === 'gold' ? '🪙' : m === 'stone' ? '🪨' : m === 'gems' ? GEM_ICON : '💎', title: `Dig ${name.toLowerCase()}`, desc: seamDesc, ok: !why, why: why ?? undefined, on: now === m, run: () => (this.act.issue({ t: 'seam', p: viewer, building: b.id, seam: m }), this.act.sound('queue')) });
+            cmds.push({ key: 'QWERTY'[i] ?? '', pic: '', glyph: m === 'gold' ? '🪙' : m === 'stone' ? '🪨' : m === 'gems' ? GEM_ICON : m === 'crystal' ? CRYSTAL_ICON : m === 'glowcap' ? RARE_ICON.glowcap : '💎', title: `Dig ${name.toLowerCase()}`, desc: seamDesc, ok: !why, why: why ?? undefined, on: now === m, run: () => (this.act.issue({ t: 'seam', p: viewer, building: b.id, seam: m }), this.act.sound('queue')) });
           });
         }
         if (b.type === 'tower') {
@@ -2285,7 +2296,10 @@ function shaftLine(s: GameState, b: Building): string {
   // The wet deep (#924 m4): a flooded layer, or the water rising where none pumps, or a pump that has stalled.
   const wet = STRATA.findIndex((_, k) => k <= depthOf(b) && wetAt(k) && waterAt(b, k) > 0);
   const water = wet < 0 ? '' : floodedAt(b, wet) ? ` · ${STRATA[wet].name.toLowerCase()} flooded${b.pump ? (pumping(s, b) ? ': pumping' : ': pump stalled') : ': pump it (F)'}` : ` · water ${Math.round(waterAt(b, wet) * 100)}%${b.pump ? (pumping(s, b) ? ' and falling' : ': pump stalled') : ' and rising'}`;
-  const warn = (shut >= 0 ? ` · ${STRATA[shut].name.toLowerCase()} caved in: ${shutLeft(s, b, shut)}s` : winchHurt(s, b) ? ' · winch hurt: slow haul' : !safeAt(b, l) ? ' · unshored' : '') + water;
+  // The hot deep (#924 m5): its air, once it stands foul at all.
+  const hot = STRATA.findIndex((_, k) => k <= depthOf(b) && hotAt(k) && airAt(b, k) > 0);
+  const air = hot < 0 ? '' : ` · air ${Math.round(airAt(b, hot) * 100)}% foul${b.fan && !fanning(s, b) ? ': fan stalled' : ventilated(s, b) ? ' and clearing' : ': raise a fan (V)'}`;
+  const warn = (shut >= 0 ? ` · ${STRATA[shut].name.toLowerCase()} caved in: ${shutLeft(s, b, shut)}s` : winchHurt(s, b) ? ' · winch hurt: slow haul' : !safeAt(b, l) ? ' · unshored' : '') + water + air;
   return `<span data-tip="${tip}">${STRATA[l].name}: ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(digShare(s, b, seam, l) * 100)}% · ${vein > 0 ? `${Math.ceil(vein / 10) * 10} left` : 'vein spent'}</span> · ${miners}${warn}`;
 }
 
