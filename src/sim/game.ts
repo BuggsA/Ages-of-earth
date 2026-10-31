@@ -66,7 +66,7 @@ import { seraiStep, tollStep } from './passage';
 import { wheelyardStep } from './wheelyard';
 import { chantryStep } from './chantry';
 import { mercStep } from './merc';
-import { BLOOM, FINDS, KIN, LEVIATHANS, NOMAD, STEP_BACK } from './data';
+import { BLOOM, FINDS, KIN, LEVIATHANS, NOMAD, STEP_BACK, TEEM } from './data';
 import { ageDef, ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
@@ -251,6 +251,12 @@ export function createGame(setup: GameSetup): GameState {
       a.homeY = c.y;
     }
   }
+  // The teeming wild (`TEEM`) takes ids from a range of its own too, so it renumbers nothing.
+  map.teem.forEach((b, k) => {
+    const a = spawnAnimal(s, b.x, b.y, b.kind);
+    s.nextId--;
+    a.id = TEEM.idBase + k;
+  });
   // Finds (#588) take ids from a range of their own too, so they renumber nothing.
   if (map.finds.length) s.finds = map.finds.map((f, k) => ({ id: FINDS.idBase + k, x: f.x, y: f.y, kind: f.kind, key: f.key, near: f.near, by: -1 }));
   // Born on the move (#501): a nomad people starts with its flock about the camp.

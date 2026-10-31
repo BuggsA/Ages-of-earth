@@ -2681,9 +2681,10 @@ export interface BuildingStats {
  * Taming (the Age of the Wild, `docs/wild-road.md`, `src/sim/tame.ts`): a citizen within `reach` tiles of a wild wolf, boar or mammoth
  * sings to it for `secs[kind]` seconds and it becomes a beast of war of that people (`unit[kind]`). The beast stands calm for its tamer
  * while the song lasts and the tamer is within `calm` tiles (from the moment the tamer sets out); a beast hurt within `wary` seconds
- * won't take the hand. The call of the wild (`callWild`): a Wild people's Hunting Camps draw a beast each season (`call*`).
+ * won't take the hand. The call of the wild (`callWild`): a Wild people's Hunting Camps draw a beast every `callEvery` seconds, the kind
+ * not yet tamed first, up to `callCap` wolves and boars near each, and a mammoth while none is tamed (then each winter), `callMammoths` near (`call*`).
  * The computer takes the road on a coin of `aiTake` (raising the Hunting Camp that shows it once `aiClue` of the deed is in), tames within `aiNear` tiles of home (a wolf only with
- * `aiEscort` soldiers sent ahead at its pack), raises `aiDen` Dens and stays `aiStay` seconds before it climbs on.
+ * `aiEscort` soldiers sent ahead at its pack; once it holds `aiHerd` beasts, only a kind not yet tamed), raises `aiDen` Dens and stays `aiStay` seconds before it climbs on.
  */
 export const TAME = {
   reach: 1.1,
@@ -2692,11 +2693,14 @@ export const TAME = {
   secs: { wolf: 6, boar: 10, mammoth: 24 } as Record<'wolf' | 'boar' | 'mammoth', number>,
   unit: { wolf: 'warwolf', boar: 'tusker', mammoth: 'warmammoth' } as Record<'wolf' | 'boar' | 'mammoth', UnitType>,
   callAt: 20,
+  callEvery: 50,
   callFrom: 7,
   callNear: 10,
-  callCap: 2,
+  callCap: 3,
+  callMammoths: 1,
   aiNear: 40,
   aiEscort: 4,
+  aiHerd: 3,
   aiTake: 0.3,
   aiClue: 0.8,
   aiDen: 1,
@@ -4087,6 +4091,37 @@ export const WOLF = { hunt: 7, hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35
  */
 export const RAIDER = { hp: 30, walk: 0.8, run: 2.2, bite: 4, reach: 0.4, reload: 1.1, notice: 3.8, leash: 6.5, roam: 1.3, radius: 0.24, guards: 3, home: 22, fair: 10, spacing: 18,
   idBase: 1_000_000_000, loot: { gold: 120, food: 80, wood: 60 }, camps: { small: 1, medium: 2, large: 3 } as Record<MapSize, number> };
+
+/**
+ * The teeming wild (2026-10-30, the owner: "make animals just more plentiful in general … right now they feel very limited", then "it
+ * should likely be 3-4x animals"). On top of
+ * the wild above, laid last on dice of its own (`placeTeeming` in `mapgen.ts`, so every other part of a map is as it was), each town
+ * gets `mammoths` more mammoths about `mammothAt` tiles out, `boars` more boars by berries or woods `boarMin`–`boarMax` tiles out (no
+ * nearer: a boar closer in charges the woodcutters), and `dens` wolf dens of its own about `denAt` tiles out (past `AI_WILD.clear`, so a pack
+ * waits to be cleared or tamed by choice, and seldom finds the gatherers); and the open ground between the towns gets `open` more
+ * mammoths, boars and dens for the map's size. Their ids come from `idBase` up, so they renumber nothing, and they idle on dice of their
+ * own (`beastStep`), so they move no other roll of the match.
+ */
+export const TEEM = {
+  mammoths: 3,
+  mammothAt: 28,
+  boars: 1,
+  boarMin: 24,
+  boarMax: 32,
+  dens: 2,
+  denAt: 37,
+  open: {
+    mammoth: { small: 8, medium: 14, large: 20 } as Record<MapSize, number>,
+    boar: { small: 4, medium: 7, large: 10 } as Record<MapSize, number>,
+    den: { small: 4, medium: 7, large: 10 } as Record<MapSize, number>,
+  },
+  /**
+   * How far its dens and boars keep from relics, posts, ruins, landmarks and finds, so a walker sent there isn't eaten on arrival; and
+   * (`road`) from the straight way between any two towns, where armies, traders and priests walk.
+   */
+  clearOf: { wolf: 16, boar: 9, road: 8 },
+  idBase: 1_200_000_000,
+};
 
 // ---- Tidings, the market and starting resources ---------------------------------------------------
 
