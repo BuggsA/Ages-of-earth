@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed' | 'scald' | 'forgeCold' | 'forgeWarm' | 'tremor' | 'quake' | 'deepRumble' | 'greatQuake' | 'heave' | 'swallow' | 'caveIn' | 'inrush'
+  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed' | 'scald' | 'forgeCold' | 'forgeWarm' | 'tremor' | 'quake' | 'deepRumble' | 'greatQuake' | 'heave' | 'swallow' | 'caveIn' | 'inrush' | 'choke'
   | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise' | 'krakenGrip' | 'krakenRise' | 'webRot' | 'webBurn' | 'webGrown' | 'hawkCry';
 
 export interface SoundSettings {
@@ -871,6 +871,16 @@ export class Sound {
         this.noise(out, t + 0.3, { dur: 1.6, filter: 'lowpass', f: 1200, to: 300, q: 0.6, peak: 0.08, attack: 0.2 });
         this.tone(out, t + 0.05, { f: 70, to: 42, type: 'sine', dur: 1.1, peak: 0.2, attack: 0.03, lp: 180 });
         for (let i = 0; i < 5; i++) this.tone(out, t + 1.1 + i * 0.21 + (i % 2) * 0.06, { f: 900 + (i % 3) * 260, to: 1500 + (i % 2) * 300, type: 'sine', dur: 0.06, peak: 0.025 - i * 0.003, attack: 0.004 });
+        break;
+      case 'choke':
+        // The hot deep's air goes foul (#924 m5): a hot breath sighing up the shaft, then the pithead's signal bell struck three
+        // times fast, the old call to wind the cage up, ringing thin over a low hum.
+        this.noise(out, t, { dur: 1.3, filter: 'bandpass', f: 180, to: 620, q: 1.1, peak: 0.1, attack: 0.25 });
+        this.tone(out, t, { f: 62, to: 55, type: 'sine', dur: 1.6, peak: 0.08, attack: 0.2, lp: 200 });
+        for (let i = 0; i < 3; i++) {
+          this.tone(out, t + 0.7 + i * 0.22, { f: 1180, type: 'sine', dur: 0.5, peak: 0.07, attack: 0.003 });
+          this.tone(out, t + 0.7 + i * 0.22, { f: 2950, type: 'sine', dur: 0.22, peak: 0.025, attack: 0.002 });
+        }
         break;
       case 'swallow':
         // A district goes below at once (#904): a soft giving-way of earth, a long falling slide, and the hush as it closes over.

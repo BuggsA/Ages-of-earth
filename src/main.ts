@@ -11,7 +11,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { shortfall, wallLine } from './sim/commands';
-import { AGES, FAULT, LIVING, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, GEMS, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, FAULT, LIVING, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, GEMS, CRYSTAL, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { siteGrade } from './sim/shafts';
 import { coreProblem, coresOf, lodeName, patchOf } from './sim/lodes';
 import { coreTip } from './ui/cutaway';
@@ -2832,6 +2832,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(ev.why === 'inrush' ? `🌊 Inrush! The water broke into ${L.toLowerCase()}: ${toll}. It takes no one until it is pumped (F). (Space to look)` : `🌊 ${L} has flooded to the roof: ${toll}. Pump it (F) to dig there again. (Space to look)`, 'alert');
         }
         break;
+      case 'choke':
+        // The hot deep (#924 m5): foul air on your own shaft is its one toast.
+        if (ev.owner === viewer) {
+          lastAlert = { x: ev.x, y: ev.y };
+          const L = STRATA[ev.layer]?.name ?? 'A layer';
+          const toll = [ev.dead ? `${ev.dead} ${ev.dead === 1 ? 'miner' : 'miners'} overcome` : '', ev.up ? `${ev.up} carried up` : ''].filter(Boolean).join(', ') || 'nobody was at the face';
+          hud.toast(`🌀 Foul air! ${L} was crowded past what its air bears: ${toll}. Send fewer down, or raise a fan (V). (Space to look)`, 'alert');
+        }
+        break;
       case 'tideSwept':
         // A rival's Tide Gate scoured the flats your people stood on (#785).
         if (ev.by !== undefined && ev.by !== viewer && ev.owner === viewer && s.tick - sweptToldAt > TICK_HZ * 10) {
@@ -2999,6 +3008,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'trade':
         if (ev.owner === viewer && ev.res === 'gems' && ev.gold !== undefined) hud.toast(`💠 Sold ${GEMS.lot} gems for ${ev.gold} gold`, 'good');
+        if (ev.owner === viewer && ev.crystal) hud.toast(`Bartered ${CRYSTAL.lot} crystal for ${CRYSTAL.buys} ${ev.res}`, 'good');
         else if (ev.owner === viewer && !ev.buy && ev.res in RARE) {
           const ore = ev.res as keyof typeof ORE_TRADE.gold;
           hud.toast(`Sold ${ORE_TRADE.lot} ${RARE[ore].name.toLowerCase()} for ${ORE_TRADE.gold[ore]} gold`, 'good');

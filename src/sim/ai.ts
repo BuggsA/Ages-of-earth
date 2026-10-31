@@ -46,7 +46,7 @@ import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, freeShaft, nearestTemple, TILE_OF_RARE } from './units';
-import { blastProblem, deepenProblem, depthOf, floodedAt, propProblem, pumpCost, pumpProblem, pumping, seamOf, seamProblem, siteGrade, spentAt, wetLayer } from './shafts';
+import { blastProblem, deepenProblem, depthOf, fanProblem, floodedAt, hotLayer, propProblem, pumpCost, pumpProblem, pumping, seamOf, seamProblem, siteGrade, spentAt, ventilated, wetLayer } from './shafts';
 import { coreProblem, coresOf, drillingLeft, kindOf, lodeOfSite, patchOf } from './lodes';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findPath, findRoute } from './path';
@@ -70,7 +70,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_DEEP, AI_TEMPER, CORE, LODE, LODES, ROUTES, STRATA, TRUNK, type RouteId } from './data';
+import { AI_DEEP, AI_TEMPER, CORE, CRYSTAL, LODE, LODES, ROUTES, STRATA, TRUNK, type RouteId } from './data';
 import { AI_COVER, AI_RIDGE, TERRAIN } from './data';
 import { ridgeNear, standAt, woodsNear } from './terrain';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY, AI_MEWS } from './data';
@@ -612,6 +612,12 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   // Gems (#924 m4) are sold while a lot fetches `SHAFT.aiGems`: below it, they wait for the price to climb back.
   if ((p.gems ?? 0) >= GEMS.lot && (s.market.gems ?? GEMS.price) >= SHAFT.aiGems) {
     issue({ t: 'trade', p: p.id, res: 'gems', buy: false });
+    return;
+  }
+  // Crystal (#924 m5) has no other use: a lot is bartered at once for the stock it has least of.
+  if ((p.crystal ?? 0) >= CRYSTAL.lot) {
+    const r = (['wood', 'food', 'stone'] as const).reduce((a, k) => (p.res[k] < p.res[a] ? k : a));
+    issue({ t: 'trade', p: p.id, res: r, buy: true, crystal: true });
     return;
   }
   // On the Deep Road (#906) the next climb is paid in stone: gold beyond its own buys the stone, and food or wood piled past it is sold for gold.
@@ -3572,12 +3578,35 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
       done = true;
       break;
     }
+    // The hot deep (#924 m5): a fan goes up at a shaft that has reached it, or is about to, unless a hot Vent Forge draws its
+    // air already, with every stock to spare over the fan's price.
+    const hot = hotLayer();
+    for (const b of done || hot < 0 ? [] : v.buildings) {
+      if (b.type !== 'shaft' || fanProblem(s, b) || ventilated(s, b)) continue;
+      const seam = seamOf(s, b);
+      if (depthOf(b) < hot && !(seam && spentAt(b, seam) && !deepenProblem(s, b))) continue;
+      if (!RES.every((r) => !SHAFT.fan[r] || v.budget[r] >= SHAFT.fan[r]! + SHAFT.aiFan)) continue;
+      spend(v, SHAFT.fan);
+      issue({ t: 'fan', p: p.id, building: b.id });
+      done = true;
+      break;
+    }
+    // Crystal: a clever computer with a Market sets a shaft in the hot deep to it while its vein lasts, to barter for stock.
+    const market = AI_LEVELS[p.ai!].clever && v.buildings.some((m) => m.type === 'market' && m.built);
+    for (const b of done || hot < 0 || !market ? [] : v.buildings) {
+      if (b.type !== 'shaft' || !b.built || depthOf(b) < hot || seamOf(s, b) === 'crystal' || seamProblem(s, b, 'crystal')) continue;
+      issue({ t: 'seam', p: p.id, building: b.id, seam: 'crystal' });
+      done = true;
+      break;
+    }
     // Gems: a clever computer with a Market sets a pumped shaft in the wet deep to them while a lot fetches enough, and back to
     // gold when the price falls.
     const gems = s.market.gems ?? GEMS.price;
     for (const b of done || wet < 0 || !AI_LEVELS[p.ai!].clever || !v.buildings.some((m) => m.type === 'market' && m.built) ? [] : v.buildings) {
       if (b.type !== 'shaft' || !b.built || depthOf(b) < wet || !pumping(s, b) || floodedAt(b, wet)) continue;
       const now = seamOf(s, b);
+      // A shaft on crystal (#924 m5) stays on it while it lasts.
+      if (now === 'crystal') continue;
       if (now !== 'gems' && gems >= SHAFT.aiGems && !seamProblem(s, b, 'gems')) {
         issue({ t: 'seam', p: p.id, building: b.id, seam: 'gems' });
         done = true;

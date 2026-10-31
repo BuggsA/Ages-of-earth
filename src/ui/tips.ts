@@ -16,7 +16,7 @@ import { R_FISH, R_GOLD, R_STONE } from '../sim/types';
 import { isIdleCitizen } from './idle';
 import { laterTip, type Opening } from './opening';
 import { findResource } from '../sim/units';
-import { deepenProblem, seamOf, spentAt, waterAt, wetLayer } from '../sim/shafts';
+import { deepenProblem, depthOf, hotLayer, seamOf, spentAt, ventilated, waterAt, wetLayer } from '../sim/shafts';
 import { seasonAt } from '../sim/seasons';
 import { tideWaitLeft } from '../sim/tides';
 import { bared } from '../sim/tides';
@@ -99,6 +99,8 @@ const TIPS: Tip[] = [
   { id: 'deepen', when: (s, me) => buildings(s, me).some((b) => b.type === 'shaft' && b.built && !deepenProblem(s, b) && (() => { const m = seamOf(s, b); return !!m && (m === 'stone' || m === 'gold') && spentAt(b, m); })()), text: 'A <b>Mine Shaft</b>\'s vein is spent: it still digs, at the plain pace. Select it and <b>sink it deeper</b> (<kbd>D</kbd>) for a richer layer and room for more miners. The cut-away in the panel shows what each layer holds.' },
   // The wet deep (#924 m4): the water rises in a shaft that reaches it unpumped.
   { id: 'wetDeep', when: (s, me) => buildings(s, me).some((b) => b.type === 'shaft' && b.built && !b.pump && waterAt(b, wetLayer()) > 0), text: 'Water is rising in your <b>Mine Shaft</b>\'s wet deep. Dig its <b>gems</b> while it is low, and sell them at a Market, but every full basket risks an <b>inrush</b> that floods the layer and may drown its miners, likelier the higher it stands. Raise a <b>pump</b> (<kbd>F</kbd>) to drain it and keep it dry.' },
+  // The hot deep (#924 m5): a shaft that reaches it with no fan and no forge to draw its air.
+  { id: 'hotDeep', when: (s, me) => buildings(s, me).some((b) => b.type === 'shaft' && b.built && hotLayer() >= 0 && depthOf(b) >= hotLayer() && !ventilated(s, b)), text: 'Your <b>Mine Shaft</b> has reached the <b>hot deep</b>: <b>crystal</b>, which barters at a Market for the stock you lack at its old price, and <b>glowcaps</b>. Its air bears only one miner unventilated; crowd it by hand and the air goes <b>foul</b>, overcoming those at the face. Raise a <b>fan</b> (<kbd>V</kbd>) for a full face, or on the Deep Road sink it by a hot Vent Forge.' },
   { id: 'train', when: (s) => secsIn(s) > 25, text: 'More citizens mean a faster economy. Click your <b>Town Center</b> and press <kbd>Q</kbd> to train one (you can queue several).' },
   { id: 'house', when: (s, me) => s.players[me].pop >= s.players[me].cap - 2, text: 'You are nearly out of room. Select a citizen, press <kbd>B</kbd> then <kbd>E</kbd> to build a <b>house</b> (5 more people each).' },
   { id: 'idle', when: (s, me) => secsIn(s) > 60 && s.ents.some((e) => isIdleCitizen(e, me)), text: 'Someone is standing around: press <kbd>.</kbd> to find an idle citizen, or <kbd>Shift</kbd> + <kbd>.</kbd> to select every idle citizen and put them to work.' },

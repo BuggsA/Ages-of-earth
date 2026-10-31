@@ -24,7 +24,7 @@ Layers live in one table, `STRATA` in `data.ts`: each layer lists its seams, wei
 - **m2, props, cave-ins and blasting** (built, #929): shore a layer with wood, or dig unshored faster with a chance of a cave-in on the match's dice that kills its miners; from the Gunpowder Age blast a new layer open at once, with a chance of firedamp. The pithead is a target: a burnt winch strands the miners below.
 - **m3, the ground below differs** (built, #931): the seed lays strata by region (rich and poor ground, rare seams under some places only); the Prospector's Lodge takes **core samples** (a striped borehole column on the map); the U key shows the underground view.
 - **m4, the wet deep** (built, #937): gems, sold at the Market at a price every seller shares; water that rises in the layer from the day it is reached, with an inrush on the match's dice on a full basket; the pump (a steam engine from the Industrial Age, or a windmill pump for a people that walked the Age of Dykes), which a hurt pithead stalls. Wet ground floods faster, and a core shows it.
-- **m5, the hot deep:** glowcaps and crystal, beside the Deep Road (vents, Delvings and the Undercity may tunnel into a mine).
+- **m5, the hot deep** (built, #939): glowcaps and crystal, crystal bartered at the Market for a stock at its opening price; air that fouls with crowding (a gauge, answered by how many you send, and on the dice when it goes foul), the fan, and a hot Vent Forge that draws the air on the Deep Road; a flooded wet deep bars the way down.
 
 ## Rules for every step
 

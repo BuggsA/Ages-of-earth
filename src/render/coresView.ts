@@ -13,6 +13,7 @@ import { heightAt } from './terrain';
  * lode's colour on the faded ground.
  *
  * The wet deep (#924 m4): its band carries a ring of water, thicker the wetter the ground (`LODES[].wet`), and cut gems.
+ * The hot deep (#924 m5): its band glows ember at its foot, with pale crystal shards and glowcaps, more where the ground holds more.
  */
 const ORE_FLECK: Partial<Record<SeamId, string>> = { salt: '#f4f6f8', saltpetre: '#b8e0d0', bloodiron: '#c0303a' };
 
@@ -39,6 +40,17 @@ function coreModel(code: number): THREE.BufferGeometry {
       k.cyl(0.145, 0.145, Math.min(band - 0.02, 0.05 * lode.wet), 6, '#3a8ab8', 0, y, 0);
       const gems = Math.min(4, Math.max(1, Math.round(((STRATA[l].veins.gems ?? 0) * lode.gems) / 150)));
       for (let g = 0; g < gems; g++) k.octa(0.035, '#7fe0f0', 0.13 * (g % 2 ? -1 : 1), y + 0.08 + (g * 0.04) % (band - 0.1), 0.05 * (g - 1.5));
+    }
+    if (STRATA[l].foul > 0) {
+      // The hot deep: an ember ring at the band's foot, crystal shards standing out of it, and a glowcap or two.
+      k.cyl(0.14, 0.14, 0.04, 6, '#e0682a', 0, y, 0);
+      const shards = Math.min(4, Math.max(1, Math.round(((STRATA[l].veins.crystal ?? 0) * lode.crystal) / 120)));
+      for (let g = 0; g < shards; g++) {
+        const shard = k.box(0.025, 0.09, 0.025, '#e2d4ff', 0.13 * (g % 2 ? 1 : -1), y + 0.05, 0.06 * (g - 1.5));
+        shard.rotation.z = (g % 2 ? -1 : 1) * 0.35;
+      }
+      const caps = Math.min(3, Math.max(1, Math.round(((STRATA[l].veins.glowcap ?? 0) * lode.caps) / 120)));
+      for (let g = 0; g < caps; g++) k.sphere(0.03, '#b8f0c0', 0.05 * (g - 1), y + band - 0.05, 0.13).scale.set(1, 0.6, 1);
     }
   }
   // The cap, in the lode's colour, and a little marker peg.
